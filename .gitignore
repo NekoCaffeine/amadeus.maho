@@ -1,0 +1,7 @@
+/logs/
+/dump/
+/build/distributive/
+/build/output/
+hs_err*
+*.iml
+/build/compiled-script/
