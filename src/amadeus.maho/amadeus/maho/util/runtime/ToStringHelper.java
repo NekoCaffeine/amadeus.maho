@@ -80,6 +80,8 @@ public interface ToStringHelper {
         
     }
     
+    String renderToString = "toString()"; // must be const
+    
     FunctionChain<Class<?>, Function<Object, String>> defaultSupplyChain = new FunctionChain<Class<?>, Function<Object, String>>().add(target -> target.map(Generator.instance()::generate));
     
     Switch<Class<?>, Function<Object, String>> initSwitch = new Switch<Class<?>, Function<Object, String>>().whenDefaultF(defaultSupplyChain()::applyNullable);

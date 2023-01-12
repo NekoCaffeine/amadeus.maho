@@ -10,7 +10,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntPredicate;
 import java.util.function.IntUnaryOperator;
 
+import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.misc.Environment;
@@ -23,7 +25,7 @@ public interface DebugHelper {
     @Target(ElementType.TYPE)
     @Retention(RetentionPolicy.CLASS)
     @interface Renderer {
-
+        
         String value() default "";
         
         String childrenArray() default "";
@@ -32,7 +34,28 @@ public interface DebugHelper {
         
     }
     
-    boolean inDebug = Environment.local().lookup("maho.debug.helper", JDWP.isJDWPEnable()), showBreakpoint = Environment.local().lookup("maho.debug.show.breakpoint", inDebug);
+    interface CodePathPerception {
+        
+        String renderCodePath = "codePathString()"; // must be const
+        
+        @Setter
+        @Nullable CodePath codePath();
+        
+        default String codePathString() = codePath()?.toString() ?? "";
+        
+    }
+    
+    @EqualsAndHashCode
+    record CodePath(Class<?> clazz, String fieldName) {
+    
+        @Override
+        public String toString() = clazz.getCanonicalName() + "#" + fieldName;
+        
+    }
+    
+    boolean
+            inDebug              = Environment.local().lookup("maho.debug.helper", JDWP.isJDWPEnable()),
+            showBreakpoint       = Environment.local().lookup("maho.debug.show.breakpoint", inDebug());
     
     Map<Object, Object> globalContext = new ConcurrentHashMap<>();
     

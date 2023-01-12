@@ -104,7 +104,7 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
         return capture;
     }
     
-    private void let(final int[] indexes, final Env<AttrContext> env, final JCTree.JCFieldAccess access, final Symbol.ClassSymbol symbol, final Symbol.ClassSymbol targetSymbol) {
+    private void let(final int indexes[], final Env<AttrContext> env, final JCTree.JCFieldAccess access, final Symbol.ClassSymbol symbol, final Symbol.ClassSymbol targetSymbol) {
         final @Nullable List<? extends Symbol.RecordComponent> components = symbol.getRecordComponents();
         final int pos = maker.pos;
         final JCTree.JCCompilationUnit topLevel = maker.toplevel;
