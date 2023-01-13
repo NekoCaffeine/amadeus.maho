@@ -49,6 +49,7 @@ import com.sun.tools.javac.comp.TypeEnter;
 import com.sun.tools.javac.jvm.ByteCodes;
 import com.sun.tools.javac.jvm.ClassReader;
 import com.sun.tools.javac.jvm.Code;
+import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.jvm.Items;
 import com.sun.tools.javac.jvm.PoolConstant;
 import com.sun.tools.javac.main.JavaCompiler;
@@ -607,6 +608,7 @@ public class JavacContext {
     ArgumentAttr         argumentAttr;
     DeferredAttr         deferredAttr;
     Symtab               symtab;
+    Gen                  gen;
     Lint                 lint;
     Log                  log;
     JCDiagnostic.Factory diagnostic;
@@ -642,6 +644,7 @@ public class JavacContext {
         argumentAttr = ArgumentAttr.instance(context);
         deferredAttr = DeferredAttr.instance(context);
         symtab = Symtab.instance(context);
+        gen = Gen.instance(context);
         lint = Lint.instance(context);
         log = Log.instance(context);
         diagnostic = JCDiagnostic.Factory.instance(context);

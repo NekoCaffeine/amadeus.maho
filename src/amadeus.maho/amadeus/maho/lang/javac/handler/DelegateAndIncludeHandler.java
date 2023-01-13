@@ -3,7 +3,6 @@ package amadeus.maho.lang.javac.handler;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
@@ -185,17 +184,7 @@ public class DelegateAndIncludeHandler extends BaseSyntaxHandler {
                                     access.selected = symbol instanceof Symbol.MethodSymbol methodSymbol ? apply(maker, maker.Select(access.selected, symbol), methodSymbol) : maker.Select(access.selected, symbol);
                                     throw new ReAttrException(access, access);
                                 }
-                                default                                 -> {
-                                    final @Nullable Supplier<JCTree.JCExpression> suppliers[] = OperatorOverloadingHandler.context.get();
-                                    if (suppliers != null) {
-                                        final Supplier<JCTree.JCExpression> supplier = suppliers[0];
-                                        suppliers[0] = () -> {
-                                            final JCTree.JCExpression expression = supplier.get();
-                                            return symbol instanceof Symbol.MethodSymbol methodSymbol ? apply(maker, maker.Select(expression, symbol), methodSymbol) : maker.Select(expression, symbol);
-                                        };
-                                    } else
-                                        throw new UnsupportedOperationException(tree.getClass() + " - " + tree);
-                                }
+                                default                                 -> throw new UnsupportedOperationException(tree.getClass() + " - " + tree);
                             }
                         }
                     }));

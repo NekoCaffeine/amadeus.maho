@@ -23,6 +23,7 @@ import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.Resolve;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeInfo;
+import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 
@@ -36,6 +37,7 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.DynamicAnnotationHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
+import amadeus.maho.lang.javac.handler.base.HandlerMarker;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformMetadata;
@@ -119,7 +121,7 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
             final Symbol bestSoFar,
             final boolean allowBoxing,
             final boolean useVarargs) {
-        if (capture.kind == Kinds.Kind.MTH || capture.kind == Kinds.Kind.AMBIGUOUS || site.isErroneous() || argTypes.stream().anyMatch(Type::isErroneous) || OperatorOverloadingHandler.context.get() != null)
+        if (capture.kind == Kinds.Kind.MTH || capture.kind == Kinds.Kind.AMBIGUOUS || site.isErroneous() || argTypes.stream().anyMatch(Type::isErroneous) || !HandlerMarker.attrContext().contains(env.tree))
             return capture;
         final ExtensionHandler instance = instance(ExtensionHandler.class);
         if (instance.extensionProviders.isEmpty())
@@ -127,7 +129,7 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         final Object resultInfo = resultInfo(instance.attr);
         if (resultInfo == null)
             return capture;
-        final List<Type> extArgTypes = env.tree instanceof JCTree.JCMemberReference ? argTypes : argTypes == null ? List.of(site) : argTypes.prepend(site);
+        final List<Type> extArgTypes = argTypes.prepend(site);
         final Type pt = pt(resultInfo);
         @Nullable Runnable rollback = null;
         if (pt instanceof Type.ForAll forAll) {
@@ -137,7 +139,7 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                 methodType.argtypes = rollbackArgTypes;
                 forAll.tvars = rollbackTvars;
             };
-            methodType.argtypes = env.tree instanceof JCTree.JCMemberReference ? methodType.argtypes : methodType.argtypes == null ? List.of(site) : methodType.argtypes.prepend(site);
+            methodType.argtypes = methodType.argtypes.prepend(site);
         }
         Symbol result = capture;
         // Lookup available method from classes marked by @Extension.
@@ -154,18 +156,30 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                 }
             }
         }
-        if (result.kind == Kinds.Kind.MTH) {
+        if (result.kind == Kinds.Kind.MTH && result instanceof Symbol.MethodSymbol methodSymbol) {
+            final TreeMaker maker = instance.maker.at(env.tree.pos);
             if (env.tree instanceof JCTree.JCMethodInvocation invocation) {
                 invocation.meth.type = result.type;
                 TreeInfo.setSymbol(invocation.meth, result);
-                final List<JCTree.JCExpression> args = invocation.args.prepend(invocation.meth instanceof JCTree.JCFieldAccess access ? access.selected : instance.maker.at(invocation.pos).Ident(instance.names._this));
-                final JCTree.JCMethodInvocation resolved = instance.maker.at(invocation.pos).Apply(invocation.typeargs, instance.maker.at(invocation.meth.pos).QualIdent(result), args);
+                final List<JCTree.JCExpression> args = invocation.args.prepend(invocation.meth instanceof JCTree.JCFieldAccess access ? access.selected : maker.Ident(instance.names._this));
+                final JCTree.JCMethodInvocation resolved = maker.Apply(invocation.typeargs, maker.QualIdent(result), args);
                 throw new ReAttrException(() -> invocation.type = resolved.type, resolved, invocation);
             } else if (env.tree instanceof JCTree.JCMemberReference reference) {
-                reference.sym = result;
-                reference.referentType = result.type;
+                List<JCTree.JCVariableDecl> decls = methodSymbol.params.tail.stream().map(parameter -> maker.VarDef(maker.Modifiers(0L), parameter.name, maker.Type(parameter.type), null)).collect(List.collector());
+                List<JCTree.JCExpression> args = decls.map(decl -> maker.Ident(decl.name));
+                final @Nullable Type type = ((Privilege) instance.deferredAttr.attribSpeculative(reference.expr, env.dup(reference.expr), (Privilege) instance.attr.unknownExprInfo)).type;
+                if (type != null) {
+                    if (!type.isErroneous())
+                        args = args.prepend(reference.expr);
+                    else {
+                        final Name $ref = instance.name("$ref");
+                        decls = decls.prepend(maker.VarDef(maker.Modifiers(0L), $ref, maker.Type(site), null));
+                        args = args.prepend(maker.Ident($ref));
+                    }
+                    final JCTree.JCLambda lambda = maker.Lambda(decls, maker.Apply(List.nil(), maker.QualIdent(result), args));
+                    throw new ReAttrException(() -> reference.type = lambda.type, lambda, reference);
+                }
             }
-            return result;
         } else if (rollback != null) // Failed to look up a suitable result from the extension method.
             rollback.run(); // If the generic parameter list is modified, roll back to the previous state.
         return capture;

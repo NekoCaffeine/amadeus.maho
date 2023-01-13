@@ -429,7 +429,7 @@ public class PrivilegeHandler extends JavacContext {
             final boolean allowBoxing, final boolean useVarargs) = name.table.names.init == name ? findNew(capture, $this, env, site, argTypes, typeArgTypes, allowBoxing, useVarargs) : capture;
     
     private static Symbol findNew(final Symbol capture, final Resolve $this, final Env<AttrContext> env, final Type site, final List<Type> argTypes, final List<Type> typeArgTypes, final boolean allowBoxing, final boolean useVarargs) {
-        if (capture.kind == MTH || OperatorOverloadingHandler.context.get() != null)
+        if (capture.kind == MTH)
             return capture;
         final PrivilegeHandler handler = instance(PrivilegeHandler.class);
         Symbol bestSoFar = capture;

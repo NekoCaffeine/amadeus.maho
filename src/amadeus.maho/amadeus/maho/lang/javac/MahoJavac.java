@@ -18,9 +18,11 @@ import com.sun.tools.javac.code.TypeMetadata;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.DeferredAttr;
 import com.sun.tools.javac.jvm.ClassWriter;
+import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.jvm.PoolConstant;
 import com.sun.tools.javac.jvm.PoolWriter;
 import com.sun.tools.javac.main.Option;
+import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Log;
@@ -36,6 +38,8 @@ import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.vm.JDWP;
+
+import static amadeus.maho.util.bytecode.Bytecodes.PUTFIELD;
 
 @TransformProvider
 public class MahoJavac {
@@ -68,6 +72,9 @@ public class MahoJavac {
         }
         return { index };
     }
+    
+    @Hook(at = @At(field = @At.FieldInsn(opcode = PUTFIELD, name = "varDebugInfo")), capture = true, metadata = @TransformMetadata(disable = "disable.force.var.debug"))
+    private static boolean _init_(final boolean capture, final Gen $this, final Context context) = true;
     
     // Emit parameter names for lambda expressions when javac has "-parameters" in its parameters, See details: https://bugs.openjdk.java.net/browse/JDK-8138729
     @Redirect(targetClass = ClassWriter.class, selector = "writeMethod", slice = @Slice(@At(method = @At.MethodInsn(name = "isLambdaMethod"))),

@@ -37,7 +37,7 @@ public class ValueBasedHandler extends JavacContext {
                         final TreeMaker maker = instance.maker;
                         final JCTree.JCMethodInvocation apply = maker.Apply(List.nil(), maker.Select(instance.IdentQualifiedName(ObjectHelper.class), instance.name(eq ? "valueBasedEquals" : "valueBasedNotEquals")), List.of(tree.lhs, tree.rhs));
                         throw new ReAttrException(apply, tree);
-                    } else
+                    } else if (tree.lhs.type.tsym != instance.types.boxedClass(tree.rhs.type))
                         instance.log.error(JCDiagnostic.DiagnosticFlag.MANDATORY, tree, new JCDiagnostic.Error(MahoJavac.KEY, "value.based.compare.inconsistency", tree.lhs.type, tree.rhs.type));
                 }
             }

@@ -1,6 +1,7 @@
 package amadeus.maho.lang.javac.handler;
 
 import java.util.EnumSet;
+import java.util.LinkedList;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -24,6 +25,7 @@ import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
+import amadeus.maho.lang.javac.handler.base.HandlerMarker;
 import amadeus.maho.lang.javac.handler.base.Syntax;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
@@ -232,8 +234,6 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         return lowerExpr;
     }
     
-    public static final ThreadLocal<Supplier<JCTree.JCExpression>[]> context = { };
-    
     @Privilege
     public final JCTree.JCExpression methodInvocation(final Name name, final Env<AttrContext> env, final JCTree.JCExpression source, final Supplier<JCTree.JCExpression>... expressions) {
         final List<JCTree.JCExpression> args = List.from(expressions).map(Supplier::get);
@@ -244,10 +244,11 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         localEnv.info.pendingResolutionPhase = null;
         final Attr.ResultInfo resultInfo = attr.new ResultInfo(kind, methodPrototype, attr.resultInfo.checkContext);
         final Type methodType = discardDiagnostic(() -> {
+            final List<JCTree.JCExpression> realArgs = List.from(expressions).map(Supplier::get);
+            final JCTree.JCMethodInvocation realApply = maker.at(source.pos).Apply(List.nil(), maker.Select(realArgs.head, name), realArgs.tail);
+            final LinkedList<JCTree> attrContext = HandlerMarker.attrContext();
+            attrContext << (localEnv.tree = realApply);
             try {
-                final List<JCTree.JCExpression> realArgs = List.from(expressions).map(Supplier::get);
-                final JCTree.JCMethodInvocation realApply = maker.at(source.pos).Apply(List.nil(), maker.Select(realArgs.head, name), realArgs.tail);
-                localEnv.tree = realApply;
                 return attr.attribTree(realApply.meth, localEnv, resultInfo);
             } catch (final ReAttrException e) {
                 if (e.breakTree == localEnv.tree) {
@@ -256,7 +257,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                         e.tree = new OperatorInvocation(invocation.meth, invocation.args, source);
                 }
                 throw e;
-            }
+            } finally { attrContext--; }
         });
         if (localEnv.tree instanceof JCTree.JCMethodInvocation overloading) {
             if (!methodType.isErroneous()) {
