@@ -25,9 +25,9 @@ public class DebugHelperHandler extends JavacContext {
             codePathSetter = name(LookupHelper.<DebugHelper.CodePathPerception, DebugHelper.CodePath>methodV2(DebugHelper.CodePathPerception::codePath).getName());
     
     @Hook(at = @At(method = @At.MethodInsn(name = "initEnv")))
-    private static void visitVarDef(final Attr $this, final JCTree.JCVariableDecl tree) = instance(DebugHelperHandler.class).markJumpTarget(tree);
+    private static void visitVarDef(final Attr $this, final JCTree.JCVariableDecl tree) = instance(DebugHelperHandler.class).markCodePath(tree);
     
-    public void markJumpTarget(final JCTree.JCVariableDecl tree) {
+    public void markCodePath(final JCTree.JCVariableDecl tree) {
         if (tree.sym != null && tree.sym.owner instanceof Symbol.ClassSymbol && tree.init instanceof JCTree.JCNewClass newClass &&
                 types.isAssignable(attr.attribType(newClass.clazz, env(attr)), symtab.enterClass(mahoModule, CodePathPerceptionName).type)) {
             final JCTree.JCNewClass codePath = maker.at(newClass.pos).NewClass(null, List.nil(), IdentQualifiedName(DebugHelper.CodePath.class), List.of(

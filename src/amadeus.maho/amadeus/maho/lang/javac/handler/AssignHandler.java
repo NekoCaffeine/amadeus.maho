@@ -52,7 +52,7 @@ public class AssignHandler {
     
     public static void lower(final JCTree.JCVariableDecl tree, final JCTree.JCNewArray newArray, final Type type) {
         if (!type.isPrimitiveOrVoid() && !type.isErroneous()) {
-            final TreeMaker maker = instance().maker;
+            final TreeMaker maker = instance().maker.at(newArray.pos);
             if (type instanceof Type.ClassType classType)
                 tree.init = maker.NewClass(null, List.nil(), dropTypeArguments(maker.Type(classType)), newArray.elems, null);
         }
@@ -73,7 +73,7 @@ public class AssignHandler {
             final Env<AttrContext> env = env($this);
             final Type type = $this.attribExpr(tree.lhs, env.dup(tree));
             if (!type.isPrimitiveOrVoid() && !type.isErroneous()) {
-                final TreeMaker maker = instance().maker;
+                final TreeMaker maker = instance().maker.at(tree.rhs.pos);
                 if (type instanceof Type.ClassType classType)
                     tree.rhs = maker.NewClass(null, List.nil(), dropTypeArguments(maker.Type(classType)), newArray.elems, null);
             }
@@ -90,7 +90,7 @@ public class AssignHandler {
                 assert type != null;
                 if (!type.isPrimitiveOrVoid() && !type.isErroneous()) {
                     final JavacContext context = instance();
-                    final TreeMaker maker = context.maker;
+                    final TreeMaker maker = context.maker.at(tree.expr.pos);
                     if (type instanceof Type.ArrayType arrayType)
                         newArray.elemtype = maker.Type(arrayType.elemtype);
                     else if (type instanceof Type.ClassType classType)
