@@ -12,6 +12,7 @@ import java.util.function.IntUnaryOperator;
 
 import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
@@ -46,12 +47,15 @@ public interface DebugHelper {
     }
     
     @EqualsAndHashCode
-    record CodePath(Class<?> clazz, String fieldName) {
+    record CodePath(Class<?> clazz, String fieldName, @Nullable Object debugInfo) {
     
         @Override
         public String toString() = clazz.getCanonicalName() + "#" + fieldName;
         
     }
+    
+    @NoArgsConstructor
+    class NotImplementedError extends Error { }
     
     boolean
             inDebug              = Environment.local().lookup("maho.debug.helper", JDWP.isJDWPEnable()),
@@ -82,6 +86,11 @@ public interface DebugHelper {
     static <T> T breakpointThenError() {
         breakpoint();
         throw new AssertionError();
+    }
+    
+    static <T> T notYetImplemented() {
+        breakpoint();
+        throw new NotImplementedError("Not yet implemented");
     }
     
     static void breakpointWhen(final boolean flag = Environment.assertState()) {

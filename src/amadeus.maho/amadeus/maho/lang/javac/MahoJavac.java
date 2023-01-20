@@ -21,6 +21,7 @@ import com.sun.tools.javac.jvm.ClassWriter;
 import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.jvm.PoolConstant;
 import com.sun.tools.javac.jvm.PoolWriter;
+import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
@@ -40,6 +41,7 @@ import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.vm.JDWP;
 
 import static amadeus.maho.util.bytecode.Bytecodes.PUTFIELD;
+import static com.sun.tools.javac.main.JavaCompiler.CompilePolicy.SIMPLE;
 
 @TransformProvider
 public class MahoJavac {
@@ -47,6 +49,9 @@ public class MahoJavac {
     public static final String KEY = "amadeus.maho.lang";
     
     private static final boolean debugFlag = System.getProperty("amadeus.maho.lang.debug") != null || JDWP.isJDWPEnable();
+    
+    @Hook(value = JavaCompiler.CompilePolicy.class, isStatic = true)
+    private static Hook.Result decode(final String option) = { SIMPLE };
     
     @Hook
     private static void initPlugins(final BasicJavacTask $this, final Set<List<String>> pluginOpts) {
