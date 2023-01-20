@@ -47,7 +47,7 @@ public interface DebugHelper {
     }
     
     @EqualsAndHashCode
-    record CodePath(Class<?> clazz, String fieldName, @Nullable Object debugInfo) {
+    record CodePath(Class<?> clazz, String fieldName, @Nullable Object debugInfo = null) {
     
         @Override
         public String toString() = clazz.getCanonicalName() + "#" + fieldName;
