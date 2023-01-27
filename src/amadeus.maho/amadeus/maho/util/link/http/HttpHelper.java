@@ -1,27 +1,10 @@
 package amadeus.maho.util.link.http;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.Method;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Type;
 
 import amadeus.maho.lang.Extension;
-import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.transform.mark.Web;
-import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.function.FunctionHelper;
-
-import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
 
 public interface HttpHelper {
     
@@ -280,59 +263,6 @@ public interface HttpHelper {
                 X_UA_Compatible                  = "X-UA-Compatible",
                 X_XSS_Protection                 = "X-XSS-Protection";
         
-    }
-    
-    enum QueryType {
-        URLENCODED, X_WWW_FORM_URLENCODED, JSON, FORM_DATA
-    }
-    
-    String DEFAULT_DOMAIN = "default";
-    
-    Map<String, HttpClient> domain_context = new ConcurrentHashMap<>();
-    
-    static HttpClient defaultHttpClient() = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofMillis(3000))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .version(HttpClient.Version.HTTP_2)
-            .build();
-    
-    static HttpClient contextHttpClient(final String context) = domain_context.computeIfAbsent(context, FunctionHelper.abandon(HttpHelper::defaultHttpClient));
-    
-    static void contextHttpClient(final String context, final HttpClient httpClient) = domain_context.put(context, httpClient);
-    
-    Handle make = {
-            H_INVOKESTATIC,
-            ASMHelper.className(HttpHelper.class),
-            "make",
-            Type.getMethodDescriptor(
-                    ASMHelper.TYPE_OBJECT,
-                    ASMHelper.TYPE_METHOD_HANDLES_LOOKUP,
-                    ASMHelper.TYPE_STRING,
-                    ASMHelper.TYPE_CLASS,
-                    ASMHelper.TYPE_STRING,
-                    ASMHelper.TYPE_METHOD_TYPE),
-            true
-    };
-    
-    @SneakyThrows
-    static Object make(final MethodHandles.Lookup lookup, final String name, final Class<?> type, final String methodName, final MethodType methodType) {
-        final Method method = lookup.lookupClass().getDeclaredMethod(methodName, methodType.parameterArray());
-        final @Nullable Web.Request request = method.getAnnotation(Web.Request.class);
-        if (request == null)
-            throw new IllegalArgumentException(method + " missing @Web.Request");
-        final HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(request.value()))
-                .timeout(Duration.ofMillis(request.timeout()))
-                .version(request.version());
-        if (request.headers().length > 0)
-            builder.headers(request.headers());
-        if (type == HttpRequest.class)
-            return builder
-                    .method(request.method(), HttpRequest.BodyPublishers.noBody())
-                    .build();
-        if (type == HttpRequest.Builder.class)
-            return builder;
-        throw new IllegalArgumentException("Illegal type: " + type);
     }
     
 }

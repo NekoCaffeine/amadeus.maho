@@ -2,6 +2,7 @@ package amadeus.maho.util.data;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -9,7 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.function.IntPredicate;
+import java.util.stream.IntStream;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
@@ -19,6 +23,7 @@ import amadeus.maho.lang.VisitorChain;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.dynamic.DynamicObject;
 import amadeus.maho.util.language.parsing.ParseException;
+import amadeus.maho.util.runtime.TypeHelper;
 
 import static amadeus.maho.util.language.parsing.Tokenizer.*;
 
@@ -45,6 +50,143 @@ public interface Json {
         public void visitKey(final String key);
         
         public void visitValue(final @Nullable Object value);
+        
+    }
+    
+    @FieldDefaults(level = AccessLevel.PROTECTED)
+    class Writer extends Visitor implements CharSequence {
+        
+        final StringBuilder builder = { 1 << 12 };
+        
+        @Override
+        public void beginObject() = builder.append('{');
+        
+        @Override
+        public void endObject() = builder.append('}');
+        
+        @Override
+        public void beginArray() = builder.append('[');
+        
+        @Override
+        public void endArray() = builder.append(']');
+        
+        @Override
+        public void visitKey(final String key) = builder.append('"').append(key).append('"').append(':');
+        
+        @Override
+        @SneakyThrows
+        public void visitValue(final Object value) = switch (value) {
+            case null                  -> builder.append("null");
+            case DynamicObject dynamic -> {
+                switch (dynamic) {
+                    case DynamicObject.NullUnit ignored      -> builder.append("null");
+                    case DynamicObject.StringUnit stringUnit -> builder.append('"').append(stringUnit.asString()).append('"');
+                    case DynamicObject.ArrayUnit arrayUnit   -> {
+                        beginArray();
+                        final List<DynamicObject> list = arrayUnit.asList();
+                        final int length = list.size();
+                        if (length > 0) {
+                            int index = 0;
+                            visitValue(list[0]);
+                            while (++index < length) {
+                                builder.append(',');
+                                visitValue(list[index]);
+                            }
+                        }
+                        endArray();
+                    }
+                    case DynamicObject.MapUnit mapUnit       -> {
+                        beginObject();
+                        final boolean p_flag[] = { false };
+                        mapUnit.asMap().forEach((name, object) -> {
+                            if (p_flag[0])
+                                builder.append(',');
+                            else
+                                p_flag[0] = true;
+                            visitKey(name);
+                            visitValue(object);
+                        });
+                        endObject();
+                    }
+                    default                                  -> builder.append(dynamic);
+                }
+            }
+            default       -> {
+                final Class<?> type = value.getClass();
+                if (TypeHelper.isSimple(type) || Number.class.isAssignableFrom(type))
+                    builder.append(value);
+                else if (CharSequence.class.isAssignableFrom(type))
+                    builder.append('"').append(value).append('"');
+                else if (type.isArray()) {
+                    beginArray();
+                    final int length = Array.getLength(value);
+                    if (length > 0) {
+                        int index = 0;
+                        visitValue(Array.get(value, 0));
+                        while (++index < length) {
+                            builder.append(',');
+                            visitValue(Array.get(value, index));
+                        }
+                    }
+                    endArray();
+                } else if (List.class.isAssignableFrom(type)) {
+                    beginArray();
+                    final List<?> list = (List<?>) value;
+                    final int length = list.size();
+                    if (length > 0) {
+                        int index = 0;
+                        visitValue(list[0]);
+                        while (++index < length) {
+                            builder.append(',');
+                            visitValue(list[index]);
+                        }
+                    }
+                    endArray();
+                } else if (Map.class.isAssignableFrom(type)) {
+                    beginObject();
+                    final boolean p_flag[] = { false };
+                    ((Map<Object, Object>) value).forEach((name, object) -> {
+                        if (p_flag[0])
+                            builder.append(',');
+                        else
+                            p_flag[0] = true;
+                        visitKey(name.toString());
+                        visitValue(object);
+                    });
+                    endObject();
+                } else {
+                    beginObject();
+                    final boolean p_flag[] = { false };
+                    Converter.handle()[type].forEach((name, info) -> {
+                        if (p_flag[0])
+                            builder.append(',');
+                        else
+                            p_flag[0] = true;
+                        visitKey(name);
+                        visitValue(info.v3.invoke(value));
+                    });
+                    endObject();
+                }
+            }
+        };
+        
+        @Override
+        public int length() = builder.length();
+        
+        @Override
+        public char charAt(final int index) = builder.charAt(index);
+        
+        @Override
+        public CharSequence subSequence(final int start, final int end) = builder.substring(start, end);
+        
+        @Override
+        public IntStream chars() = builder.chars();
+        
+        @Override
+        public IntStream codePoints() = builder.codePoints();
+        
+        @Override
+        public String toString() = builder.toString();
         
     }
     

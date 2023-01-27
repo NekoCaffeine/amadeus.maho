@@ -21,7 +21,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -465,7 +464,7 @@ public interface ASMHelper {
     
     static int follow(final int target, final int source, final int value) = (target & value) != 0 ? source | value : source & ~value;
     
-    static void generateGetter(final ClassNode node, final String owner, final FieldNode field, int access, final @Nullable String name) {
+    static void generateGetter(final ClassNode node, final String owner = node.name, final FieldNode field, int access = ACC_PUBLIC, final @Nullable String name = null) {
         final boolean isStatic = anyMatch(field.access, ACC_STATIC);
         final Type fieldType = Type.getType(field.desc);
         access = follow(field.access, access, ACC_STATIC);
@@ -481,9 +480,7 @@ public interface ASMHelper {
         generator.endMethod();
     }
     
-    static void generateGetter(final ClassNode node, final String owner, final FieldNode field, final int access) = generateGetter(node, owner, field, access, null);
-    
-    static void generateSetter(final ClassNode node, final String owner, final FieldNode field, int access, final @Nullable String name) {
+    static void generateSetter(final ClassNode node, final String owner, final FieldNode field, int access = ACC_PUBLIC, final @Nullable String name = null) {
         final boolean isStatic = anyMatch(field.access, ACC_STATIC);
         final Type fieldType = Type.getType(field.desc);
         access = follow(field.access, access, ACC_STATIC);
@@ -500,8 +497,6 @@ public interface ASMHelper {
         generator.returnValue();
         generator.endMethod();
     }
-    
-    static void generateSetter(final ClassNode node, final String owner, final FieldNode field, final int access) = generateSetter(node, owner, field, access, null);
     
     static void generateProxy(final ClassNode node, final String owner, final FieldNode field, final int access, final @Nullable String getterName, final @Nullable String setterName) {
         generateGetter(node, owner, field, access, getterName);
@@ -601,11 +596,28 @@ public interface ASMHelper {
     }
     
     static int[] findCandidateParameters(final Type parameters[], final Type parameter) {
-        final List<Integer> integers = new LinkedList<>();
+        @Nullable int result[] = null;
         for (int i = 0; i < parameters.length; i++)
             if (parameters[i].equals(parameter))
-                integers += i;
-        return ArrayHelper.toPrimitive(integers.toArray(Integer[]::new));
+                result = ArrayHelper.add(result, i);
+        return result;
+    }
+    
+    static int findAnnotatedParameter(final MethodNode methodNode, final Class<? extends Annotation> annotationType) {
+        if (methodNode.visibleParameterAnnotations != null)
+            for (int i = 0, length = methodNode.visibleParameterAnnotations.length; i < length; i++)
+                if (hasAnnotation(methodNode.invisibleParameterAnnotations[i], annotationType))
+                    return i;
+        return -1;
+    }
+    
+    static @Nullable int[] findAnnotatedParameters(final MethodNode methodNode, final Class<? extends Annotation> annotationType) {
+        @Nullable int result[] = null;
+        if (methodNode.visibleParameterAnnotations != null)
+            for (int i = 0, length = methodNode.visibleParameterAnnotations.length; i < length; i++)
+                if (hasAnnotation(methodNode.visibleParameterAnnotations[i], annotationType))
+                    result = ArrayHelper.add(result, i);
+        return result;
     }
     
     static void rollback(final MethodNode methodNode, final Consumer<MethodNode> consumer) {

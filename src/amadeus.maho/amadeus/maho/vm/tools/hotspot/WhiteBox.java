@@ -122,8 +122,9 @@ public enum WhiteBox {
         public static native void openJVMFlag();
         
         public static void ready() = MahoBridge.bridgeClassLoader().loadClass(Names.WhiteBox_Shadow).getDeclaredMethod("ready").invoke(null);
-        
+    
         @Patch.Spare
+        @SuppressWarnings("DataFlowIssue")
         public static Patcher getWhiteBox() = (Patcher) (Object) instance;
         
         static { MahoBridge.bridgeClassLoader().loadClass(Names.WhiteBox_Shadow).getDeclaredMethod("openJVMFlag").invoke(null); }

@@ -1,8 +1,9 @@
 package amadeus.maho.util.link.http;
 
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 import amadeus.maho.core.MahoExport;
@@ -10,13 +11,17 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.util.logging.LogLevel;
 
 public record HttpSetting(
-        int maxRetries = 3,
+        Map<String, String> headers = baseHeaders,
         HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(3)).version(HttpClient.Version.HTTP_1_1).build(),
-        HttpRequest.Builder baseDownloadRequest = HttpRequest.newBuilder().GET().header(HttpHelper.Header.User_Agent, "Maho/%s".formatted(MahoExport.VERSION)),
+        int maxRetries = 3,
         BiConsumer<LogLevel, String> logger = MahoExport.logger().namedLogger("HttpClient")
 ) {
     
+    public static final Map<String, String> baseHeaders = Map.of(HttpHelper.Header.User_Agent, "Maho/%s".formatted(MahoExport.VERSION));
+    
     @Getter
     private static final HttpSetting defaultInstance = { };
+    
+    public static Map<String, String> withBaseHeaders(final Map<String, String> headers) = Map.copyOf(new HashMap<>(headers) *= baseHeaders);
     
 }

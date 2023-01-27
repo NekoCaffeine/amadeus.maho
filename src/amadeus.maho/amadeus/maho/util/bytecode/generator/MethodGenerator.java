@@ -501,6 +501,8 @@ public class MethodGenerator extends MethodVisitor {
     
     public void fieldInsn(final int opcode, final Type ownerType, final String name, final Type fieldType) = mv.visitFieldInsn(opcode, ownerType.getInternalName(), name, fieldType.getDescriptor());
     
+    public void fieldInsn(final int opcode, final Type ownerType, final String name, final String fieldType) = mv.visitFieldInsn(opcode, ownerType.getInternalName(), name, fieldType);
+    
     public void getStatic(final Type owner, final String name, final Type type) = fieldInsn(GETSTATIC, owner, name, type);
     
     public void putStatic(final Type owner, final String name, final Type type) = fieldInsn(PUTSTATIC, owner, name, type);
@@ -508,6 +510,14 @@ public class MethodGenerator extends MethodVisitor {
     public void getField(final Type owner, final String name, final Type type) = fieldInsn(GETFIELD, owner, name, type);
     
     public void putField(final Type owner, final String name, final Type type) = fieldInsn(PUTFIELD, owner, name, type);
+    
+    public void getStatic(final Type owner, final FieldNode field) = fieldInsn(GETSTATIC, owner, field.name, field.desc);
+    
+    public void putStatic(final Type owner, final FieldNode field) = fieldInsn(PUTSTATIC, owner, field.name, field.desc);
+    
+    public void getField(final Type owner, final FieldNode field) = fieldInsn(GETFIELD, owner, field.name, field.desc);
+    
+    public void putField(final Type owner, final FieldNode field) = fieldInsn(PUTFIELD, owner, field.name, field.desc);
     
     public void invokeHandle(final Handle handle) = switch (handle.getTag()) {
         case H_GETFIELD  -> mv.visitFieldInsn(GETFIELD, handle.getOwner(), name, handle.getDesc());
@@ -785,13 +795,14 @@ public class MethodGenerator extends MethodVisitor {
     }
     
     public static MethodGenerator fromExecutable(final ClassVisitor visitor, final Executable executable, final FieldNode... fieldNodes) {
-        final String sourceDesc = executable instanceof Constructor ?
-                Type.getConstructorDescriptor((Constructor<?>) executable) :
-                Type.getMethodDescriptor((java.lang.reflect.Method) executable);
+        final String sourceDesc = switch (executable) {
+            case Constructor<?> constructor     -> Type.getConstructorDescriptor(constructor);
+            case java.lang.reflect.Method method -> Type.getMethodDescriptor(method);
+        };
         final String desc = fieldNodes.length == 0 ? sourceDesc :
                 Type.getMethodDescriptor(Type.getReturnType(sourceDesc),
                         Stream.concat(Stream.of(Type.getArgumentTypes(sourceDesc)), Stream.of(fieldNodes).map(fieldNode -> fieldNode.desc).map(Type::getType)).toArray(Type[]::new));
-        return visitMethod(visitor, executable.getModifiers() & ~(ACC_ABSTRACT | ACC_NATIVE), executable.getName(), desc, null, // TODO signature
+        return visitMethod(visitor, executable.getModifiers() & ~(ACC_ABSTRACT | ACC_NATIVE), executable instanceof Constructor<?> ? ASMHelper._INIT_ : executable.getName(), desc, null, // TODO signature
                 Stream.of(executable.getExceptionTypes()).map(ASMHelper::className).toArray(String[]::new));
     }
     

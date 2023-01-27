@@ -14,7 +14,6 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.runtime.CollectionHelper;
 
 @FieldDefaults(level = AccessLevel.PROTECTED, makeFinal = true)
 public class EventDispatcher {
@@ -70,7 +69,7 @@ public class EventDispatcher {
     public boolean removeListener(final MethodHandle listener) { try { return listeners.removeIf(wrapper -> wrapper.handle == listener); } finally { rebuildCallChain(); } }
     
     public synchronized void rebuildCallChain() {
-        CollectionHelper.sort(listeners);
+        listeners.sort();
         final MethodHandle p_result[] = { null };
         listeners().forEach(wrapper -> p_result[0] = p_result[0] == null ? catchThrowable(wrapper.handle) : MethodHandles.foldArguments(catchThrowable(wrapper.handle), p_result[0]));
         updateCallChainTarget(p_result[0]);

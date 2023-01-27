@@ -10,8 +10,25 @@ import java.util.stream.Stream;
 import amadeus.maho.lang.EqualsAndHashCode;
 
 @EqualsAndHashCode
-public record InferredParameterizedType(ParameterizedType sourceType, InferredGenericType actualTypeArguments[], Map<TypeVariable<?>, Type> typeVariableMap = TypeInferer.typeVariableMap(this))
-        implements InferredGenericType, ParameterizedType {
+public record InferredParameterizedType(ParameterizedType sourceType, InferredGenericType actualTypeArguments[]) implements InferredGenericType, ParameterizedType {
+    
+    public record Cached(ParameterizedType sourceType, InferredGenericType actualTypeArguments[], Map<TypeVariable<?>, Type> typeVariableMap) implements InferredGenericType, ParameterizedType {
+        
+        @Override
+        public InferredGenericType[] getActualTypeArguments() = actualTypeArguments.clone();
+        
+        @Override
+        public Type getRawType() = sourceType.getRawType();
+        
+        @Override
+        public Type getOwnerType() = sourceType.getOwnerType();
+        
+        @Override
+        public String toString() = InferredParameterizedType.toString(this);
+    
+    }
+    
+    public Cached cache() = { sourceType, actualTypeArguments, TypeInferer.typeVariableMap(this) };
     
     @Override
     public InferredGenericType[] getActualTypeArguments() = actualTypeArguments.clone();
@@ -23,8 +40,10 @@ public record InferredParameterizedType(ParameterizedType sourceType, InferredGe
     public Type getOwnerType() = sourceType.getOwnerType();
     
     @Override
-    public String toString() {
-        final Type ownerType = getOwnerType(), rawType = getRawType(), actualTypeArguments[] = getActualTypeArguments();
+    public String toString() = toString(this);
+    
+    public static String toString(final ParameterizedType parameterizedType) {
+        final Type ownerType = parameterizedType.getOwnerType(), rawType = parameterizedType.getRawType(), actualTypeArguments[] = parameterizedType.getActualTypeArguments();
         final StringBuilder builder = { };
         if (ownerType != null) {
             if (ownerType instanceof Class<?> clazz)
@@ -32,8 +51,8 @@ public record InferredParameterizedType(ParameterizedType sourceType, InferredGe
             else
                 builder.append(ownerType);
             builder.append(".");
-            if (ownerType instanceof ParameterizedType parameterizedType)
-                builder.append(rawType.getTypeName().replace(parameterizedType.getRawType().getTypeName() + "$", ""));
+            if (ownerType instanceof ParameterizedType ownerParameterizedType)
+                builder.append(rawType.getTypeName().replace(ownerParameterizedType.getRawType().getTypeName() + "$", ""));
             else
                 builder.append(rawType.getTypeName());
         } else

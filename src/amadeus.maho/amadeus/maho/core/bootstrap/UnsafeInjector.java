@@ -1,6 +1,7 @@
 package amadeus.maho.core.bootstrap;
 
 import java.security.ProtectionDomain;
+import java.util.List;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -30,6 +31,7 @@ public enum UnsafeInjector implements Injector {
             for (final MethodNode methodNode : node.methods)
                 if (methodNode.name.equals("checkPrimitiveArray")) {
                     Maho.debug("UnsafeInjector -> jdk.internal.misc.Unsafe::checkPrimitiveArray");
+                    methodNode.localVariables = List.of();
                     methodNode.instructions.clear();
                     methodNode.instructions.add(new InsnNode(RETURN));
                     methodNode.maxStack = 0;

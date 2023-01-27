@@ -12,6 +12,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.transform.GhostContext;
 import amadeus.maho.util.annotation.mark.Ghost;
+import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.runtime.TypeHelper;
 
@@ -43,6 +44,7 @@ public class TypeToken<T> {
     @Ghost
     private static Type compileTimeGenericType() { throw GhostContext.touch(); }
     
+    @IndirectCaller
     public static Type runtimeType(final String signature) {
         final StackWalker.StackFrame frame = CallerContext.callerFrame();
         final GenericDeclaration declaration = CallerContext.executable(frame) ?? (GenericDeclaration) frame.getDeclaringClass();
@@ -53,6 +55,7 @@ public class TypeToken<T> {
         })).let(SignatureParser.make().parseTypeSig(signature)::accept).getResult();
     }
     
+    @IndirectCaller
     public static TypeVariable<?> runtimeTypeVariable(final String signature, final int index) {
         if (runtimeType(signature) instanceof ParameterizedType parameterizedType && parameterizedType.getRawType() instanceof Class<?> clazz)
             return clazz.getTypeParameters()[index];

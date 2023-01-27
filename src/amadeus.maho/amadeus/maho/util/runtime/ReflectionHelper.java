@@ -70,14 +70,10 @@ public interface ReflectionHelper {
     }
     
     @SneakyThrows
-    static void set(final Field field, final @Nullable Object instance, final Object val) = field.set(instance, val);
-    
-    static void set(final Field field, final Object val) = set(field, null, val);
+    static void set(final Field field, final @Nullable Object instance = null, final Object val) = field.set(instance, val);
     
     @SneakyThrows
-    static <T> @Nullable T get(final Field field, final @Nullable Object instance) = (T) field.get(instance);
-    
-    static <T> @Nullable T get(final Field field) = get(field, null);
+    static <T> @Nullable T get(final Field field, final @Nullable Object instance = null) = (T) field.get(instance);
     
     @SneakyThrows
     static Method lookupMethod(final Class<?> owner, final String name, final Class<?>... args) {

@@ -466,14 +466,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
         return !srcMethodTypes.hasNext();
     }
     
-    public @Nullable int[] checkReferences() {
-        @Nullable int result[] = null;
-        if (sourceMethod.visibleParameterAnnotations != null)
-            for (int i = 0, len = sourceMethod.visibleParameterAnnotations.length; i < len; i++)
-                if (ASMHelper.hasAnnotation(sourceMethod.visibleParameterAnnotations[i], Hook.Reference.class))
-                    result = ArrayHelper.add(result, i);
-        return result;
-    }
+    public @Nullable int[] checkReferences() = ASMHelper.findAnnotatedParameters(sourceMethod, Hook.Reference.class);
     
     private boolean shouldMarkStack() {
         if (referenceTransformer != null)

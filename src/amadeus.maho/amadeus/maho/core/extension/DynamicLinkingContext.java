@@ -145,7 +145,7 @@ public class DynamicLinkingContext {
     
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
     public static void linkDynamicConstant_$Enter(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
-            = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
+            = contextStack().push(withLinkDynamicConstant((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkDynamicConstant_$Exit(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
@@ -164,7 +164,7 @@ public class DynamicLinkingContext {
     
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
     public static void linkDynamicConstant_$Enter(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
-            = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
+            = contextStack().push(withLinkDynamicConstant((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkDynamicConstant_$Exit(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)

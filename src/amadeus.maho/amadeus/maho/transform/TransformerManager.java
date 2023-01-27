@@ -78,6 +78,7 @@ import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.profile.Sampler;
 import amadeus.maho.util.resource.ResourcePath;
 import amadeus.maho.util.runtime.ArrayHelper;
+import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 import amadeus.maho.util.runtime.ReflectionHelper;
 import amadeus.maho.util.throwable.ExtraInformationThrowable;
@@ -115,7 +116,24 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                     .filter(clazz -> transformers.stream().anyMatch(transformer -> transformer.isTarget(clazz)))
                     .filter(clazz -> needRetransformFilter().apply(clazz).orElse(Boolean.TRUE))
                     .toArray(Class[]::new);
-            instrumentation.retransformClasses(classes);
+            try {
+                instrumentation.retransformClasses(classes);
+            } catch (final LinkageError error) {
+                if (classes.length > 1) {
+                    for (final Class clazz : classes)
+                        try {
+                            instrumentation.retransformClasses(clazz);
+                        } catch (final LinkageError singleError) {
+                            final ExtraInformationThrowable extraInformation = { clazz.toString() };
+                            singleError.addSuppressed(extraInformation);
+                            DebugHelper.breakpointWhenDebug(singleError);
+                            error.addSuppressed(extraInformation);
+                        }
+                }
+                for (final Class clazz : classes)
+                    error.addSuppressed(new ExtraInformationThrowable(clazz.toString()));
+                throw DebugHelper.breakpointBeforeThrow(error);
+            }
         }
         
     }
@@ -297,6 +315,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     @Setter
     volatile @Nullable Context context;
     
+    @SneakyThrows
     public synchronized void setup(final @Nullable ClassLoader loader, final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter = _ -> true, final String debugInfo,
             final AOTTransformer.Level aotLevel = AOTTransformer.Level.RUNTIME, final boolean scanAnnotation = true, final boolean scanProvider = true) {
         final boolean aot = this != runtime();
@@ -332,8 +351,9 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             if (!aot)
                 setupCallbacks.forEach(Runnable::run);
         } catch (final Throwable t) {
+            Maho.debug("Setup failed: " + debugInfo);
             t.printStackTrace();
-            throw t;
+            throw DebugHelper.breakpointBeforeThrow(t);
         } finally {
             setupCallbacks.clear();
             context(srcContext);
@@ -527,7 +547,9 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             return result == null ? node : result;
         } catch (final Throwable throwable) {
             Maho.error("Throwable in transform " + ASMHelper.sourceName(node.name) + " : " + transformer);
-            throw TransformException.of(throwable);
+            throwable.addSuppressed(new ExtraInformationThrowable("Class: " + ASMHelper.sourceName(node.name)));
+            throwable.addSuppressed(new ExtraInformationThrowable("Transformer: " + transformer.toString()));
+            throw DebugHelper.breakpointBeforeThrow(TransformException.of(throwable));
         }
     }
     

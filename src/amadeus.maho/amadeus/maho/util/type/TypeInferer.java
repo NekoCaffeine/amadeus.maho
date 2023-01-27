@@ -4,7 +4,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
-import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -82,17 +81,11 @@ public interface TypeInferer {
     }
     
     @SneakyThrows
-    static Map<TypeVariable<?>, Type> typeVariableMap(final Type type) {
-        if (type instanceof InferredParameterizedType inferredParameterizedType) {
-            final @Nullable Map<TypeVariable<?>, Type> typeVariableMap = inferredParameterizedType.typeVariableMap();
-            if (typeVariableMap != null)
-                return typeVariableMap;
-        }
-        return switch (type) {
-            case Class<?> clazz -> typeVariableMapLocal[clazz];
-            default -> computeType(type, false);
-        };
-    }
+    static Map<TypeVariable<?>, Type> typeVariableMap(final Type type) = switch (type) {
+        case InferredParameterizedType.Cached cached -> cached.typeVariableMap();
+        case Class<?> clazz                          -> typeVariableMapLocal[clazz];
+        default                                      -> computeType(type, false);
+    };
     
     @SneakyThrows
     private static @Nullable Executable executableReference(final Class<?> lambdaType) {
@@ -106,9 +99,9 @@ public interface TypeInferer {
     
     static RuntimeParameterizedType parameterization(final Class<?> classType) = { classType.getTypeParameters(), classType, classType.getDeclaringClass() };
     
-    static <T> InferredGenericType<? extends T> infer(final TypeToken<T> token, final Class<?> subClassType) = (InferredGenericType<? extends T>) infer(token.genericType(), subClassType);
+    static <T> InferredGenericType<? extends T> infer(final TypeToken<T> token, final Type context) = (InferredGenericType<? extends T>) infer(token.genericType(), context);
     
-    static InferredGenericType<?> infer(final Type genericType, final Class<?> subClassType) = infer(genericType, typeVariableMap(subClassType));
+    static InferredGenericType<?> infer(final Type genericType, final Type context) = infer(genericType, typeVariableMap(context));
     
     static InferredGenericType<?> infer(final Type genericType, final Map<TypeVariable<?>, Type> typeVariableMap, final Map<Type, Type> context = new HashMap<>()) = switch (genericType) {
         case Class<?> clazz                          -> new InferredClassType(clazz);
@@ -131,8 +124,9 @@ public interface TypeInferer {
                 }
                 case ParameterizedType parameterizedType -> {
                     final InferredParameterizedType inferredParameterizedType = { parameterizedType, infer(parameterizedType.getActualTypeArguments(), typeVariableMap, context) };
-                    context[parameterizedType] = inferredParameterizedType;
-                    yield inferredParameterizedType;
+                    final InferredParameterizedType.Cached cached = inferredParameterizedType.cache();
+                    context[parameterizedType] = cached;
+                    yield cached;
                 }
                 case GenericArrayType genericArrayType   -> {
                     final InferredGenericArrayType inferredGenericArrayType = { genericArrayType, infer(genericArrayType.getGenericComponentType(), typeVariableMap, context) };
@@ -151,14 +145,5 @@ public interface TypeInferer {
     
     static InferredGenericType[] infer(final Type genericTypes[], final Map<TypeVariable<?>, Type> typeVariableMap, final Map<Type, Type> context = new HashMap<>())
             = Stream.of(genericTypes).map(genericType -> infer(genericType, typeVariableMap, context)).toArray(InferredGenericType[]::new);
-    
-    static InferredGenericType<?> inferFieldType(final @Nullable Type context, final Field field) {
-        if (context instanceof ParameterizedType parameterizedType) {
-            final Type genericType = field.getGenericType();
-            if (!(genericType instanceof Class<?>) && parameterizedType.getRawType() instanceof Class<?> owner && owner == field.getDeclaringClass())
-                return infer(genericType, typeVariableMap(parameterizedType));
-        }
-        return new InferredClassType(field.getType());
-    }
     
 }

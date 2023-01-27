@@ -4,7 +4,7 @@ import java.lang.reflect.Type;
 
 import amadeus.maho.util.runtime.TypeHelper;
 
-public sealed interface InferredGenericType<T> extends Type permits InferredClassType, InferredGenericArrayType, InferredParameterizedType, InferredTypeVariable, InferredWildcardType {
+public sealed interface InferredGenericType<T> extends Type permits InferredClassType, InferredGenericArrayType, InferredParameterizedType, InferredParameterizedType.Cached, InferredTypeVariable, InferredWildcardType {
     
     Type sourceType();
     

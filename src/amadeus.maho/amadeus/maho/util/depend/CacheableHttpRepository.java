@@ -67,7 +67,8 @@ public abstract class CacheableHttpRepository implements Repository {
     
     public @Nullable Path tryCache(final Path relative, final Path cache = cacheDir() / relative) { try { return cache(relative, cache); } catch (final IOException e) { return null; } }
     
-    public HttpRequest.Builder request(final Path relative) = baseDownloadRequest().copy().uri(URI.create(rootUrl() + relative.toString().replace(relative.getFileSystem().getSeparator(), "/")));
+    public HttpRequest.Builder request(final Path relative) = HttpRequest.newBuilder().GET().let(builder -> setting().headers().forEach(builder::header))
+            .uri(URI.create(rootUrl() + relative.toString().replace(relative.getFileSystem().getSeparator(), "/")));
     
     @SneakyThrows
     public Path downloadDataFormRemote(final Path relative, final Path cache = cacheDir() / relative, final boolean completenessMetadata = false) throws IOException {

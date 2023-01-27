@@ -30,9 +30,10 @@ public sealed interface DynamicObject {
         
         @Override
         public DynamicObject GET(final String key) = asMap[key];
-    
+        
         @Override
         public String toString() = asMap.toString();
+        
     }
     
     @Getter
@@ -47,9 +48,10 @@ public sealed interface DynamicObject {
         
         @Override
         public DynamicObject GET(final int index) = asList[index];
-    
+        
         @Override
         public String toString() = asList.toString();
+        
     }
     
     @Getter
@@ -60,9 +62,10 @@ public sealed interface DynamicObject {
     final class StringUnit implements DynamicObject {
         
         String asString;
-    
+        
         @Override
         public String toString() = asString;
+        
     }
     
     @Getter
@@ -88,9 +91,10 @@ public sealed interface DynamicObject {
         
         @Override
         public double asDouble() = asDecimal.doubleValue();
-    
+        
         @Override
         public String toString() = asDecimal.toString();
+        
     }
     
     @Getter
@@ -101,9 +105,10 @@ public sealed interface DynamicObject {
     final class BooleanUnit implements DynamicObject {
         
         boolean asBoolean;
-    
+        
         @Override
         public String toString() = Boolean.toString(asBoolean);
+        
     }
     
     @Getter
@@ -114,12 +119,13 @@ public sealed interface DynamicObject {
     final class NullUnit implements DynamicObject {
         
         public static final NullUnit instance = { };
-    
+        
         @Override
         public boolean isNull() = true;
-    
+        
         @Override
         public String toString() = "null";
+        
     }
     
     non-sealed interface Export extends DynamicObject { }

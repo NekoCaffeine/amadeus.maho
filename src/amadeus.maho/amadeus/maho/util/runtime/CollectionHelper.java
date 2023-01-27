@@ -17,8 +17,12 @@ import amadeus.maho.lang.inspection.Nullable;
 @Extension
 public interface CollectionHelper {
     
-    static <T> void sort(final Collection<T> orderedContainer, final Comparator<? super T> comparator = (v1, v2) -> ((Comparable<T>) v1).compareTo(v2))
-            = orderedContainer *= orderedContainer.stream().sorted(comparator).toList().let(_ -> orderedContainer.clear());
+    static <C extends Collection<T>, T> C sort(final C collection, final Comparator<? super T> comparator = (v1, v2) -> ((Comparable<T>) v1).compareTo(v2)) {
+        final List<T> sorted = collection.stream().sorted(comparator).toList();
+        collection.clear();
+        collection.addAll(sorted);
+        return collection;
+    }
     
     static <T> @Nullable T GET(final List<T> list, final int index) {
         final int size = list.size(), i = index < 0 ? size + index : index;
@@ -51,6 +55,11 @@ public interface CollectionHelper {
         collection.clear();
         collection.addAll(value);
         return collection;
+    }
+    
+    static <M extends Map<K, V>, K, V> M MULEQ(final M map, final Map<K,V> value) {
+        map.putAll(value);
+        return map;
     }
     
     static <T> boolean nonEmpty(final Collection<T> $this) = !$this.isEmpty();

@@ -120,7 +120,7 @@ public interface Converter {
                 types.stream()
                         .map(Class::getDeclaredFields)
                         .flatMap(Stream::of)
-                        .filter(ReflectionHelper.noneMatch(Modifier.STATIC | Modifier.FINAL | Modifier.TRANSIENT))
+                        .filter(ReflectionHelper.noneMatch(Modifier.STATIC | Modifier.TRANSIENT | Modifier.TRANSIENT))
                         .peek(field -> {
                             if (fieldHandles.containsKey(field.getName()))
                                 throw new UnsupportedOperationException("Duplicate key: " + field.getName());

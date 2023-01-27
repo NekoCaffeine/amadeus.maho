@@ -4,12 +4,15 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.objectweb.asm.Type;
@@ -37,6 +40,7 @@ import amadeus.maho.util.runtime.ReflectionHelper;
 import amadeus.maho.util.runtime.TypeHelper;
 
 import static amadeus.maho.util.runtime.ReflectionHelper.*;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
 
 @Getter
 @ToString
@@ -109,10 +113,12 @@ public class Wrapper<T> {
     
     public Stream<Method> inheritableMethods() = allMethods().filter(anyMatch(PROTECTED | PUBLIC)).filter(noneMatch(STATIC | FINAL | BRIDGE));
     
-    public Stream<Method> inheritableUniqueSignatureMethods() { // FIXME
+    public Stream<Method> inheritableUniqueSignatureMethods() {
         final Set<String> set = new HashSet<>();
-        return inheritableMethods().filter(method -> set.add(method.getName() + Type.getMethodDescriptor(method)));
+        return inheritableMethods().filter(method -> set.add(methodKey(method)));
     }
+    
+    public Stream<Method> unimplementedMethods() = inheritableMethods().collect(Collectors.toMap(Wrapper::methodKey, Function.identity(), (a, b) -> Modifier.isAbstract(a.getModifiers()) ? b : a)).values().stream();
     
     public static Predicate<Executable> filterDeclaringClass(final Class<?>... declaringClasses) = executable -> Stream.of(declaringClasses).anyMatch(declaringClass -> executable.getDeclaringClass() == declaringClass);
     
@@ -157,14 +163,15 @@ public class Wrapper<T> {
             .forEach(generator -> onlySuperCall(generator, fieldNodes));
     
     public void superCall(final MethodGenerator generator, final FieldNode... fieldNodes) {
+        final int offset = generator.argumentTypes.length - fieldNodes.length;
         generator.loadThis();
-        generator.loadArgs(0, generator.argumentTypes.length - fieldNodes.length);
+        generator.loadArgs(0, offset);
         generator.invokeConstructor(superType(), fieldNodes.length == 0 ? generator.desc :
-                Type.getMethodDescriptor(Type.VOID_TYPE, Arrays.copyOf(Type.getArgumentTypes(generator.desc), generator.argumentTypes.length - fieldNodes.length)));
+                Type.getMethodDescriptor(Type.VOID_TYPE, Arrays.copyOf(Type.getArgumentTypes(generator.desc), offset)));
         for (int i = 0; i < fieldNodes.length; i++) {
             final FieldNode fieldNode = fieldNodes[i];
             generator.loadThis();
-            generator.loadArg(generator.argumentTypes.length + i);
+            generator.loadArg(offset + i);
             generator.putField(wrapperType(), fieldNode.name, Type.getType(fieldNode.desc));
         }
     }
@@ -174,6 +181,14 @@ public class Wrapper<T> {
         generator.returnValue();
         generator.endMethod();
     }
+    
+    public FieldNode field(final Type type, final String name, final int flag = ACC_PROTECTED) {
+        final FieldNode field = { flag, name, type.getDescriptor(), null, null };
+        node().fields += field;
+        return field;
+    }
+    
+    public FieldNode field(final Class<?> type, final String name, final int flag = ACC_PROTECTED) = field(Type.getType(type), name, flag);
     
     public void patch(final Class<?> patcher, final boolean remap = false) {
         final ClassNode patchNode = Maho.getClassNodeFromClassNonNull(patcher);
@@ -211,5 +226,7 @@ public class Wrapper<T> {
     
     public static <R, T extends R> Wrapper<R> ofAnonymousReplace(final Class<T> target, final String suffix)
             = new Wrapper<>(target.getClassLoader(), (Class<R>) target.getSuperclass(), suffix, target.getInterfaces()).let(result -> result.node(Maho.getClassNodeFromClassNonNull(target)));
+    
+    private static String methodKey(final Method method) = method.getName() + Type.getMethodDescriptor(method);
     
 }

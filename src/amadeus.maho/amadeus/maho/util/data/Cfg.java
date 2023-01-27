@@ -103,7 +103,7 @@ public enum Cfg implements Converter {
                             default               -> {
                                 final @Nullable Tuple3<Field, MethodHandle, MethodHandle> tuple = Converter.handle()[layer.getClass()][key];
                                 setters << tuple.v2;
-                                yield tuple == null ? null : TypeInferer.inferFieldType(typesContext.peekLast(), tuple.v1);
+                                yield tuple == null ? null : TypeInferer.infer(tuple.v1.getGenericType(), typesContext.peekLast());
                             }
                         };
                         typesContext << nextType;
