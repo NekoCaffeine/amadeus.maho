@@ -299,11 +299,11 @@ public interface HttpApi {
     HttpSetting setting();
     
     @IndirectCaller
-    static <T extends HttpApi> T make(final HttpSetting setting = HttpSetting.defaultInstance(), final Adapter adapter = Adapter.Default.instance(), final Class<T> apiInterface = (Class<T>) CallerContext.caller()) {
-        final @Nullable Endpoint domain = apiInterface.getAnnotation(Endpoint.class);
-        if (domain == null)
-            throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("Class %s missing @Domain".formatted(apiInterface.getCanonicalName())));
-        final String root = domain.value();
+    static <T extends HttpApi> T make(final HttpSetting setting = HttpSetting.defaultInstance(), final Adapter adapter = Adapter.Default.instance(), final Class<T> apiInterface = CallerContext.caller()) {
+        final @Nullable Endpoint endpoint = apiInterface.getAnnotation(Endpoint.class);
+        if (endpoint == null)
+            throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("Class %s missing @Endpoint".formatted(apiInterface.getCanonicalName())));
+        final String root = endpoint.value();
         final Wrapper<T> wrapper = { apiInterface, "HttpApiInstance" };
         final org.objectweb.asm.Type wrapperType = wrapper.wrapperType();
         final ClassNode node = wrapper.node();
@@ -315,7 +315,7 @@ public interface HttpApi {
             final @Nullable Request request = method.getAnnotation(Request.class);
             if (request != null) {
                 final FieldNode field = wrapper.field(Callable.class, "$%s_%d".formatted(method.getName(), callableMap.size()));
-                callableMap[field] = { setting, adapter, method, domain, request };
+                callableMap[field] = { setting, adapter, method, endpoint, request };
                 final MethodGenerator generator = wrapper.wrap(method);
                 generator.loadThis();
                 generator.getField(wrapperType, field);

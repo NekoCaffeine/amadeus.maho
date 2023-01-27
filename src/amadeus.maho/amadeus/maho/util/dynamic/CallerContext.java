@@ -27,11 +27,11 @@ public interface CallerContext {
     
     static boolean invisibleFrame(final StackWalker.StackFrame frame) = frame.getDeclaringClass().isAnnotationPresent(IndirectCaller.class) || executable(frame)?.isAnnotationPresent(IndirectCaller.class) ?? false;
     
-    static Class<?> self() = callerFrame(1).getDeclaringClass();
+    static <T> Class<T> self() = (Class<T>) callerFrame(1).getDeclaringClass();
     
-    static Class<?> caller() = callerFrame(2).getDeclaringClass();
+    static <T> Class<T> caller() = (Class<T>) callerFrame(2).getDeclaringClass();
     
-    static Class<?> caller(final int depth) = callerFrame(1 + depth).getDeclaringClass();
+    static <T> Class<T> caller(final int depth) = (Class<T>) callerFrame(1 + depth).getDeclaringClass();
     
     static Executable selfExecutable() = executable(callerFrame(1));
     
