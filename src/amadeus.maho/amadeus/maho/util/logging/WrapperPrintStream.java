@@ -9,14 +9,14 @@ import java.util.function.Consumer;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class WrapperPrintStream extends PrintStream {
     
     Consumer<String> logger;
+    
     Charset charset;
+    
     ThreadLocal<StringBuilder> builder = ThreadLocal.withInitial(StringBuilder::new);
     
     public StringBuilder builder() = builder.get();

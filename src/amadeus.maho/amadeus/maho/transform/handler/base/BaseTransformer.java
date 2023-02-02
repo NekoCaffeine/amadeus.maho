@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
+
 import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
@@ -26,9 +29,6 @@ import amadeus.maho.util.bytecode.ClassWriter;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.RemapContext;
 
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.ClassNode;
-
 @RequiredArgsConstructor
 public abstract class BaseTransformer<A extends Annotation> implements ClassTransformer {
     
@@ -45,6 +45,9 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
     public final @Nullable TransformMetadata metadata = handler.lookupValue("metadata");
     
     public final int order = metadata == null ? 0 : metadata.order();
+    
+    @Getter
+    private volatile int debugTransformCount = 0;
     
     @Setter
     @Getter
@@ -71,9 +74,13 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
     protected void markExperimental() = experimental = true;
     
     @Override
-    public @Nullable ClassNode transform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain)
-            = nodeFilter().test(node) ? doTransform(context, node, loader, clazz, domain) : node;
-    
+    public @Nullable ClassNode transform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
+        if (nodeFilter().test(node)) {
+            debugTransformCount++;
+           return doTransform(context, node, loader, clazz, domain);
+        }
+        return node;
+    }
     public abstract @Nullable ClassNode doTransform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain);
     
     public @Nullable ClassNode transformWithoutContext(final @Nullable ClassNode node, final @Nullable ClassLoader loader) = transform(new ClassWriter(loader).mark(node).context(), node, null, null, null);

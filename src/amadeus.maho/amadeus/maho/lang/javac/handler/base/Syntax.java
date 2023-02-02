@@ -12,6 +12,7 @@ import org.objectweb.asm.Type;
 
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.transform.TransformerManager;
 import amadeus.maho.transform.handler.base.marker.BaseMarker;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.util.bytecode.ASMHelper;
@@ -28,7 +29,7 @@ public @interface Syntax {
         private static final Map<Integer, Supplier<Class<? extends BaseSyntaxHandler>>> syntaxTypes = new ConcurrentSkipListMap<>();
         
         @Override
-        public synchronized void onMark() = syntaxTypes()[annotation.priority()] = () -> (Class<? extends BaseSyntaxHandler>) ASMHelper.loadType(Type.getObjectType(sourceClass.name), true, contextClassLoader());
+        public synchronized void onMark(final TransformerManager.Context context) = syntaxTypes()[annotation.priority()] = () -> (Class<? extends BaseSyntaxHandler>) ASMHelper.loadType(Type.getObjectType(sourceClass.name), true, contextClassLoader());
         
         @Override
         public boolean advance() = false;

@@ -9,8 +9,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Future;
 
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 
@@ -28,12 +28,9 @@ import amadeus.maho.transform.mark.Erase;
 import amadeus.maho.transform.mark.Share;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.remap.ClassNameRemapper;
-import amadeus.maho.util.concurrent.AsyncHelper;
 import amadeus.maho.util.resource.ResourcePath;
 import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
-import amadeus.maho.vm.transform.handler.HotSpotJITMarker;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static amadeus.maho.util.concurrent.AsyncHelper.async;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -49,7 +46,7 @@ public final class ShareMarker extends BaseMarker<Share> {
     private static volatile boolean init;
     
     @Override
-    public void onMark() {
+    public void onMark(final TransformerManager.Context context) {
         synchronized (markerQueue) {
             block:
             {
@@ -57,7 +54,7 @@ public final class ShareMarker extends BaseMarker<Share> {
                     if (init || ASMHelper.className(Share.class).equals(sourceClass.name))
                         break block;
                     else
-                        markerQueue.add(Tuple.tuple(new ConcurrentLinkedQueue<>(Set.of(Share.class.getName())), this::onShare));
+                        markerQueue.add(Tuple.tuple(new ConcurrentLinkedQueue<>(Set.of(Share.class.getName())), () -> onShare(context)));
                 } else {
                     final Queue<String> required = new ConcurrentLinkedQueue<>(List.of(annotation.required()));
                     required.add(Share.class.getName());
@@ -65,23 +62,23 @@ public final class ShareMarker extends BaseMarker<Share> {
                     if (required.isEmpty())
                         break block;
                     else
-                        markerQueue.add(Tuple.tuple(required, this::onShare));
+                        markerQueue.add(Tuple.tuple(required, () -> onShare(context)));
                 }
                 return;
             }
         }
-        onShare();
+        onShare(context);
     }
     
     @SneakyThrows
-    public void onShare() {
+    public void onShare(final TransformerManager.Context context) {
+        final @Nullable String target = handler.isNotDefault(Share::value) ?  handler.<Type>lookupSourceValue(Share::value).getClassName() : handler.isNotDefault(Share::target) ? annotation.target() : null;
         ClassNode node = ASMHelper.newClassNode(sourceClass);
-        TransformerManager.transform("share", ASMHelper.sourceName(node.name) + (handler.isNotDefault(Share::value) ? "\n->  " + annotation.value().getName() :
-                handler.isNotDefault(Share::target) ? "\n->  " + annotation.target() : ""));
+        TransformerManager.transform("share", ASMHelper.sourceName(node.name) + (target == null ? "" : "\n->  " + target));
         if (annotation.privilegeEscalation())
             node.superName = MagicAccessor.Bridge;
         if (annotation.shareAnonymousInnerClass()) {
-            final @Nullable ResourcePath contextResourcePath = manager.context()?.resourcePath() ?? null;
+            final @Nullable ResourcePath contextResourcePath = context.resourcePath() ?? null;
             if (contextResourcePath != null)
                 node.innerClasses.stream()
                         .filter(innerClassNode -> ASMHelper.isAnonymousInnerClass(innerClassNode.name))
@@ -93,8 +90,8 @@ public final class ShareMarker extends BaseMarker<Share> {
                                     .findAny()
                                     .orElseThrow();
                             final byte bytecode[] = innerClassInfo.readAll();
-                            if (handler.isNotDefault(Share::value)) {
-                                final String newName = name.replace(ASMHelper.sourceName(sourceClass.name), annotation.value().getName());
+                            if (target != null) {
+                                final String newName = name.replace(ASMHelper.sourceName(sourceClass.name), target);
                                 TransformerManager.transform("share", "%s\n->  %s".formatted(name, newName));
                                 Maho.shareClass(newName, ClassNameRemapper.changeName(bytecode, name, newName), null);
                             } else {
@@ -118,41 +115,26 @@ public final class ShareMarker extends BaseMarker<Share> {
             node.access = ASMHelper.changeAccess(node.access, ACC_PUBLIC);
         if (handler.isNotDefault(Share::remap))
             node = new RemapTransformer(manager, annotation.remap(), node).transformWithoutContext(node, null);
-        final Class<?> clazz;
-        if (handler.isNotDefault(Share::value))
-            clazz = Maho.shareClass(ClassNameRemapper.changeName(node, sourceClass.name, annotation.value().getName()));
-        else if (handler.isNotDefault(Share::target))
-            clazz = Maho.shareClass(ClassNameRemapper.changeName(node, sourceClass.name, annotation.target()));
-        else
-            clazz = Maho.shareClass(node);
-        final @Nullable HotSpotJIT hotSpotJIT = ASMHelper.findAnnotation(sourceClass, HotSpotJIT.class, Share.class.getClassLoader());
-        if (hotSpotJIT != null)
-            new HotSpotJITMarker(manager, hotSpotJIT, sourceClass).mark(null);
-        final String name = clazz.getName();
+        final Class<?> shared = target != null ? Maho.shareClass(ClassNameRemapper.changeName(node, sourceClass.name, target)) : Maho.shareClass(node);
+        TransformerManager.Patcher.preLoadedClasses() += shared;
+        final String name = shared.getName();
         synchronized (markerQueue) {
-            if (Share.class.getName().equals(name)) {
-                final Class<? extends Annotation> bootShare = (Class<? extends Annotation>) clazz;
-                TransformerManager.Patcher.needRetransformFilter().add(target -> target
-                        .filter(retransformTarget -> manager.context() != null)
-                        .filter(retransformTarget -> retransformTarget.isAnnotationPresent(bootShare))
-                        .map(_ -> Boolean.FALSE));
+            if (Share.class.getName().equals(name))
                 init = true;
-            }
-            loadedMapping.put(name, clazz);
-            final @Nullable Queue<Future<?>> asyncTasks = manager.context()?.asyncTasks() ?? null;
+            loadedMapping[name] = shared;
             markerQueue.stream()
                     .filter(tuple -> tuple.v1.remove(name))
                     .filter(tuple -> tuple.v1.isEmpty())
                     .peek(markerQueue::remove)
                     .map(tuple -> async(tuple.v2, MahoExport.Setup.executor()))
-                    .forEach(asyncTasks != null ? asyncTasks::offer : AsyncHelper::await);
+                    .forEach(context.asyncTasks()::offer);
         }
         if (handler.isNotDefault(Share::init))
-            InitMarker.init(this.annotation.init(), clazz);
+            InitMarker.init(annotation.init(), shared);
     }
     
     @SafeVarargs
-    protected final List<AnnotationNode> reservedAnnotationNodes(final ClassNode node, final Class<? extends Annotation>... annotationTypes) {
+    private List<AnnotationNode> reservedAnnotationNodes(final ClassNode node, final Class<? extends Annotation>... annotationTypes) {
         final List<AnnotationNode> result = new ArrayList<>(annotationTypes.length);
         for (final var annotationType : annotationTypes) {
             final @Nullable AnnotationNode annotationNodes[] = ASMHelper.findAnnotationNodes(node.visibleAnnotations, annotationType);

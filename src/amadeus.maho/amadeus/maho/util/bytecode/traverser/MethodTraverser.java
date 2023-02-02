@@ -52,20 +52,15 @@ import amadeus.maho.util.bytecode.traverser.exception.ComputeException;
 import amadeus.maho.util.bytecode.type.IntTypeRange;
 import amadeus.maho.util.profile.Sampler;
 import amadeus.maho.util.runtime.TypeHelper;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
-import amadeus.maho.vm.transform.mark.HotSpotMethodFlags;
 
 import static amadeus.maho.util.bytecode.Bytecodes.*;
-import static amadeus.maho.vm.reflection.hotspot.KlassMethod.Flags._force_inline;
-import static java.lang.Math.max;
+import static amadeus.maho.util.math.MathHelper.max;
 import static org.objectweb.asm.tree.AbstractInsnNode.*;
 
-@HotSpotJIT
 @TransformProvider
 @FunctionalInterface
 public interface MethodTraverser {
     
-    @HotSpotJIT
     @RequiredArgsConstructor
     @FieldDefaults(level = AccessLevel.PUBLIC)
     class ComputeLabel extends Label {
@@ -80,7 +75,6 @@ public interface MethodTraverser {
         
         final @Nullable List<TryCatchBlockNode> handlers;
         
-        @HotSpotMethodFlags(_force_inline)
         public final boolean mark(final Frame frame, final Frame.Snapshot snapshot, final BinaryOperator<String> getCommonSuperClass) {
             if (result == null) {
                 result = frame.dup((LabelNode) info);
@@ -100,12 +94,24 @@ public interface MethodTraverser {
             Frame.Snapshot snapshot = init;
             @Nullable AbstractInsnNode next = instructions.getFirst();
             while (next != null) {
-                if (next.getType() == LABEL && ((LabelNode) next).labelGet() instanceof ComputeLabel computeLabel && computeLabel.mark) {
-                    while ((next = next.getNext()) != null && next.getOpcode() == -1) ;
-                    if (next == null)
-                        return;
-                    instructions.insertBefore(next, snapshot.diff(snapshot = computeLabel.result.snapshot()));
-                }
+                if (next.getType() == LABEL && ((LabelNode) next).labelGet() instanceof ComputeLabel computeLabel && computeLabel.mark)
+                    if (computeLabel.result != null) {
+                        while ((next = next.getNext()) != null && next.getOpcode() == -1) ;
+                        if (next == null)
+                            return;
+                        instructions.insertBefore(next, snapshot.diff(snapshot = computeLabel.result.snapshot()));
+                    } else {
+                        AbstractInsnNode prev = next;
+                        while ((next = next.getNext()) != null)
+                            if (next.getType() == LABEL && ((LabelNode) next).labelGet() instanceof ComputeLabel nextLabel && nextLabel.result != null)
+                                break;
+                            else {
+                                instructions.remove(prev);
+                                prev = next;
+                            }
+                        instructions.remove(prev);
+                        continue;
+                    }
                 next = next.getNext();
             }
         }
@@ -196,7 +202,6 @@ public interface MethodTraverser {
             return result;
         }
         
-        @HotSpotMethodFlags(_force_inline)
         private static void markLabel(final LabelNode labelNode) {
             if (labelNode.labelGet() instanceof ComputeLabel computeLabel)
                 computeLabel.mark = true;
@@ -206,7 +211,6 @@ public interface MethodTraverser {
         
     }
     
-    @HotSpotJIT
     @AllArgsConstructor
     @FieldDefaults(level = AccessLevel.PUBLIC)
     class ExceptionHandlerLabel extends ComputeLabel {
@@ -220,7 +224,6 @@ public interface MethodTraverser {
         
         { mark = true; }
         
-        @HotSpotMethodFlags(_force_inline)
         public final void mergeExceptionHandler(final Frame frame, final BinaryOperator<String> getCommonSuperClass) {
             if (result == null)
                 result = frame.dup((LabelNode) info, TypeOwner.ofThrowable(exception));
@@ -327,8 +330,19 @@ public interface MethodTraverser {
                                 }
                             }
                 }
-                if (needMarkFrame)
+                if (needMarkFrame) {
                     ComputeLabel.insertFrame(instructions, initFrame.snapshot());
+                    final List<LabelNode> labelNodes = methodNode.instructions.fromIterable().cast(LabelNode.class).toList();
+                    if (methodNode.localVariables != null) {
+                        methodNode.localVariables.removeIf(variable -> !labelNodes.contains(variable.start) || !labelNodes.contains(variable.end));
+                        if (methodNode.visibleLocalVariableAnnotations != null && methodNode.visibleLocalVariableAnnotations.size() > methodNode.localVariables.size())
+                            methodNode.visibleLocalVariableAnnotations = new ArrayList<>(methodNode.visibleLocalVariableAnnotations.subList(0, methodNode.localVariables.size()));
+                        if (methodNode.invisibleLocalVariableAnnotations != null && methodNode.invisibleLocalVariableAnnotations.size() > methodNode.localVariables.size())
+                            methodNode.invisibleLocalVariableAnnotations = new ArrayList<>(methodNode.invisibleLocalVariableAnnotations.subList(0, methodNode.localVariables.size()));
+                    }
+                    if (methodNode.tryCatchBlocks != null)
+                        methodNode.tryCatchBlocks.removeIf(blockNode -> !labelNodes.contains(blockNode.start) || !labelNodes.contains(blockNode.end) || !labelNodes.contains(blockNode.handler));
+                }
             }
             methodNode.maxLocals = max(methodNode.maxLocals, initFrame.localsSize());
         }
@@ -359,7 +373,6 @@ public interface MethodTraverser {
         }
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void compute(final Frame frame, final int opcode) {
         switch (opcode) {
             case -1,
@@ -525,10 +538,8 @@ public interface MethodTraverser {
         }
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void pushNull(final Frame frame) = frame.push(TypeOwner.NULL);
     
-    @HotSpotMethodFlags(_force_inline)
     private static void pushConstant(final Frame frame) = frame.push(switch (frame.insn().getOpcode()) {
         case ICONST_M1,
                 ICONST_5,
@@ -556,13 +567,10 @@ public interface MethodTraverser {
         default          -> throw unreachableArea();
     });
     
-    @HotSpotMethodFlags(_force_inline)
     private static void load(final Frame frame) = frame.push(checkTargetType(frame, targetType(frame.insn().getOpcode()), frame.load(frame.<VarInsnNode>insn().var)));
     
-    @HotSpotMethodFlags(_force_inline)
     private static void store(final Frame frame) = frame.store(frame.<VarInsnNode>insn().var, checkTargetType(frame, targetType(frame.insn().getOpcode()), frame.pop()));
     
-    @HotSpotMethodFlags(_force_inline)
     private static void arrayLoad(final Frame frame) {
         checkTargetType(frame, Type.INT_TYPE, frame.pop());
         final Type arrayType = arrayType(frame.insn().getOpcode());
@@ -571,7 +579,6 @@ public interface MethodTraverser {
         frame.push(array == TypeOwner.NULL ? TypeOwner.ofNull(ASMHelper.elementType(arrayType)) : TypeOwner.of(ASMHelper.elementType(array.type())));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void arrayStore(final Frame frame) {
         final int opcode = frame.insn().getOpcode();
         checkTargetType(frame, targetType(opcode), frame.pop());
@@ -579,10 +586,8 @@ public interface MethodTraverser {
         checkTargetType(frame, arrayType(opcode), frame.pop());
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void pop(final Frame frame) = checkTargetSize(frame, 1 + frame.insn().getOpcode() - POP, frame.pop());
     
-    @HotSpotMethodFlags(_force_inline)
     private static void dup(final Frame frame) {
         final int opcode = frame.insn().getOpcode(), size = opcode < DUP2 ? 1 : 2, offset = opcode - (opcode < DUP2 ? DUP : DUP2), index[] = { 0 };
         for (int sum = 0; sum < offset; index[0]++)
@@ -593,7 +598,6 @@ public interface MethodTraverser {
         values.forEach(value -> frame.insert(index[0], value));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void swap(final Frame frame) {
         final TypeOwner
                 next = checkTargetSize(frame, 1, frame.pop()),
@@ -602,7 +606,6 @@ public interface MethodTraverser {
         frame.push(prev);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void binary(final Frame frame) {
         final Type
                 right = rightType(frame.insn().getOpcode()),
@@ -612,23 +615,18 @@ public interface MethodTraverser {
         frame.push(TypeOwner.of(resultType(frame.insn().getOpcode())));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void unary(final Frame frame) = frame.push(checkTargetType(frame, targetType(frame.insn().getOpcode()), frame.pop()));
     
-    @HotSpotMethodFlags(_force_inline)
     private static void inc(final Frame frame) = checkTargetType(frame, Type.INT_TYPE, frame.load(frame.<IincInsnNode>insn().var));
     
-    @HotSpotMethodFlags(_force_inline)
     private static void ifJump(final Frame frame) = checkTargetType(frame, targetType(frame.insn().getOpcode()), frame.pop());
     
-    @HotSpotMethodFlags(_force_inline)
     private static void ifCmpJump(final Frame frame) {
         final Type expected = targetType(frame.insn().getOpcode());
         checkTargetType(frame, expected, frame.pop());
         checkTargetType(frame, expected, frame.pop());
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void cast(final Frame frame) {
         final AbstractInsnNode insn = frame.insn();
         final int opcode = insn.getOpcode();
@@ -636,7 +634,6 @@ public interface MethodTraverser {
         frame.push(TypeOwner.of(resultType(opcode)));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void checkCast(final Frame frame) {
         final AbstractInsnNode insn = frame.insn();
         final Type expected = Type.getObjectType(((TypeInsnNode) insn).desc);
@@ -644,23 +641,18 @@ public interface MethodTraverser {
         frame.push(TypeOwner.of(expected));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void jsr(final Frame frame) { throw obsoleteOpcode(frame.insn().getOpcode()); }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void ret(final Frame frame) { throw obsoleteOpcode(frame.insn().getOpcode()); }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void switchJump(final Frame frame) = checkTargetType(frame, Type.INT_TYPE, frame.pop());
     
-    @HotSpotMethodFlags(_force_inline)
     private static void returnType(final Frame frame) {
         final Type expected = targetType(frame.insn().getOpcode());
         if (expected.getSort() != Type.VOID)
             checkTargetType(frame, expected, frame.pop());
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void field(final Frame frame) {
         switch (frame.insn().getOpcode()) {
             case GETSTATIC -> getStatic(frame);
@@ -670,25 +662,20 @@ public interface MethodTraverser {
         }
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void getStatic(final Frame frame) = frame.push(TypeOwner.of(Type.getType(frame.<FieldInsnNode>insn().desc)));
     
-    @HotSpotMethodFlags(_force_inline)
     private static void putStatic(final Frame frame) = checkTargetType(frame, Type.getType(frame.<FieldInsnNode>insn().desc), frame.pop());
     
-    @HotSpotMethodFlags(_force_inline)
     private static void getField(final Frame frame) {
         checkTargetType(frame, ASMHelper.TYPE_OBJECT, frame.pop());
         frame.push(TypeOwner.of(Type.getType(frame.<FieldInsnNode>insn().desc)));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void putField(final Frame frame) {
         checkTargetType(frame, Type.getType(frame.<FieldInsnNode>insn().desc), frame.pop());
         checkTargetType(frame, Type.getObjectType(frame.<FieldInsnNode>insn().owner), frame.pop());
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void invoke(final Frame frame) {
         switch (frame.insn().getOpcode()) {
             case INVOKEVIRTUAL   -> invokeVirtual(frame);
@@ -699,22 +686,16 @@ public interface MethodTraverser {
         }
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void invokeVirtual(final Frame frame) = invoke(frame, frame.<MethodInsnNode>insn().desc, frame.<MethodInsnNode>insn().owner);
     
-    @HotSpotMethodFlags(_force_inline)
     private static void invokeSpecial(final Frame frame) = invoke(frame, frame.<MethodInsnNode>insn().desc, frame.<MethodInsnNode>insn().owner);
     
-    @HotSpotMethodFlags(_force_inline)
     private static void invokeStatic(final Frame frame) = invoke(frame, frame.<MethodInsnNode>insn().desc);
     
-    @HotSpotMethodFlags(_force_inline)
     private static void invokeInterface(final Frame frame) = invoke(frame, frame.<MethodInsnNode>insn().desc, frame.<MethodInsnNode>insn().owner);
     
-    @HotSpotMethodFlags(_force_inline)
     private static void invokeDynamic(final Frame frame) = invoke(frame, frame.<InvokeDynamicInsnNode>insn().desc);
     
-    @HotSpotMethodFlags(_force_inline)
     private static void invoke(final Frame frame, final String desc, final @Nullable String owner = null) {
         final Type argumentTypes[] = Type.getArgumentTypes(desc);
         for (int i = argumentTypes.length - 1; i > -1; i--)
@@ -727,42 +708,34 @@ public interface MethodTraverser {
             frame.erase(target.flag());
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void newInstance(final Frame frame) = frame.push(TypeOwner.ofNew(frame.insn()));
     
-    @HotSpotMethodFlags(_force_inline)
     private static void newArray(final Frame frame) {
         final AbstractInsnNode insn = frame.insn();
         checkTargetType(frame, Type.INT_TYPE, frame.pop());
         frame.push(TypeOwner.of(ASMHelper.arrayType(insn instanceof TypeInsnNode typeInsn ? Type.getObjectType(typeInsn.desc) : newArrayType(((IntInsnNode) insn).operand))));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void arrayLength(final Frame frame) {
         checkTargetIsArray(frame, frame.pop());
         frame.push(TypeOwner.INTEGER);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void athrow(final Frame frame) = checkTargetType(frame, ASMHelper.TYPE_THROWABLE, frame.pop());
     
-    @HotSpotMethodFlags(_force_inline)
     private static void instanceOf(final Frame frame) {
         checkTargetType(frame, ASMHelper.TYPE_OBJECT, frame.pop());
         frame.push(TypeOwner.INTEGER);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void monitor(final Frame frame) = frame.pop();
     
-    @HotSpotMethodFlags(_force_inline)
     private static void multiNewArray(final Frame frame) {
         final MultiANewArrayInsnNode insn = frame.insn();
         IntStream.range(0, insn.dims).forEach(length -> checkTargetType(frame, Type.INT_TYPE, frame.pop()));
         frame.push(TypeOwner.of(Type.getObjectType(insn.desc)));
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static TypeOwner checkTargetType(final Frame frame, final Type expected, final TypeOwner owner) {
         final int expectedSort = expected.getSort(), valueSort = owner.type().getSort();
         if (expectedSort == valueSort)
@@ -776,14 +749,12 @@ public interface MethodTraverser {
         throw new ComputeException.TypeMismatch(frame, expected, owner);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static TypeOwner checkTargetSize(final Frame frame, final int expected, final TypeOwner owner) {
         if (expected != owner.type().getSize())
             throw new ComputeException.SizeMismatch(frame, expected, owner);
         return owner;
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static TypeOwner checkTargetSize(final Frame frame, final int min, final int max, final TypeOwner owner) {
         final int size = owner.type().getSize();
         if (min > size || max < size)
@@ -791,17 +762,14 @@ public interface MethodTraverser {
         return owner;
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static TypeOwner checkTargetIsArray(final Frame frame, final TypeOwner owner) {
         if (owner != TypeOwner.NULL && owner.type().getSort() != Type.ARRAY)
             throw new ComputeException.ArrayTypeMismatch(frame, owner);
         return owner;
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static IllegalArgumentException obsoleteOpcode(final int opcode) = { "Obsolete opcode: " + opcode };
     
-    @HotSpotMethodFlags(_force_inline)
     private static AssertionError unreachableArea() = { "Unreachable area!" };
     
 }

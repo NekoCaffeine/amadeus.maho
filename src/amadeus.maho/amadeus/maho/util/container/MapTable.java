@@ -14,15 +14,14 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.function.Consumer3;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.tuple.Tuple2;
 import amadeus.maho.util.tuple.Tuple3;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 public interface MapTable<R, C, V> {
     
     static <R, C, V> MapTable<R, C, V> newMapTable(final Map<R, Map<C, V>> backingMap, final Function<R, Map<C, V>> factory) = new MapTable<>() {
@@ -75,6 +74,7 @@ public interface MapTable<R, C, V> {
     
     default void clear() = backingMap().clear();
     
+    @Extension.Operator("GET")
     default @Nullable Map<C, V> get(final @Nullable R rowKey) = backingMap().get(rowKey);
     
     default @Nullable V get(final @Nullable R rowKey, final @Nullable C columnKey) {

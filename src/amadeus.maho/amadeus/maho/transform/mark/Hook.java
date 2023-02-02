@@ -16,6 +16,7 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.util.annotation.mark.DefaultClass;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.Freeze;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 import amadeus.maho.util.annotation.mark.paradigm.AOP;
@@ -40,7 +41,7 @@ public @interface Hook {
                 VOID_MARK = { };
             else
                 try {
-                    final Class<?> bridgeTarget = Class.forName(Result.class.getName(), true, MahoBridge.bridgeClassLoader());
+                    final Class<?> bridgeTarget = Class.forName(Result.class.getName(), true, MahoBridge.bridgeClassLoader()); // fallback
                     if (Result.class != bridgeTarget) {
                         final Field field = bridgeTarget.getDeclaredField("VOID_MARK");
                         field.setAccessible(true);
@@ -67,7 +68,7 @@ public @interface Hook {
                 TRUE  = { Boolean.TRUE },
                 FALSE = { Boolean.FALSE };
         
-        public final Object result;
+        public final @Nullable Object result;
         
         public int jumpIndex = -1;
         
@@ -97,7 +98,7 @@ public @interface Hook {
         
         public Result() = this(VOID_MARK);
         
-        public <T> Result(final T result) = this.result = result;
+        public <T> Result(final @Nullable T result) = this.result = result;
         
         public static Result trueToVoid(final boolean flag) = flag ? VOID : FALSE;
         
@@ -169,6 +170,7 @@ public @interface Hook {
     @IgnoredDefaultValue("target")
     String target() default "";
     
+    @DisallowLoading
     @Remap.Class
     @IgnoredDefaultValue("target")
     Class<?> value() default DefaultClass.class;

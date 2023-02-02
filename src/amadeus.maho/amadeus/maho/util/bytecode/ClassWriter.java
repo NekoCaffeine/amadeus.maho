@@ -21,11 +21,9 @@ import amadeus.maho.util.control.FunctionChain;
 import amadeus.maho.util.dynamic.ClassLoaderLocal;
 import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
 
-@HotSpotJIT
 @Setter
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE)

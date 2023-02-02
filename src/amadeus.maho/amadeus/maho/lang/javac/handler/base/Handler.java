@@ -13,6 +13,7 @@ import org.objectweb.asm.Type;
 
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.transform.TransformerManager;
 import amadeus.maho.transform.handler.base.marker.BaseMarker;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.util.bytecode.ASMHelper;
@@ -29,7 +30,7 @@ public @interface Handler {
         private static final List<Supplier<Class<? extends BaseHandler<Annotation>>>> handlerTypes = new CopyOnWriteArrayList<>();
         
         @Override
-        public void onMark() = handlerTypes() += () -> (Class<? extends BaseHandler<Annotation>>) ASMHelper.loadType(Type.getObjectType(sourceClass.name), true, contextClassLoader());
+        public void onMark(final TransformerManager.Context context) = handlerTypes() += () -> (Class<? extends BaseHandler<Annotation>>) ASMHelper.loadType(Type.getObjectType(sourceClass.name), true, contextClassLoader());
         
         @Override
         public boolean advance() = false;

@@ -33,7 +33,6 @@ import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.inspection.APIStatus;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.mark.Hook;
-import amadeus.maho.transform.mark.Preload;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.TransformTarget;
 import amadeus.maho.transform.mark.base.At;
@@ -52,7 +51,6 @@ import static org.objectweb.asm.Opcodes.*;
 
 @Experimental
 @HiddenDanger(HiddenDanger.JVM_NOT_CATCH) // java.lang.StackStreamFactory$AbstractStackWalker.fetchStackFrames(JJII[Ljava/lang/Object;)I
-@Preload
 @TransformProvider
 @APIStatus(design = APIStatus.Stage.β, implement = APIStatus.Stage.γ)
 public class HackerLiveStackFrame implements Hacker {

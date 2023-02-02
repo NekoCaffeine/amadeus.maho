@@ -2,10 +2,11 @@ package amadeus.maho.transform.mark.base;
 
 import java.util.List;
 
-import amadeus.maho.util.annotation.AnnotationHandler;
-import amadeus.maho.util.bytecode.remap.RemapHandler;
-
 import org.objectweb.asm.Type;
+
+import amadeus.maho.util.annotation.AnnotationHandler;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
+import amadeus.maho.util.bytecode.remap.RemapHandler;
 
 public @interface MethodDescriptor {
     
@@ -20,9 +21,10 @@ public @interface MethodDescriptor {
         
     }
     
-    // return target
+    @DisallowLoading
     Class<?> value() default void.class;
     
+    @DisallowLoading
     Class<?>[] parameters() default { };
     
 }

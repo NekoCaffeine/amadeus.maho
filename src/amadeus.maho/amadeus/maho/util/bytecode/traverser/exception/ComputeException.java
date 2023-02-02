@@ -1,15 +1,13 @@
 package amadeus.maho.util.bytecode.traverser.exception;
 
+import org.objectweb.asm.Type;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.util.bytecode.traverser.Frame;
 import amadeus.maho.util.bytecode.traverser.TypeOwner;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-import org.objectweb.asm.Type;
-
-@HotSpotJIT
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ComputeException extends RuntimeException {
@@ -19,7 +17,7 @@ public class ComputeException extends RuntimeException {
     public static class Load extends ComputeException {
         
         Frame frame;
-        int local;
+        int   local;
         
         public Load(final Frame frame, final int local) {
             super("at: " + local + ", in: " + frame.locals(), frame);
@@ -33,7 +31,7 @@ public class ComputeException extends RuntimeException {
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class TypeMismatch extends ComputeException {
         
-        Type expected;
+        Type      expected;
         TypeOwner owner;
         
         public TypeMismatch(final Frame frame, final Type expected, final TypeOwner owner) {
@@ -62,7 +60,7 @@ public class ComputeException extends RuntimeException {
     public static class Pop extends ComputeException {
         
         public Pop(final Frame frame) = super("pop empty stack", frame);
-    
+        
     }
     
     @Getter
@@ -82,7 +80,7 @@ public class ComputeException extends RuntimeException {
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class SizeMismatch extends ComputeException {
         
-        int expected;
+        int       expected;
         TypeOwner owner;
         
         public SizeMismatch(final Frame frame, final int expected, final TypeOwner owner) {

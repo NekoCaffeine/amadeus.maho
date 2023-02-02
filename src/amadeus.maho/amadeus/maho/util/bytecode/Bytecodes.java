@@ -5,13 +5,9 @@ import jdk.internal.vm.annotation.Stable;
 import org.objectweb.asm.Type;
 
 import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
-import amadeus.maho.vm.transform.mark.HotSpotMethodFlags;
 
 import static amadeus.maho.util.bytecode.Bytecodes.Flags.*;
-import static amadeus.maho.vm.reflection.hotspot.KlassMethod.Flags._force_inline;
 
-@HotSpotJIT
 public interface Bytecodes {
     
     interface Flags {
@@ -467,7 +463,6 @@ public interface Bytecodes {
             T_LONG    = 11;
     // @formatter:on
     
-    @HotSpotMethodFlags(_force_inline)
     static int newArrayType(final Type type) = switch (type.getSort()) {
         case Type.BOOLEAN -> T_BOOLEAN;
         case Type.CHAR    -> T_CHAR;
@@ -480,7 +475,6 @@ public interface Bytecodes {
         default           -> throw new IllegalArgumentException(type.getDescriptor());
     };
     
-    @HotSpotMethodFlags(_force_inline)
     static Type newArrayType(final int type) = switch (type) {
         case T_BOOLEAN -> Type.BOOLEAN_TYPE;
         case T_CHAR    -> Type.CHAR_TYPE;
@@ -493,7 +487,6 @@ public interface Bytecodes {
         default        -> throw new IllegalArgumentException(String.valueOf(type));
     };
     
-    @HotSpotMethodFlags(_force_inline)
     static int baseType(final int opcode) {
         if (isLoad(opcode))
             return ILOAD;
@@ -504,10 +497,8 @@ public interface Bytecodes {
         return opcode;
     }
     
-    @HotSpotMethodFlags(_force_inline)
     static int lengthOf(final int opcode) = lengthArray[opcode];
     
-    @HotSpotMethodFlags(_force_inline)
     static int stackEffectOf(final int opcode) = stackEffectArray[opcode];
     
     static String nameOf(final int opcode) throws IllegalArgumentException {

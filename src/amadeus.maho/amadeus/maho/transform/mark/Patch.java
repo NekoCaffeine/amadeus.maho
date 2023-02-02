@@ -9,6 +9,7 @@ import amadeus.maho.transform.handler.PatchTransformer;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.util.annotation.mark.DefaultClass;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 import amadeus.maho.util.annotation.mark.paradigm.AOP;
 
@@ -54,6 +55,7 @@ public @interface Patch {
     @Retention(RetentionPolicy.RUNTIME)
     @interface Inline { }
     
+    @DisallowLoading
     @Remap.Class
     @IgnoredDefaultValue("target")
     Class<?> value() default DefaultClass.class;

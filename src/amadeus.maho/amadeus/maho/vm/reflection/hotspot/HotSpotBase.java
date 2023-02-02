@@ -6,8 +6,8 @@ import amadeus.maho.util.runtime.UnsafeHelper;
 
 public interface HotSpotBase {
     
-    HotSpot jvm = HotSpot.instance();
-    
     Unsafe unsafe = UnsafeHelper.unsafe();
+    
+    HotSpot jvm = HotSpot.instance();
     
 }

@@ -9,6 +9,7 @@ import amadeus.maho.transform.handler.ProxyTransformer;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.util.annotation.mark.DefaultClass;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 
 @TransformMark(ProxyTransformer.class)
@@ -28,6 +29,7 @@ public @interface Proxy {
     // makeSiteByNameWithBoot
     boolean reverse() default false;
     
+    @DisallowLoading
     @Remap.Class
     @IgnoredDefaultValue("target")
     Class<?> targetClass() default DefaultClass.class;

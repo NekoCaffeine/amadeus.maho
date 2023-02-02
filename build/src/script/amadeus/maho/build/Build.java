@@ -93,10 +93,9 @@ public interface Build {
     
     static void aotPush() = push(aotBuild());
     
-    @Privilege
     @SneakyThrows
     private static void closeModuleReaderAndPush(final Path build, final Path home, final Consumer<Path> copy) throws InterruptedException {
-        ((BuiltinClassLoader) Maho.class.getClassLoader()).moduleToReader.values().forEach(ModuleReader::close); // Unlock 'modules'
+        ((Privilege) ((BuiltinClassLoader) Maho.class.getClassLoader()).moduleToReader).values().forEach(ModuleReader::close); // Unlock 'modules'
         FileHelper.retryWhenIOE(() -> {
             --(home / "modules");
             --(home / "sources");
@@ -118,5 +117,9 @@ public interface Build {
         Files.writeString(mark, map.entrySet().stream().map(entry -> "%s: %s".formatted(entry.getKey(), entry.getValue())).collect(Collectors.joining("\n")));
         push(build);
     }
+    
+    int debugPort = 36768;
+    
+    static Process debug(final List<String> args = List.of()) = workspace.run(module, debugPort, args);
     
 }

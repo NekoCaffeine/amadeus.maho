@@ -8,9 +8,7 @@ import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.util.bytecode.traverser.Frame;
 import amadeus.maho.util.bytecode.traverser.TypeOwner;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class FrameMergeException extends IllegalArgumentException {

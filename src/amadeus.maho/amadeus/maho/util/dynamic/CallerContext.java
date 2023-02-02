@@ -5,11 +5,9 @@ import java.lang.reflect.Executable;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static amadeus.maho.util.bytecode.ASMHelper.*;
 
-@HotSpotJIT
 public interface CallerContext {
     
     abstract class Stack {

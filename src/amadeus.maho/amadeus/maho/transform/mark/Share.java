@@ -9,6 +9,7 @@ import amadeus.maho.transform.handler.ShareMarker;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.util.annotation.mark.DefaultClass;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 
 @Share(erase = @Erase(method = true))
@@ -18,6 +19,7 @@ import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 public @interface Share { // Share class to boot class loader
     
     // Remapping is fully qualified of the target class fully qualified, default is not mapped
+    @DisallowLoading
     @IgnoredDefaultValue("target")
     Class<?> value() default DefaultClass.class;
     

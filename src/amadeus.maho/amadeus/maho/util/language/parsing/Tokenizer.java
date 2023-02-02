@@ -17,13 +17,9 @@ import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.function.FunctionHelper;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
-import amadeus.maho.vm.transform.mark.HotSpotMethodFlags;
 
-import static amadeus.maho.vm.reflection.hotspot.KlassMethod.Flags._force_inline;
 import static java.lang.Character.getType;
 
-@HotSpotJIT
 @Getter
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -36,7 +32,6 @@ public class Tokenizer {
         
     }
     
-    @HotSpotJIT
     @AllArgsConstructor
     @FieldDefaults(level = AccessLevel.PUBLIC)
     public static class Context {
@@ -53,28 +48,21 @@ public class Tokenizer {
         @Default
         final StringBuilder builder = { };
     
-        @HotSpotMethodFlags(_force_inline)
         public StringBuilder builder() {
             builder.setLength(0);
             return builder;
         }
     
-        @HotSpotMethodFlags(_force_inline)
         public Context dup() = { tokenizer, this, nowPos, nowPos, cache };
     
-        @HotSpotMethodFlags(_force_inline)
         public self rollback(final int length = 1) = nowPos -= length;
     
-        @HotSpotMethodFlags(_force_inline)
         public boolean withinRange(final int range = codePoints().length) = nowPos < range;
     
-        @HotSpotMethodFlags(_force_inline)
         public int nowChar() = withinRange() ? codePoints()[nowPos] : '\0';
     
-        @HotSpotMethodFlags(_force_inline)
         public boolean hasNext() = withinRange(codePoints().length - 1);
     
-        @HotSpotMethodFlags(_force_inline)
         public int nextChar() = hasNext() ? codePoints()[++nowPos] : '\0';
     
         public int scanChar(final EscapeFunction escape) throws ParseException {
@@ -157,26 +145,20 @@ public class Tokenizer {
             return result;
         }
     
-        @HotSpotMethodFlags(_force_inline)
-        public ParseException eof() = { "Unexpected end of file.", debugInformation(), nowPos };
+            public ParseException eof() = { "Unexpected end of file.", debugInformation(), nowPos };
     
-        @HotSpotMethodFlags(_force_inline)
-        public self checkEOF() { if (!hasNext()) throw eof(); }
+            public self checkEOF() { if (!hasNext()) throw eof(); }
     
-        @HotSpotMethodFlags(_force_inline)
-        public ParseException invalid(final boolean next = false) = { "Invalid character: '%s'".formatted(next ? nextChar() : nowChar()), debugInformation(), nowPos };
+            public ParseException invalid(final boolean next = false) = { "Invalid character: '%s'".formatted(next ? nextChar() : nowChar()), debugInformation(), nowPos };
     
-        @HotSpotMethodFlags(_force_inline)
-        public ParseException invalid(final String string) = { "Invalid string: '%s'".formatted(string), debugInformation(), nowPos };
+            public ParseException invalid(final String string) = { "Invalid string: '%s'".formatted(string), debugInformation(), nowPos };
     
-        @HotSpotMethodFlags(_force_inline)
-        public void assertState(final boolean state) {
+            public void assertState(final boolean state) {
             if (!state)
                 throw invalid();
         }
         
-        @HotSpotMethodFlags(_force_inline)
-        public void assertNonnull(final @Nullable Object object) = assertState(object != null);
+            public void assertNonnull(final @Nullable Object object) = assertState(object != null);
         
     }
     
@@ -213,52 +195,39 @@ public class Tokenizer {
     public static Tokenizer tokenization(final int codePoints[], final @Nullable String debugInformation = null, final Function<Class<?>, Parser<?>> parserProvider = type -> null)
             = { codePoints, debugInformation, parserProvider };
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isNumber(final int c) = c >= '0' && c < '9';
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isNumberOrDot(final int c) = c == '.' || isNumber(c);
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isLowerLetter(final int c) = c >= 'a' && c <= 'z';
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isUpperLetter(final int c) = c >= 'A' && c <= 'Z';
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isLetter(final int c) = isLowerLetter(c) || isUpperLetter(c);
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isLetterOrNumber(final int c) = isLetter(c) || isNumber(c);
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isEncodingStart(final int c) = isLetter(c);
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isEncodingPart(final int c) = switch (c) {
         case '-', '_', '.' -> true;
         default -> isLetter(c) || isNumber(c);
     };
     
-    @HotSpotMethodFlags(_force_inline)
     public static IntPredicate typeChecker(final int... types) {
         final int type = IntStream.of(types).map(i -> 1 << i).reduce(0, (a, b) -> a | b);
         return codePoint -> isType(type, codePoint);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public static boolean isType(final int type, final int codePoint) = (type >> getType(codePoint) & 1) != 0;
     
-    @HotSpotMethodFlags(_force_inline)
     public static IntPredicate firstThen(final IntPredicate first, final IntPredicate then) {
         final boolean p_flag[] = { false };
         return c -> p_flag[0] ? then.test(c) : (p_flag[0] = true) && first.test(c);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public static IntPredicate javaIdentifierChecker() = firstThen(Character::isJavaIdentifierStart, Character::isJavaIdentifierPart);
     
-    @HotSpotMethodFlags(_force_inline)
     public static IntPredicate encodingChecker() = firstThen(Tokenizer::isEncodingStart, Tokenizer::isEncodingPart);
     
 }

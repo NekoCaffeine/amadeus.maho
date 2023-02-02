@@ -32,11 +32,11 @@ public class KlassMethod implements HotSpotBase {
     
     long address;
     
-    ConstMethod constMethod = { jvm.getAddress(address + _constMethod) };
+    ConstMethod constMethod = { unsafe.getAddress(address + _constMethod) };
     
-    public short flags() = jvm.getShort(address + _flags);
+    public short flags() = unsafe.getShort(address + _flags);
     
-    public void flags(final short value) = jvm.putShort(address + _flags, value);
+    public void flags(final short value) = unsafe.putShort(address + _flags, value);
     
     public void flag(final short flag, final boolean mark) = flags((short) (mark ? flags() | flag : flags() & ~flag));
     

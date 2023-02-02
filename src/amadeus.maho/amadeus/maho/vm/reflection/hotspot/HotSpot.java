@@ -15,6 +15,7 @@ import amadeus.maho.core.Maho;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.runtime.UnsafeHelper;
@@ -60,7 +61,7 @@ public enum HotSpot implements JVM {
             if (fieldName == null)
                 break;
             structs.computeIfAbsent(getStringRef(entry + typeNameOffset), k -> new TreeSet<>()) +=
-                    new HotSpotField(fieldName, getStringRef(entry + typeStringOffset), getLong(entry + (getInt(entry + isStaticOffset) != 0 ? addressOffset : offsetOffset)), getInt(entry + isStaticOffset) != 0);
+                    new HotSpotField(fieldName, getStringRef(entry + typeStringOffset), unsafe.getLong(entry + (unsafe.getInt(entry + isStaticOffset) != 0 ? addressOffset : offsetOffset)), unsafe.getInt(entry + isStaticOffset) != 0);
         }
         return structs;
     }
@@ -81,10 +82,10 @@ public enum HotSpot implements JVM {
             types[typeName] = {
                     typeName,
                     getStringRef(entry + superclassNameOffset),
-                    getInt(entry + sizeOffset),
-                    getInt(entry + isOopTypeOffset) != 0,
-                    getInt(entry + isIntegerTypeOffset) != 0,
-                    getInt(entry + isUnsignedOffset) != 0,
+                    unsafe.getInt(entry + sizeOffset),
+                    unsafe.getInt(entry + isOopTypeOffset) != 0,
+                    unsafe.getInt(entry + isIntegerTypeOffset) != 0,
+                    unsafe.getInt(entry + isUnsignedOffset) != 0,
                     structs[typeName]
             };
         }
@@ -99,7 +100,7 @@ public enum HotSpot implements JVM {
             final @Nullable String name = getStringRef(entry + nameOffset);
             if (name == null)
                 break;
-            constants[name] = getInt(entry + valueOffset);
+            constants[name] = unsafe.getInt(entry + valueOffset);
         }
     }
     
@@ -112,53 +113,29 @@ public enum HotSpot implements JVM {
             final @Nullable String name = getStringRef(entry + nameOffset);
             if (name == null)
                 break;
-            constants[name] = getLong(entry + valueOffset);
+            constants[name] = unsafe.getLong(entry + valueOffset);
         }
     }
     
     private void readVmFlags() {
         final HotSpotType flagType = type("JVMFlag");
         final int flagSize = flagType.size;
-        final int numFlagsValue = getInt(flagType.field("numFlags").offset); // numFlagsValue - 1 => null
+        final int numFlagsValue = unsafe.getInt(flagType.field("numFlags").offset); // numFlagsValue - 1 => null
         final HotSpotField _addr = flagType.field("_addr"), _name = flagType.field("_name"), _flags = flagType.field("_flags"), _type = flagType.field("_type");
-        long address = getAddress(flagType.field("flags").offset);
+        long address = unsafe.getAddress(flagType.field("flags").offset);
         for (int i = 0; i < numFlagsValue - 1; i++) {
-            final String flagName = getString(getAddress(address + _name.offset));
-            flags[flagName] = { address + _addr.offset, flagName, getInt(address + _flags.offset), getInt(address + _type.offset) };
+            final String flagName = getString(unsafe.getAddress(address + _name.offset));
+            flags[flagName] = { address + _addr.offset, flagName, unsafe.getInt(address + _flags.offset), unsafe.getInt(address + _type.offset) };
             address += flagSize;
         }
     }
-    
-    public byte getByte(final long addr) = unsafe.getByte(addr);
-    
-    public void putByte(final long addr, final byte val) = unsafe.putByte(addr, val);
-    
-    public short getShort(final long addr) = unsafe.getShort(addr);
-    
-    public void putShort(final long addr, final short val) = unsafe.putShort(addr, val);
-    
-    public int getInt(final long addr) = unsafe.getInt(addr);
-    
-    public void putInt(final long addr, final int val) = unsafe.putInt(addr, val);
-    
-    public long getLong(final long addr) = unsafe.getLong(addr);
-    
-    public void putLong(final long addr, final long val) = unsafe.putLong(addr, val);
-    
-    public double getDouble(final long addr) = unsafe.getDouble(addr);
-    
-    public void putDouble(final long addr, final double val) = unsafe.putDouble(addr, val);
-    
-    public long getAddress(final long addr) = unsafe.getAddress(addr);
-    
-    public void putAddress(final long addr, final long val) = unsafe.putAddress(addr, val);
     
     public @Nullable String getString(final long addr) {
         if (addr == 0)
             return null;
         char chars[] = new char[40];
         int offset = 0;
-        for (byte b; (b = getByte(addr + offset)) != 0; ) {
+        for (byte b; (b = unsafe.getByte(addr + offset)) != 0; ) {
             if (offset >= chars.length)
                 chars = Arrays.copyOf(chars, offset * 2);
             chars[offset++] = (char) b;
@@ -166,26 +143,26 @@ public enum HotSpot implements JVM {
         return { chars, 0, offset };
     }
     
-    public @Nullable String getStringRef(final long addr) = getString(getAddress(addr));
+    public @Nullable String getStringRef(final long addr) = getString(unsafe.getAddress(addr));
     
     @SneakyThrows
     public long getSymbol(final String name) {
         final long address = JVMSymbols.lookup(name);
         if (address == 0)
             throw new JVMReflectiveOperationException("No such symbol: " + name);
-        return getLong(address);
+        return unsafe.getLong(address);
     }
     
     HotSpotType symbolType = type("Symbol");
     long _body = symbolType.offset("_body"), _length = symbolType.offset("_length");
     
     public String getSymbol(final long symbolAddress) {
-        final long symbol = getAddress(symbolAddress);
+        final long symbol = unsafe.getAddress(symbolAddress);
         final long body = symbol + _body;
-        final int length = getShort(symbol + _length);
+        final int length = unsafe.getShort(symbol + _length);
         final byte buffer[] = new byte[length];
         for (int i = 0; i < length; i++)
-            buffer[i] = getByte(body + i);
+            buffer[i] = unsafe.getByte(body + i);
         return { buffer, StandardCharsets.UTF_8 };
     }
     
@@ -224,7 +201,6 @@ public enum HotSpot implements JVM {
         types.values().forEach(type -> type.dump(list, subHead));
     }
     
-    @Getter(lazy = true)
     int oopDescSize = type("oopDesc").size - (flag("UseCompressedClassPointers").asBool() ? type("jint").size : 0);
     
     public <T> T copyObjectWithoutHead(final Class<T> type, final Object target) {
@@ -232,8 +208,7 @@ public enum HotSpot implements JVM {
             return (T) target;
         final T result = UnsafeHelper.allocateInstanceOfType(type);
         final long objectSize = Maho.instrumentation().getObjectSize(target);
-        final int oopDescSize = oopDescSize();
-        unsafe.copyMemory(target, oopDescSize, result, oopDescSize, objectSize - oopDescSize);
+        (Privilege) unsafe.copyMemory0(target, oopDescSize, result, oopDescSize, objectSize - oopDescSize);
         return result;
     }
     
@@ -243,8 +218,7 @@ public enum HotSpot implements JVM {
             return null;
         final Object result = UnsafeHelper.allocateInstanceOfType(target.getClass());
         final long objectSize = Maho.instrumentation().getObjectSize(target);
-        final int oopDescSize = oopDescSize();
-        unsafe.copyMemory(target, oopDescSize, result, oopDescSize, objectSize - oopDescSize);
+        (Privilege) unsafe.copyMemory0(target, oopDescSize, result, oopDescSize, objectSize - oopDescSize);
         return (T) result;
     }
     

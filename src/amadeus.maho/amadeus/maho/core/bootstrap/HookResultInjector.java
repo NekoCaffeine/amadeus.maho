@@ -22,7 +22,7 @@ import amadeus.maho.lang.inspection.Nullable;
 import static amadeus.maho.util.math.MathHelper.max;
 import static org.objectweb.asm.Opcodes.*;
 
-public enum ReflectionInjector implements Injector {
+public enum HookResultInjector implements Injector {
     
     @Getter
     instance;
@@ -31,26 +31,27 @@ public enum ReflectionInjector implements Injector {
     public @Nullable byte[] transform(final @Nullable Module module, final @Nullable ClassLoader loader, final @Nullable String className,
             final @Nullable Class<?> classBeingRedefined, final @Nullable ProtectionDomain protectionDomain, final @Nullable byte[] bytecode) {
         if (classBeingRedefined != null && classBeingRedefined.getName().equals(target())) {
-            Maho.debug("ReflectionInjector -> jdk.internal.reflect.Reflection");
+            Maho.debug("HookResultInjector -> jdk.internal.loader.BuiltinClassLoader");
             final ClassReader reader = { bytecode };
             final ClassNode node = { };
             reader.accept(node, 0);
             for (final MethodNode methodNode : node.methods)
-                if (methodNode.name.equals("verifyMemberAccess") && methodNode.desc.equals("(Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Class;I)Z")) {
-                    Maho.debug("ReflectionInjector -> jdk.internal.reflect.Reflection::verifyMemberAccess");
+                if (methodNode.name.equals("loadClassOrNull") && methodNode.desc.equals("(Ljava/lang/String;Z)Ljava/lang/Class;")) {
+                    Maho.debug("HookResultInjector -> jdk.internal.loader.BuiltinClassLoader::loadClassOrNull");
                     final InsnList instructions = { };
-                    instructions.add(new VarInsnNode(ALOAD, 0));
-                    instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Class", "getName", "()Ljava/lang/String;"));
-                    instructions.add(new LdcInsnNode("amadeus."));
-                    instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/String", "startsWith", "(Ljava/lang/String;)Z"));
+                    instructions.add(new LdcInsnNode("amadeus.maho.transform.mark.Hook$Result"));
+                    instructions.add(new VarInsnNode(ALOAD, 1));
+                    instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Object", "equals", "(Ljava/lang/Object;)Z"));
                     final LabelNode label = { };
                     instructions.add(new JumpInsnNode(IFEQ, label));
-                    instructions.add(new InsnNode(ICONST_1));
-                    instructions.add(new InsnNode(IRETURN));
+                    instructions.add(new MethodInsnNode(INVOKESTATIC, "jdk/internal/loader/ClassLoaders", "bootLoader", "()Ljdk/internal/loader/BuiltinClassLoader;"));
+                    instructions.add(new VarInsnNode(ALOAD, 1));
+                    instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/ClassLoader", "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;"));
+                    instructions.add(new InsnNode(ARETURN));
                     instructions.add(label);
                     instructions.add(new FrameNode(F_SAME, 0, null, 0, null));
                     methodNode.instructions.insert(instructions);
-                    methodNode.maxStack = max(methodNode.maxStack, 2);
+                    methodNode.maxStack = max(methodNode.maxStack, 1);
                 }
             final ClassWriter writer = { 0 };
             node.accept(writer);
@@ -60,6 +61,6 @@ public enum ReflectionInjector implements Injector {
     }
     
     @Override
-    public String target() = "jdk.internal.reflect.Reflection";
+    public String target() = "jdk.internal.loader.BuiltinClassLoader";
     
 }

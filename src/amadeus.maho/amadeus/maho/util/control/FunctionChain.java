@@ -11,9 +11,7 @@ import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 @Getter
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

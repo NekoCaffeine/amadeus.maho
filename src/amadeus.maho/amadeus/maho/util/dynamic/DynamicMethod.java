@@ -52,13 +52,11 @@ import amadeus.maho.util.runtime.MethodHandleHelper;
 import amadeus.maho.util.runtime.TypeHelper;
 import amadeus.maho.util.runtime.UnsafeHelper;
 import amadeus.maho.util.tuple.Tuple2;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static amadeus.maho.core.extension.MagicAccessor.*;
 import static amadeus.maho.util.math.MathHelper.*;
 import static org.objectweb.asm.Opcodes.*;
 
-@HotSpotJIT
 @RequiredArgsConstructor(on = @IndirectCaller)
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class DynamicMethod {
@@ -68,7 +66,11 @@ public class DynamicMethod {
     @TransformProvider
     public interface Delegating {
         
-        String DelegatingClassLoader = "jdk.internal.reflect.DelegatingClassLoader";
+        String
+                DelegatingClassLoader       = "jdk.internal.reflect.DelegatingClassLoader",
+                MemberName                  = "java.lang.invoke.MemberName",
+                InnerClassLambdaMetafactory = "java.lang.invoke.InnerClassLambdaMetafactory",
+                ForwardingMethodGenerator   = "java.lang.invoke.InnerClassLambdaMetafactory$ForwardingMethodGenerator";
         
         MethodHandle constructor = MethodHandleHelper.lookup().findConstructor(Class.forName(DelegatingClassLoader), MethodType.methodType(void.class, ClassLoader.class));
         
@@ -76,11 +78,13 @@ public class DynamicMethod {
         static @InvisibleType(DelegatingClassLoader) ClassLoader delegating(final @Nullable ClassLoader parent) = (ClassLoader) constructor.invoke(parent); // rollback: before inline
         
         @Hook(avoidRecursion = true)
-        private static Hook.Result checkAccess(final MethodHandles.Lookup $this, final byte refKind, final Class<?> refClass, final @InvisibleType("java.lang.invoke.MemberName") Object memberName)
+        private static Hook.Result checkAccess(final MethodHandles.Lookup $this, final byte refKind, final Class<?> refClass, final @InvisibleType(MemberName) Object memberName)
                 = Hook.Result.falseToVoid(bridgeClass.isAssignableFrom($this.lookupClass()), null);
         
+        // # Cross-package constructor reference support
+        
         @Hook(avoidRecursion = true, at = @At(field = @At.FieldInsn(name = "useImplMethodHandle")), capture = true)
-        private static boolean _init_(final boolean capture, final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory") Object $this,
+        private static boolean _init_(final boolean capture, final @InvisibleType(InnerClassLambdaMetafactory) Object $this,
                 final MethodHandles.Lookup caller,
                 final MethodType invokedType,
                 final String samMethodName,
@@ -92,33 +96,25 @@ public class DynamicMethod {
                 final MethodType additionalBridges[])
                 = capture || bridgeClass.isAssignableFrom(caller.lookupClass());
         
-        // Fixed: https://github.com/openjdk/jdk/commit/07e90524576f159fc16523430f1db62327c89a3b
-        // @Proxy(INVOKESPECIAL)
-        // private static int invocationOpcode(@InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory$ForwardingMethodGenerator") final Object $this) = -1;
-        //
-        // @Hook(avoidRecursion = true, at = @At(method = @At.MethodInsn(name = "getMethodType")), before = false, jump = @At(method = @At.MethodInsn(name = "insertParameterTypes"), offset = 1))
-        // private static Hook.Result generate(final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory$ForwardingMethodGenerator") Object $this, final MethodType methodType)
-        //         = invocationOpcode($this) == INVOKESTATIC ? new Hook.Result().jump() : Hook.Result.VOID;
-        
         @Proxy(GETFIELD)
-        private static boolean useImplMethodHandle(final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory") Object metafactory) = DebugHelper.breakpointThenError();
+        private static boolean useImplMethodHandle(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
         
         @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_newInvokeSpecial), ordinal = 0, offset = 1), capture = true, avoidRecursion = true)
-        private static boolean generate_$NEW_DUP(final boolean capture, final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory$ForwardingMethodGenerator") MethodVisitor $this, final MethodType methodType)
+        private static boolean generate_$NEW_DUP(final boolean capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType)
                 = capture && !useImplMethodHandle(Privilege.Outer.access($this));
         
         @Proxy(GETFIELD)
-        private static int implKind(final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory") Object metafactory) = DebugHelper.breakpointThenError();
+        private static int implKind(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
         
         @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_invokeStatic), ordinal = 0, offset = 1), capture = true, avoidRecursion = true)
-        private static boolean generate_$insertParameterTypes(final boolean capture, final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory$ForwardingMethodGenerator") MethodVisitor $this, final MethodType methodType)
+        private static boolean generate_$insertParameterTypes(final boolean capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType)
                 = capture && implKind(Privilege.Outer.access($this)) != MethodHandleInfo.REF_newInvokeSpecial;
         
         @Proxy(GETFIELD)
-        private static Class<?> implClass(final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory") Object metafactory) = DebugHelper.breakpointThenError();
+        private static Class<?> implClass(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
         
         @Hook(at = @At(method = @At.MethodInsn(name = "descriptorString"), ordinal = 0), capture = true, avoidRecursion = true)
-        private static MethodType generate_$changeReturnType(final MethodType capture, final @InvisibleType("java.lang.invoke.InnerClassLambdaMetafactory$ForwardingMethodGenerator") MethodVisitor $this, final MethodType methodType) {
+        private static MethodType generate_$changeReturnType(final MethodType capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType) {
             final var metafactory = Privilege.Outer.access($this);
             return implKind(metafactory) != MethodHandleInfo.REF_newInvokeSpecial ? capture : capture.changeReturnType(implClass(metafactory));
         }
@@ -388,7 +384,7 @@ public class DynamicMethod {
     }
     
     @SneakyThrows
-    @HiddenDanger(HiddenDanger.INVALID_BYTECODE) // FIXME bytecode check
+    @HiddenDanger(HiddenDanger.INVALID_BYTECODE)
     protected Class<?> defineWrapperClass() {
         closure().forEach(fieldNode -> fieldNode.access |= ACC_SYNTHETIC);
         final byte bytecode[] = toBytecode(loader());

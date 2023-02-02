@@ -19,33 +19,24 @@ import amadeus.maho.lang.mark.StateSnapshot;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
-import amadeus.maho.vm.transform.mark.HotSpotMethodFlags;
 
-import static amadeus.maho.vm.reflection.hotspot.KlassMethod.Flags._force_inline;
-
-@HotSpotJIT
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class Sampler<T> {
     
-    @HotSpotJIT
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class Interceptor extends Sampler<String> implements amadeus.maho.intercept.Interceptor {
         
         ThreadLocal<Deque<Handle>> handleLocal = ThreadLocal.withInitial(ArrayDeque::new);
         
         @Override
-        @HotSpotMethodFlags(_force_inline)
         public void enter(final Class<?> clazz, final String name, final MethodType methodType, final Object... args) = handleLocal.get() << handle("%s#%s%s".formatted(clazz.getName(), name, methodType.descriptorString()));
         
         @Override
-        @HotSpotMethodFlags(_force_inline)
         public void exit() = handleLocal.get().pollLast()?.close();
         
     }
     
-    @HotSpotJIT
     @EqualsAndHashCode
     public record Frame(long start, long end, long total = end - start) implements Comparable<Frame> {
         
@@ -60,12 +51,10 @@ public class Sampler<T> {
     public static class Empty<T> extends Sampler<T> {
         
         @Override
-        @HotSpotMethodFlags(_force_inline)
         public void submit(final T mark, final Frame frame) { }
         
     }
     
-    @HotSpotJIT
     @RequiredArgsConstructor
     @FieldDefaults(level = AccessLevel.PROTECTED)
     public class Handle implements StateSnapshot {
@@ -74,11 +63,9 @@ public class Sampler<T> {
         
         long start = now(), end;
         
-        @HotSpotMethodFlags(_force_inline)
         public long now() = System.nanoTime();
         
         @Override
-        @HotSpotMethodFlags(_force_inline)
         public void close() = submit(mark, new Frame(start, now()));
         
     }
@@ -91,10 +78,8 @@ public class Sampler<T> {
     ConcurrentHashMap<T, ConcurrentLinkedQueue<Frame>> data = { };
     
     @Extension.Operator("GET")
-    @HotSpotMethodFlags(_force_inline)
     public Handle handle(final T mark) = { mark };
     
-    @HotSpotMethodFlags(_force_inline)
     public void submit(final T mark, final Frame frame) {
         total().addAndGet(frame.total());
         count().incrementAndGet();
@@ -104,7 +89,6 @@ public class Sampler<T> {
         data().computeIfAbsent(mark, key -> new ConcurrentLinkedQueue<>()) += frame;
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public void clear() {
         min().set(null);
         max().set(null);

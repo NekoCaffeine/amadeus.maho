@@ -11,6 +11,7 @@ import amadeus.maho.transform.mark.base.MethodDescriptor;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.util.annotation.mark.DefaultClass;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 
 @TransformMark(TargetTransformer.class)
@@ -23,6 +24,7 @@ public @interface TransformTarget {
     @IgnoredDefaultValue("target")
     String target() default "";
     
+    @DisallowLoading
     @IgnoredDefaultValue("target")
     Class<?> targetClass() default DefaultClass.class;
     

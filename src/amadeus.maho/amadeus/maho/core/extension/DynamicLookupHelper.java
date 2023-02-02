@@ -4,7 +4,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -20,16 +19,14 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.container.Indexed;
-import amadeus.maho.util.dynamic.ClassLoaderLocal;
+import amadeus.maho.util.dynamic.ClassLocal;
 import amadeus.maho.util.dynamic.DynamicMethod;
 import amadeus.maho.util.profile.Sampler;
 import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
 
-@HotSpotJIT
 public interface DynamicLookupHelper {
     
     Sampler<String> sampler = MahoProfile.sampler("makeAllPrivilegeProxy");
@@ -68,16 +65,12 @@ public interface DynamicLookupHelper {
         }
     }
     
-    ClassLoaderLocal<ConcurrentHashMap<Class<?>, Map<Method, MethodHandle>>> accessHandleCache = { loader -> new ConcurrentHashMap<>() };
+    ClassLocal<Map<Method, MethodHandle>> privilegeProxies = { DynamicLookupHelper::makePrivilegeProxies };
     
-    static void makeAllPrivilegeProxy(final Class<?> target, final ClassNode node) {
-        try (final var handle = sampler[target.getCanonicalName()]) {
-            accessHandleCache[target.getClassLoader()][target] = Stream.of(target.getDeclaredMethods())
-                    .filter(method -> method.isAnnotationPresent(Privilege.Mark.class))
-                    .map(method -> Tuple.tuple(method, dynamic(target, node, method).handle()))
-                    .collect(Collectors.toMap(Tuple2::v1, Tuple2::v2));
-        }
-    }
+    static Map<Method, MethodHandle> makePrivilegeProxies(final Class<?> clazz, final ClassNode node = Maho.getClassNodeFromClass(clazz)) = Stream.of(clazz.getDeclaredMethods())
+            .filter(method -> method.isAnnotationPresent(Privilege.Mark.class))
+            .map(method -> Tuple.tuple(method, dynamic(clazz, node, method).handle()))
+            .collect(Collectors.toMap(Tuple2::v1, Tuple2::v2));
     
     private static DynamicMethod dynamic(final Class<?> target, final ClassNode node, final Method method) {
         final DynamicMethod dynamicMethod = DynamicMethod.ofMethod(target.getClassLoader(), "PrivilegeProxy$%s$%s".formatted(target.getSimpleName(), method.getName()), method, node);
@@ -87,16 +80,7 @@ public interface DynamicLookupHelper {
     
     @SneakyThrows
     @IndirectCaller
-    static MethodHandle accessHandle(final Method method) {
-        final Class<?> declaringClass = method.getDeclaringClass();
-        final ConcurrentHashMap<Class<?>, Map<Method, MethodHandle>> cache = accessHandleCache[declaringClass.getClassLoader()];
-        @Nullable Map<Method, MethodHandle> handleMap = cache[declaringClass];
-        if (handleMap == null) {
-            BytecodeObserver.instance().observe(declaringClass);
-            handleMap = cache[declaringClass];
-        }
-        return handleMap[method];
-    }
+    static MethodHandle accessHandle(final Method method) = privilegeProxies[method.getDeclaringClass()][method];
     
     Handle makeSiteByNameWithBoot = {
             H_INVOKESTATIC,

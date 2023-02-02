@@ -47,16 +47,14 @@ import amadeus.maho.util.bytecode.remap.RemapHandler;
 import amadeus.maho.util.bytecode.tree.DynamicVarInsnNode;
 import amadeus.maho.util.bytecode.tree.NodeCopier;
 import amadeus.maho.util.runtime.ObjectHelper;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static org.objectweb.asm.Opcodes.*;
 
-@HotSpotJIT
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public final class PatchTransformer extends BaseTransformer<Patch> implements ClassTransformer.Limited {
     
-    private final String target;
+    String target;
     
     {
         if (handler.isNotDefault(Patch::value))
@@ -303,7 +301,7 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
         }
     }
     
-    protected static String replace(final String src, final String patch, final String clazz) = src.equals(patch) ? clazz : src;
+    private static String replace(final String src, final String patch, final String clazz) = src.equals(patch) ? clazz : src;
     
     @Override
     public Set<String> targets() = Set.of(target);

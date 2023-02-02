@@ -13,9 +13,8 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 public class UnsignedIntegerHandler {
     
     @Hook
-    @Privilege
     private static void visitLiteral(final Attr $this, final JCTree.JCLiteral tree) {
-        if (tree.value instanceof Number number && tree.typetag.isSubRangeOf(TypeTag.LONG) && $this.resultInfo.pt instanceof Type.JCPrimitiveType primitiveType) {
+        if (tree.value instanceof Number number && tree.typetag.isSubRangeOf(TypeTag.LONG) && (Privilege) ((Privilege) $this.resultInfo).pt instanceof Type.JCPrimitiveType primitiveType) {
             final long value = number.longValue();
             switch (primitiveType.getTag()) {
                 case BYTE  -> {

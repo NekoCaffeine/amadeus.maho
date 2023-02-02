@@ -15,12 +15,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
-import amadeus.maho.vm.transform.mark.HotSpotMethodFlags;
 
-import static amadeus.maho.vm.reflection.hotspot.KlassMethod.Flags._force_inline;
-
-@HotSpotJIT
 @EqualsAndHashCode
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -50,14 +45,12 @@ public class TypeOwner {
     @Default
     final @Nullable Object flag = null;
     
-    @HotSpotMethodFlags(_force_inline)
     public boolean isReferenceType() = this != INVALID && switch (type().getSort()) {
         case Type.OBJECT,
              Type.ARRAY -> true;
         default         -> false;
     };
     
-    @HotSpotMethodFlags(_force_inline)
     public TypeOwner erase() = flag() == null ? this : of(type());
     
     @Override
@@ -66,7 +59,6 @@ public class TypeOwner {
         return flag() == Opcodes.UNINITIALIZED_THIS ? name + ":U" : flag() instanceof Label ? name + ":L" : name;
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public static TypeOwner of(final Type type) = switch (type.getSort()) {
         case Type.BOOLEAN,
              Type.BYTE,
@@ -79,7 +71,6 @@ public class TypeOwner {
         default          -> new TypeOwner(type);
     };
     
-    @HotSpotMethodFlags(_force_inline)
     public static TypeOwner ofNull(final Type type) = switch (type.getSort()) {
         case Type.BOOLEAN,
              Type.BYTE,
@@ -92,13 +83,10 @@ public class TypeOwner {
         default          -> NULL;
     };
     
-    @HotSpotMethodFlags(_force_inline)
     public static TypeOwner ofThis(final Type type, final boolean initialized) = { type, initialized ? null : Opcodes.UNINITIALIZED_THIS };
     
-    @HotSpotMethodFlags(_force_inline)
     public static TypeOwner ofNew(final TypeInsnNode insn) = { Type.getObjectType(insn.desc), label(insn) };
     
-    @HotSpotMethodFlags(_force_inline)
     private static Label label(final AbstractInsnNode insn) {
         AbstractInsnNode now = insn;
         loop:
@@ -113,7 +101,6 @@ public class TypeOwner {
         throw new IllegalStateException("Missing LabelNode in front of opcode NEW.");
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public static TypeOwner ofThrowable(final @Nullable String internalName) = of(internalName == null ? ASMHelper.TYPE_THROWABLE : Type.getObjectType(internalName));
     
 }

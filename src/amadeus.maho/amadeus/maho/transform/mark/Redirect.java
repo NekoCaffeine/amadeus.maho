@@ -11,6 +11,7 @@ import amadeus.maho.transform.mark.base.Slice;
 import amadeus.maho.transform.mark.base.TransformMark;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.util.annotation.mark.DefaultClass;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 import amadeus.maho.util.annotation.mark.paradigm.AOP;
 
@@ -24,6 +25,7 @@ public @interface Redirect {
     
     boolean direct() default false;
     
+    @DisallowLoading
     @Remap.Class
     @IgnoredDefaultValue("target")
     Class<?> targetClass() default DefaultClass.class;

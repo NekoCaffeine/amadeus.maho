@@ -20,8 +20,16 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.CallerContext;
 
 @SneakyThrows
-@TransformProvider
 public class ReflectBreaker {
+    
+    @TransformProvider
+    private interface Layer {
+        
+        @Hook
+        private static Hook.Result checkAccess(final AccessibleObject $this, final Class<?> caller, final Class<?> memberClass, final Class<?> targetClass, final int modifiers)
+                = Hook.Result.falseToVoid(accessFlag() || breakModules.contains(caller.getModule()));
+        
+    }
     
     private static final Set<Module> breakModules = Collections.newSetFromMap(new WeakHashMap<>());
     
@@ -33,10 +41,6 @@ public class ReflectBreaker {
         accessFlag(true);
         resetReflection();
     }
-    
-    @Hook
-    private static Hook.Result checkAccess(final AccessibleObject $this, final Class<?> caller, final Class<?> memberClass, final Class<?> targetClass, final int modifiers)
-            = Hook.Result.falseToVoid(accessFlag() || breakModules.contains(caller.getModule()));
     
     public static synchronized void doBreak(final Module... modules = CallerContext.caller().getModule()) = breakModules *= List.of(modules);
     

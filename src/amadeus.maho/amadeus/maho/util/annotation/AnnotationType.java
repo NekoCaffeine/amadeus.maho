@@ -13,9 +13,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import amadeus.maho.util.dynamic.ClassLocal;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 public record AnnotationType(
         Class<?> annotationClass,
         Map<String, Class<?>> memberTypes,

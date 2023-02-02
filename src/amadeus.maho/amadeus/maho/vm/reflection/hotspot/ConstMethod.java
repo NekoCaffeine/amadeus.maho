@@ -20,13 +20,13 @@ public class ConstMethod implements HotSpotBase {
             _name_index = ConstMethod.offset("_name_index"),
             _signature_index = ConstMethod.offset("_signature_index");
     
-    long address, pool = jvm.getAddress(address + _constants);
+    long address, pool = unsafe.getAddress(address + _constants);
     
     String name = name(), signature = signature();
     
-    public int nameIndex() = jvm.getShort(address + _name_index) & 0xFFFF;
+    public int nameIndex() = unsafe.getShort(address + _name_index) & 0xFFFF;
     
-    public int signatureIndex() = jvm.getShort(address + _signature_index) & 0xFFFF;
+    public int signatureIndex() = unsafe.getShort(address + _signature_index) & 0xFFFF;
     
     public String name() = jvm.getSymbol(pool + ConstantPool.size + nameIndex() * oopSize);
     

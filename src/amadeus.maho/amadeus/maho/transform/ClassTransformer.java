@@ -3,10 +3,10 @@ package amadeus.maho.transform;
 import java.security.ProtectionDomain;
 import java.util.Set;
 
+import org.objectweb.asm.tree.ClassNode;
+
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.context.TransformContext;
-
-import org.objectweb.asm.tree.ClassNode;
 
 public interface ClassTransformer extends TransformRange {
     

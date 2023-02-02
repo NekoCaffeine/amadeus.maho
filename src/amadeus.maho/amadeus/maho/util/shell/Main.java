@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.tools.JavaFileManager;
@@ -27,8 +28,9 @@ import static amadeus.maho.util.build.Javac.*;
 
 public class Main {
     
-    @SneakyThrows
-    public static void main(final String... args) {
+    private static final Map<String, String> inlineArgMapping = Map.of(".", "/exit");
+    
+    private static void init() {
         new URLConnection(null) {
             
             @Override
@@ -41,6 +43,11 @@ public class Main {
             MahoExport.Setup.minimize();
         System.out.println("Initializing maho shell, this may take a few seconds.");
         Maho.instrumentation();
+    }
+    
+    @SneakyThrows
+    public static void main(final String... args) {
+        init();
         final int exitCode;
         final Path scriptDir = Path.of("build", "src", "script");
         if (Files.isDirectory(scriptDir)) {
@@ -86,6 +93,6 @@ public class Main {
     
     private static List<String> args(final String... args) = Stream.of(args).map(Main::map).collect(Collectors.toCollection(ArrayList::new));
     
-    private static String map(final String arg) = arg.codePoints().allMatch(Character::isJavaIdentifierPart) ? arg + "()" : arg;
+    private static String map(final String arg) = inlineArgMapping[arg] ?? (arg.codePoints().allMatch(Character::isJavaIdentifierPart) ? arg + "()" : arg);
     
 }

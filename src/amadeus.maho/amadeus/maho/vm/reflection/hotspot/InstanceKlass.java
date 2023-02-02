@@ -21,7 +21,7 @@ public class InstanceKlass implements HotSpotBase {
     
     public static final long
             oopSize       = jvm.longConstant("oopSize"),
-            _klass_offset = jvm.getInt(jvm.type("java_lang_Class").global("_klass_offset")),
+            _klass_offset = unsafe.getInt(jvm.type("java_lang_Class").global("_klass_offset")),
             _constants    = InstanceKlass.offset("_constants"),
             _fields       = InstanceKlass.offset("_fields"),
             _fields_data  = jvm.type("Array<u2>").offset("_data"),
@@ -33,22 +33,22 @@ public class InstanceKlass implements HotSpotBase {
     
     Class<?> clazz;
     
-    long address = oopSize == 8 ? unsafe.getLong(clazz, _klass_offset) : unsafe.getInt(clazz, _klass_offset) & 0xFFFFFFFFL, pool = jvm.getAddress(address + _constants);
+    long address = oopSize == 8 ? unsafe.getLong(clazz, _klass_offset) : unsafe.getInt(clazz, _klass_offset) & 0xFFFFFFFFL, pool = unsafe.getAddress(address + _constants);
     
     public Stream<KlassField> fields() {
-        final long fieldArray = jvm.getAddress(address + _fields);
-        final int methodCount = jvm.getInt(fieldArray);
+        final long fieldArray = unsafe.getAddress(address + _fields);
+        final int methodCount = unsafe.getInt(fieldArray);
         final long fields = fieldArray + _fields_data;
         final int p_index[] = { -1 };
-        return StreamHelper.takeWhileNonNull(() -> ++p_index[0] < methodCount ? new KlassField(jvm.getAddress(fields + p_index[0] * oopSize), pool) : null);
+        return StreamHelper.takeWhileNonNull(() -> ++p_index[0] < methodCount ? new KlassField(unsafe.getAddress(fields + p_index[0] * oopSize), pool) : null);
     }
     
     public Stream<KlassMethod> methods() {
-        final long methodArray = jvm.getAddress(address + _methods);
-        final int methodCount = jvm.getInt(methodArray);
+        final long methodArray = unsafe.getAddress(address + _methods);
+        final int methodCount = unsafe.getInt(methodArray);
         final long methods = methodArray + _methods_data;
         final int p_index[] = { -1 };
-        return StreamHelper.takeWhileNonNull(() -> ++p_index[0] < methodCount ? new KlassMethod(jvm.getAddress(methods + p_index[0] * oopSize)) : null);
+        return StreamHelper.takeWhileNonNull(() -> ++p_index[0] < methodCount ? new KlassMethod(unsafe.getAddress(methods + p_index[0] * oopSize)) : null);
     }
     
 }

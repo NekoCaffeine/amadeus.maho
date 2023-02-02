@@ -22,11 +22,9 @@ import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.vm.tools.hotspot.WhiteBox;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static amadeus.maho.core.MahoExport.MAHO_LOGS_FORCED_INTERRUPTION;
 
-@HotSpotJIT
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AsyncLogger extends Thread implements AutoCloseable {
     

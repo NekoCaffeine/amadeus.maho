@@ -27,25 +27,19 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.FrameNodeMergeException;
 import amadeus.maho.util.bytecode.traverser.exception.ComputeException;
 import amadeus.maho.util.bytecode.traverser.exception.FrameMergeException;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
-import amadeus.maho.vm.transform.mark.HotSpotMethodFlags;
 
 import static amadeus.maho.util.bytecode.FrameHelper.*;
 import static amadeus.maho.util.math.MathHelper.*;
-import static amadeus.maho.vm.reflection.hotspot.KlassMethod.Flags._force_inline;
 
-@HotSpotJIT
 @Setter
 @Getter
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Frame {
     
-    @HotSpotJIT
     @EqualsAndHashCode
     public record Snapshot(AbstractInsnNode insn, List<Object> locals, List<Object> stack) {
         
-        @HotSpotMethodFlags(_force_inline)
         public FrameNode node() = full(locals().toArray(), stack().toArray());
         
         public FrameNode diff(final Frame.Snapshot next) {
@@ -85,7 +79,6 @@ public class Frame {
     
     final LinkedList<TypeOwner> locals = { }, stack = { };
     
-    @HotSpotMethodFlags(_force_inline)
     public final self markInsn(final AbstractInsnNode insn) = insn(insn);
     
     public void locals(final TypeOwner owner) = locals().let(Collection::clear) += owner;
@@ -140,7 +133,6 @@ public class Frame {
                                                                      |
                                                                     null
      */
-    @HotSpotMethodFlags(_force_inline)
     public static void merge(final BinaryOperator<String> getCommonSuperClass, final List<TypeOwner> aList, final List<TypeOwner> bList) {
         final LinkedList<TypeOwner> result = { };
         for (final Iterator<TypeOwner> aIterator = aList.iterator(), bIterator = bList.iterator(); aIterator.hasNext() && bIterator.hasNext(); ) {
@@ -187,7 +179,6 @@ public class Frame {
     
     public int stackSize() = stack().stream().map(TypeOwner::type).mapToInt(Type::getSize).sum();
     
-    @HotSpotMethodFlags(_force_inline)
     protected Object frameType(final TypeOwner owner) {
         if (owner == TypeOwner.INVALID)
             return Opcodes.TOP;
@@ -198,7 +189,6 @@ public class Frame {
         return info(owner.type());
     }
     
-    @HotSpotMethodFlags(_force_inline)
     protected List<Object> snapshot(final List<TypeOwner> owners) {
         final ArrayList<Object> result = { owners.size() };
         for (final TypeOwner owner : owners)
@@ -206,42 +196,34 @@ public class Frame {
         return result;
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public Snapshot snapshot(final AbstractInsnNode insn = insn()) = { insn, snapshot(locals()), snapshot(stack()) };
     
-    @HotSpotMethodFlags(_force_inline)
     public void clear() = stack.clear();
     
-    @HotSpotMethodFlags(_force_inline)
     public void map(final UnaryOperator<TypeOwner> mapper) {
         locals().replaceAll(mapper);
         stack().replaceAll(mapper);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public void erase(final Object flag) {
         final TypeOwner p_owner[] = { null };
         map(owner -> owner.flag() == flag ? p_owner[0] == null ? p_owner[0] = owner.erase() : p_owner[0] : owner);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public void push(final TypeOwner value) = stack().addLast(value);
     
-    @HotSpotMethodFlags(_force_inline)
     public TypeOwner pop() {
         try {
             return stack().removeLast();
         } catch (final NoSuchElementException e) { throw new ComputeException.Pop(this); }
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public TypeOwner fetch() {
         try {
             return stack().getLast();
         } catch (final NoSuchElementException e) { throw new ComputeException.Fetch(this, 0); }
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public TypeOwner fetch(final int offset) {
         try {
             final LinkedList<TypeOwner> stack = stack();
@@ -249,7 +231,6 @@ public class Frame {
         } catch (final NoSuchElementException e) { throw new ComputeException.Fetch(this, offset); }
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public void insert(final int offset, final TypeOwner value) {
         final LinkedList<TypeOwner> stack = stack();
         if (offset == 0)
@@ -258,7 +239,6 @@ public class Frame {
             stack.add(stack.size() - offset - 1, value);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public TypeOwner load(final int local) {
         int context = 0;
         for (final TypeOwner owner : locals()) {
@@ -274,7 +254,6 @@ public class Frame {
         throw new ComputeException.Load(this, local);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     public TypeOwner store(final int local, final TypeOwner value) {
         int index = 0, mark;
         for (final ListIterator<TypeOwner> iterator = locals().listIterator(); iterator.hasNext(); ) {
@@ -303,7 +282,6 @@ public class Frame {
         return value.let(locals()::add);
     }
     
-    @HotSpotMethodFlags(_force_inline)
     private static void store(final ListIterator<TypeOwner> iterator, final int sourceSize, final int valueSize) {
         if (sourceSize > valueSize) {
             for (int i = sourceSize - valueSize; i > 0; i--)

@@ -30,6 +30,7 @@ import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.TransformerManager;
 import amadeus.maho.util.annotation.mark.DefaultClass;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.Bytecodes;
@@ -316,6 +317,7 @@ public @interface At {
         
         String desc() default Lookup.WILDCARD;
         
+        @DisallowLoading
         Class<?> type() default DefaultClass.class;
         
     }
@@ -348,6 +350,7 @@ public @interface At {
         
         String desc() default Lookup.WILDCARD;
         
+        @DisallowLoading
         Class<?> type() default DefaultClass.class;
         
     }

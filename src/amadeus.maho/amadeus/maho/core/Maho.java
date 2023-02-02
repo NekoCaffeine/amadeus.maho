@@ -27,12 +27,11 @@ import org.objectweb.asm.tree.MethodNode;
 
 import amadeus.maho.agent.AgentInjector;
 import amadeus.maho.agent.LiveInjector;
+import amadeus.maho.core.bootstrap.HookResultInjector;
 import amadeus.maho.core.bootstrap.Injector;
 import amadeus.maho.core.bootstrap.ReflectionInjector;
 import amadeus.maho.core.bootstrap.UnsafeInjector;
 import amadeus.maho.core.extension.AllClassesPublic;
-import amadeus.maho.core.extension.BytecodeObserver;
-import amadeus.maho.core.extension.DynamicLookupHelper;
 import amadeus.maho.core.extension.ModuleAdder;
 import amadeus.maho.core.extension.ReflectBreaker;
 import amadeus.maho.lang.AccessLevel;
@@ -119,6 +118,7 @@ public final class Maho {
         instrumentation.addTransformer(AllClassesPublic.instance(), false);
         inject(instrumentation, ReflectionInjector.instance());
         inject(instrumentation, UnsafeInjector.instance());
+        inject(instrumentation, HookResultInjector.instance());
         final Set<Module> extraReads = Set.of(Maho.class.getModule());
         jailbreak(instrumentation, ModuleLayer.boot().modules().stream(), extraReads);
         final Module maho = Maho.class.getModule();
@@ -153,7 +153,9 @@ public final class Maho {
     @SneakyThrows
     public static void inject(final Instrumentation instrumentation = instrumentation(), final Injector injector) {
         instrumentation.addTransformer(injector, true);
-        instrumentation.retransformClasses(Class.forName(injector.target()));
+        try {
+            instrumentation.retransformClasses(Class.forName(injector.target()));
+        } catch (final VerifyError | InternalError error) { throw DebugHelper.breakpointBeforeThrow(error); }
     }
     
     public static final String FIELD_BRIDGE_CLASS_LOADER = "bridgeClassLoader";
@@ -168,11 +170,6 @@ public final class Maho {
         final Field target = bridge.getDeclaredField(FIELD_BRIDGE_CLASS_LOADER);
         target.setAccessible(true);
         target.set(null, Maho.class.getClassLoader());
-    }
-    
-    private static void loadMahoExtension() {
-        stage("loadMahoExtension");
-        BytecodeObserver.instance().observers() += DynamicLookupHelper::makeAllPrivilegeProxy;
     }
     
     public static final String
@@ -207,7 +204,6 @@ public final class Maho {
         new ArrayList<String>().let(result -> dump(result, " ".repeat(4))).forEach(Maho::debug);
         loadJavaSupport(instrumentation);
         loadClassLoaderBridge();
-        loadMahoExtension();
         if (Setup.state())
             setupTransformer();
     }

@@ -29,11 +29,9 @@ import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.RemapContext;
 import amadeus.maho.util.runtime.MethodHandleHelper;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 
-@HotSpotJIT
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public final class TargetTransformer extends MethodTransformer<TransformTarget> implements ClassTransformer.Limited, RemapContext {
@@ -61,9 +59,16 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
             throw new IllegalArgumentException("Unable to determine target class, missing required fields('targetClass' or 'target').");
     }
     
+    BiFunction<TransformContext, ClassNode, ClassNode> transformHandler[] = new BiFunction[1]; // doTransform disallow class loading
+    
     @Override
-    public ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain)
-            = makeHandler(contextClassLoader()).apply(context, node);
+    public void contextClassLoader(final ClassLoader loader) {
+        super.contextClassLoader(loader);
+        transformHandler[0] = makeHandler(loader);
+    }
+    
+    @Override
+    public ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) = transformHandler[0].apply(context, node);
     
     @SneakyThrows
     private BiFunction<TransformContext, ClassNode, ClassNode> makeHandler(final ClassLoader loader) {

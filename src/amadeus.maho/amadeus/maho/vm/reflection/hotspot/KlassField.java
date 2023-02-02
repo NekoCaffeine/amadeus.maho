@@ -32,17 +32,17 @@ public class KlassField implements HotSpotBase {
     
     String name = name(), signature = signature();
     
-    public int nameIndex() = jvm.getShort(address + name_index_offset) & 0xFFFF;
+    public int nameIndex() = unsafe.getShort(address + name_index_offset) & 0xFFFF;
     
-    public int signatureIndex() = jvm.getShort(address + signature_index_offset) & 0xFFFF;
+    public int signatureIndex() = unsafe.getShort(address + signature_index_offset) & 0xFFFF;
     
     public String name() = jvm.getSymbol(pool + ConstantPool.size + nameIndex() * oopSize);
     
     public String signature() = jvm.getSymbol(pool + ConstantPool.size + signatureIndex() * oopSize);
     
-    public short flags() = jvm.getShort(address + access_flags_offset);
+    public short flags() = unsafe.getShort(address + access_flags_offset);
     
-    public void flags(final short value) = jvm.putShort(address + access_flags_offset, value);
+    public void flags(final short value) = unsafe.putShort(address + access_flags_offset, value);
     
     public void flag(final short flag, final boolean mark) = flags((short) (mark ? flags() | flag : flags() & ~flag));
     

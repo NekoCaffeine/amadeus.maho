@@ -139,8 +139,15 @@ public enum WhiteBox {
     }
     
     public static synchronized void ready() {
-        Maho.debug("WhiteBox: Ready!");
-        JITCompiler.instance().ready();
+        try {
+            Maho.debug("WhiteBox: Ready!");
+            JITCompiler.instance().ready();
+        } catch (final NoClassDefFoundError e) {
+            try {
+                MahoBridge.bridgeClassLoader().loadClass("amadeus.maho.util.runtime.DebugHelper").getDeclaredMethod("breakpoint").invoke(null);
+            } catch (final ReflectiveOperationException ignored) { }
+            throw new IllegalStateException("The reason for this error is because Patcher is not working as expected, please check the behavior of TransformerManager", e);
+        }
     }
     
     // Get the maximum heap size supporting COOPs

@@ -19,7 +19,7 @@ public final class PreloadMarker extends BaseMarker<Preload> {
     
     @Override
     @SneakyThrows
-    public void onMark() {
+    public void onMark(final TransformerManager.Context context) {
         TransformerManager.transform("preload", ASMHelper.sourceName(sourceClass.name));
         preload(annotation, Class.forName(ASMHelper.sourceName(sourceClass.name), false, contextClassLoader()));
     }
@@ -36,13 +36,7 @@ public final class PreloadMarker extends BaseMarker<Preload> {
                         .invoke(MethodHandleHelper.lookup().findStaticVarHandle(clazz, "INSTANCE", clazz).get());
             else
                 MethodHandleHelper.lookup().findStatic(clazz, annotation.invokeMethod(), MethodType.methodType(void.class)).invoke();
-    }
-    
-    static {
-        TransformerManager.Patcher.needRetransformFilter().add(target -> target
-                .filter(retransformTarget -> TransformerManager.runtime().context() != null)
-                .filter(retransformTarget -> retransformTarget.isAnnotationPresent(Preload.class))
-                .map(_ -> Boolean.FALSE));
+        TransformerManager.Patcher.preLoadedClasses() += clazz;
     }
     
 }

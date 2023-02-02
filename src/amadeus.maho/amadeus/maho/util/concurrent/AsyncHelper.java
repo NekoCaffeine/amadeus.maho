@@ -14,9 +14,7 @@ import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.inspection.TestOnly;
 import amadeus.maho.util.throwable.RetryException;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 public interface AsyncHelper {
     
     @Getter

@@ -17,7 +17,7 @@ public final class HotSpotMethodFlagsMarker extends MethodMarker<HotSpotMethodFl
     
     @Override
     @SneakyThrows
-    public void onMark() = mark(contextClassLoader());
+    public void onMark(final TransformerManager.Context context) = mark(contextClassLoader());
     
     @SneakyThrows
     public void mark(final @Nullable ClassLoader loader) {

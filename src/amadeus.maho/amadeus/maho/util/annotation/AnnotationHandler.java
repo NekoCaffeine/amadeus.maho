@@ -24,18 +24,19 @@ import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.dynamic.ClassLocal;
 import amadeus.maho.util.dynamic.Wrapper;
 import amadeus.maho.util.runtime.ArrayHelper;
+import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
+import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.runtime.TypeHelper;
 import amadeus.maho.util.runtime.UnsafeHelper;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static amadeus.maho.util.function.FunctionHelper.lazy;
 
-@HotSpotJIT
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AnnotationHandler<T> {
     
@@ -101,7 +102,7 @@ public class AnnotationHandler<T> {
             .toArray(String[]::new);
     
     @Getter
-    private static final ClassLocal<Class<?>> annotationWrapper = {
+    private static final ClassLocal<Class<? extends Annotation>> annotationWrapper = {
             type -> {
                 final Wrapper<BaseAnnotation> wrapper = {
                         type.getClassLoader() ?? AnnotationHandler.class.getClassLoader(),
@@ -130,9 +131,9 @@ public class AnnotationHandler<T> {
     
     protected static <T> T wrapper(final Class<T> type) = UnsafeHelper.allocateInstance(annotationWrapper()[type]);
     
-    public static <T extends Annotation> T make(final Class<T> type, final ClassLoader contextLoader = type.getClassLoader(), final @Nullable List<Object> objects) = make(type, contextLoader, valueToMap(objects));
+    public static <T extends Annotation> T make(final Class<T> type, final @Nullable ClassLoader contextLoader = type.getClassLoader(), final @Nullable List<Object> objects) = make(type, contextLoader, valueToMap(objects));
     
-    public static <T extends Annotation> T make(final Class<T> clazz, final ClassLoader contextLoader, final Map<String, Object> sourceMemberValues)
+    public static <T extends Annotation> T make(final Class<T> clazz, final @Nullable ClassLoader contextLoader, final Map<String, Object> sourceMemberValues)
             = wrapper(clazz).let(it -> BaseAnnotation.handler(it, new AnnotationHandler<>(clazz, contextLoader, sourceMemberValues)));
     
     @Nullable
@@ -162,16 +163,19 @@ public class AnnotationHandler<T> {
     Class<T> type;
     
     @Getter
-    ClassLoader contextLoader;
+    @Nullable ClassLoader contextLoader;
     
     Map<String, Object> sourceMemberValues;
-    
-    Map<String, Object> defaultMemberValues;
     
     Map<String, Supplier<Object>> memberValueGetters;
     
     @Getter
     AnnotationType annotationData;
+    
+    @Getter(lazy = true)
+    Map<String, Object> defaultMemberValues = defaultValues()[annotationType].entrySet().stream()
+            .map(entry -> Map.entry(entry.getKey(), getter(entry.getValue(), method(entry.getKey()), false).get()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     
     public Map<String, Object> sourceMemberValues() = new HashMap<>(sourceMemberValues);
     
@@ -183,7 +187,7 @@ public class AnnotationHandler<T> {
     
     public <R> R defaultValue(final Function<T, R> getter) = defaultValue(name(getter));
     
-    public <R> R defaultValue(final String name) = (R) defaultMemberValues[name];
+    public <R> R defaultValue(final String name) = (R) defaultMemberValues()[name];
     
     public boolean isDefault(final Function<T, Object> getter) = isDefault(name(getter));
     
@@ -195,10 +199,7 @@ public class AnnotationHandler<T> {
     
     public <R> R lookupValue(final Function<T, R> getter) = lookupValue(name(getter));
     
-    public <R> R lookupValue(final String name) {
-        final @Nullable Supplier<Object> getter = memberValueGetters[name];
-        return getter != null ? (R) getter.get() : (R) defaultValue(name);
-    }
+    public <R> R lookupValue(final String name) = (R) memberValueGetters[name]?.get() ?? (R) defaultValue(name);
     
     public <R> @Nullable R lookupSourceValue(final Function<T, Object> getter) = lookupSourceValue(name(getter));
     
@@ -211,34 +212,33 @@ public class AnnotationHandler<T> {
         memberValueGetters[name] = getter(value, method(name));
     }
     
-    protected AnnotationHandler(final Class<T> type, final ClassLoader loader, final Map<String, Object> sourceMemberValues) {
+    protected AnnotationHandler(final Class<T> type, final @Nullable ClassLoader loader, final Map<String, Object> memberValues) {
         annotationType = findAnnotationClass(this.type = type);
         contextLoader = loader;
-        this.sourceMemberValues = new ConcurrentHashMap<>(sourceMemberValues);
+        sourceMemberValues = new ConcurrentHashMap<>(memberValues);
         annotationData = AnnotationType.instance(annotationType);
-        memberValueGetters = sourceMemberValues.entrySet().stream()
-                .collect(Collectors.toConcurrentMap(Map.Entry::getKey, entry -> getter(entry.getValue(), method(entry.getKey()))));
-        defaultMemberValues = defaultValues()[annotationType].entrySet().stream()
-                .map(entry -> Map.entry(entry.getKey(), getter(entry.getValue(), method(entry.getKey())).get()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        memberValueGetters = memberValues.entrySet().stream().collect(Collectors.toConcurrentMap(Map.Entry::getKey, entry -> getter(entry.getValue(), method(entry.getKey()))));
     }
     
     @SneakyThrows
-    protected Supplier<Object> getter(final Object value, final Method method) = switch (value) {
-        case Supplier<?> supplier -> (Supplier<Object>) supplier;
-        case Type type -> lazy(() -> ASMHelper.loadType(type, false, contextLoader));
-        case Type[] types -> lazy(() -> ASMHelper.loadTypes(Stream.of(types), false, contextLoader));
-        case AnnotationNode annotationNode -> lazy(() -> make((Class<? extends Annotation>) Class.forName(ASMHelper.sourceName(annotationNode.desc), false, contextLoader), contextLoader, annotationNode.values));
-        case List<?> list -> Enum[].class.isAssignableFrom(method.getReturnType()) ?
-                lazy(() -> ((List<String[]>) list).stream()
-                        .map(args -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]))
-                        .toArray(TypeHelper.arrayConstructor(method.getReturnType().getComponentType()))) :
-                lazy(() -> ArrayHelper.toPrimitive(list.stream()
-                        .map(element -> getter(element, method).get())
-                        .toArray(lookupArrayMapper(method))));
-        case String[] args && args.length == 2 && Enum.class.isAssignableFrom(method.getReturnType()) -> lazy(() -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]));
-        case null, default -> () -> value;
-    };
+    protected Supplier<Object> getter(final Object value, final Method method, final boolean checkLoading = true) = checkLoading && method.isAnnotationPresent(DisallowLoading.class) ?
+            () -> DebugHelper.breakpointBeforeThrow(new IllegalStateException("%s#%s is annotated with @DisallowLoading".formatted(method.getDeclaringClass().getCanonicalName(), method.getName()))) :
+            switch (value) {
+                case Supplier<?> supplier                                                                     -> (Supplier<Object>) supplier;
+                case Type type                                                                                -> lazy(() -> ASMHelper.loadType(type, false, contextLoader));
+                case Type[] types                                                                             -> lazy(() -> ASMHelper.loadTypes(Stream.of(types), false, contextLoader));
+                case AnnotationNode annotationNode                                                            ->
+                        lazy(() -> make((Class<? extends Annotation>) Class.forName(ASMHelper.sourceName(annotationNode.desc), false, contextLoader), contextLoader, annotationNode.values));
+                case List<?> list                                                                             -> Enum[].class.isAssignableFrom(method.getReturnType()) ?
+                        lazy(() -> ((List<String[]>) list).stream()
+                                .map(args -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]))
+                                .toArray(TypeHelper.arrayConstructor(method.getReturnType().getComponentType()))) :
+                        lazy(() -> ArrayHelper.toPrimitive(list.stream()
+                                .map(element -> getter(element, method).get())
+                                .toArray(lookupArrayMapper(method))));
+                case String[] args && args.length == 2 && Enum.class.isAssignableFrom(method.getReturnType()) -> lazy(() -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]));
+                case null, default                                                                            -> () -> value;
+            };
     
     protected IntFunction<Object[]> lookupArrayMapper(final Method method) {
         if (!method.getReturnType().isArray())
@@ -278,7 +278,13 @@ public class AnnotationHandler<T> {
         return annotationData().members().values().stream().allMatch(method -> ArrayHelper.deepEquals(lookupValue(method.getName()), handler != null ? handler.lookupValue(method.getName()) : method.invoke(obj)));
     }
     
-    protected String toStringImpl() = "@%s(%s)".formatted(type().getName(), values().map(entry -> "%s = %s".formatted(entry.getKey(), entry.getValue())).collect(Collectors.joining(", ")));
+    protected String toStringImpl() = "@%s(%s)".formatted(type().getName(), sourceMemberValues().entrySet().stream().map(entry -> "%s = %s".formatted(entry.getKey(), toStringValue(entry.getValue()))).collect(Collectors.joining(", ")));
+    
+    private static String toStringValue(final Object object) = switch (object) {
+        case Type type      -> type.getClassName();
+        case Object[] array -> Stream.of(array).map(AnnotationHandler::toStringValue).collect(Collectors.joining(", ", "[", "]"));
+        default             -> ObjectHelper.toString(object);
+    };
     
     protected int hashCodeImpl() = new int[]{ 0 }.let(it -> values().forEach(entry -> it[0] = 127 * entry.getKey().hashCode() ^ ArrayHelper.deepHashCode(entry.getValue())))[0];
     

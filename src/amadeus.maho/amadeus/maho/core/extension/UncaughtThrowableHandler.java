@@ -8,9 +8,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Init;
 import amadeus.maho.transform.mark.base.TransformProvider;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 @Init(initialized = true)
 @TransformProvider
 public interface UncaughtThrowableHandler {

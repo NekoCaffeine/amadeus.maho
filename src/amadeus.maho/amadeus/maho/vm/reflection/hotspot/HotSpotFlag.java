@@ -40,11 +40,11 @@ public record HotSpotFlag(long address, String name, int flags, int type) implem
     @Override
     public int compareTo(final HotSpotFlag o) = name.compareTo(o.name);
     
-    public long resoleAddress() = jvm.getAddress(address());
+    public long resoleAddress() = unsafe.getAddress(address());
     
-    public boolean asBool() = jvm.getByte(resoleAddress()) != 0;
+    public boolean asBool() = unsafe.getByte(resoleAddress()) != 0;
     
-    public void asBool(final boolean flag) = jvm.putByte(resoleAddress(), (byte) (flag ? 1 : 0));
+    public void asBool(final boolean flag) = unsafe.putByte(resoleAddress(), (byte) (flag ? 1 : 0));
     
     public void enable() = asBool(true);
     
@@ -56,14 +56,14 @@ public record HotSpotFlag(long address, String name, int flags, int type) implem
         final HotSpotType type = types[this.type];
         final long address = resoleAddress();
         return switch (type.name) {
-            case "bool"   -> Boolean.toString(jvm.getByte(address) != 0);
-            case "double" -> Double.toString(jvm.getDouble(address));
+            case "bool"   -> Boolean.toString(unsafe.getByte(address) != 0);
+            case "double" -> Double.toString(unsafe.getDouble(address));
             case "void*"  -> jvm.getStringRef(address);
             default       -> switch (type.size) {
-                case 1  -> type.isUnsigned ? Long.toUnsignedString(jvm.getByte(address)) : Long.toString(jvm.getByte(address));
-                case 2  -> type.isUnsigned ? Long.toUnsignedString(jvm.getShort(address)) : Long.toString(jvm.getShort(address));
-                case 4  -> type.isUnsigned ? Long.toUnsignedString(jvm.getInt(address)) : Long.toString(jvm.getInt(address));
-                case 8  -> type.isUnsigned ? Long.toUnsignedString(jvm.getLong(address)) : Long.toString(jvm.getLong(address));
+                case 1  -> type.isUnsigned ? Long.toUnsignedString(unsafe.getByte(address)) : Long.toString(unsafe.getByte(address));
+                case 2  -> type.isUnsigned ? Long.toUnsignedString(unsafe.getShort(address)) : Long.toString(unsafe.getShort(address));
+                case 4  -> type.isUnsigned ? Long.toUnsignedString(unsafe.getInt(address)) : Long.toString(unsafe.getInt(address));
+                case 8  -> type.isUnsigned ? Long.toUnsignedString(unsafe.getLong(address)) : Long.toString(unsafe.getLong(address));
                 default -> "<unknown int:%d>".formatted(type.size);
             };
         };

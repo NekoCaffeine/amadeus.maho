@@ -12,9 +12,7 @@ import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PROTECTED, makeFinal = true)
 public class ClassLocal<V> implements Local<Class<?>, V> { // Don't use the stupid fucking ClassValue
@@ -23,7 +21,7 @@ public class ClassLocal<V> implements Local<Class<?>, V> { // Don't use the stup
     public static class Recursive<V> extends ClassLocal<V> {
         
         ThreadLocal<RecursiveGuard<Class<?>, V>> guardLocal = { };
-    
+        
         @Override
         @SneakyThrows
         public V get(final Class<?> key) {

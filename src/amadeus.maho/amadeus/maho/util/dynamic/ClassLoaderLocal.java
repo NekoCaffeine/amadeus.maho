@@ -9,9 +9,7 @@ import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
-@HotSpotJIT
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PROTECTED, makeFinal = true)
 public class ClassLoaderLocal<V> implements Local<ClassLoader, V> {

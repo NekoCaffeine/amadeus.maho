@@ -76,11 +76,9 @@ import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.runtime.StreamHelper;
 import amadeus.maho.util.runtime.TypeHelper;
 import amadeus.maho.util.throwable.ExtraInformationThrowable;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static org.objectweb.asm.Opcodes.*;
 
-@HotSpotJIT
 public interface ASMHelper {
     
     ConstantLookup

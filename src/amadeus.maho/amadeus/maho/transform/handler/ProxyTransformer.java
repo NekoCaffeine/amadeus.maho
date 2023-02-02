@@ -24,12 +24,10 @@ import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.bytecode.remap.RemapContext;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.*;
 import static org.objectweb.asm.Opcodes.*;
 
-@HotSpotJIT
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public final class ProxyTransformer extends MethodTransformer<Proxy> implements ClassTransformer.Limited, RemapContext {

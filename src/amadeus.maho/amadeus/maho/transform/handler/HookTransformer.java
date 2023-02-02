@@ -53,12 +53,10 @@ import amadeus.maho.util.bytecode.remap.RemapContext;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.StringHelper;
 import amadeus.maho.util.tuple.Tuple2;
-import amadeus.maho.vm.transform.mark.HotSpotJIT;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.*;
 import static org.objectweb.asm.Opcodes.*;
 
-@HotSpotJIT
 @SneakyThrows
 @TransformProvider
 @NoArgsConstructor
@@ -102,7 +100,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
     }
     
     private static final Type
-            TYPE_HOOK_RESULT             = Type.getType(Hook.Result.class),
+            TYPE_HOOK_RESULT             = Type.getObjectType(ASMHelper.className("amadeus.maho.transform.mark.Hook$Result")),
             TYPE_DYNAMIC_LINKING_CONTEXT = Type.getObjectType(ASMHelper.className("amadeus.maho.core.extension.DynamicLinkingContext"));
     
     private static final Method
@@ -388,12 +386,19 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                 methodNode.instructions.add(new InsnNode(ATHROW));
         } else if (annotation.before()) {
             before = (after = insn).getPrevious();
-            methodNode.instructions.insertBefore(insn, injectMethod.instructions);
+            if (before == null && annotation.forceReturn()) {
+                methodNode.instructions = injectMethod.instructions;
+                methodNode.localVariables?.clear();
+                methodNode.visibleLocalVariableAnnotations?.clear();
+                methodNode.invisibleLocalVariableAnnotations?.clear();
+                methodNode.tryCatchBlocks?.clear();
+            } else
+                methodNode.instructions.insertBefore(insn, injectMethod.instructions);
         } else {
             after = (before = insn).getNext();
             methodNode.instructions.insert(insn, injectMethod.instructions);
         }
-        if (insn != null && Bytecodes.isConditionalBranch(after.getOpcode()) && sourceReturnType == Type.BOOLEAN_TYPE && captureType == Type.BOOLEAN_TYPE) {
+        if (insn != null && before != null && Bytecodes.isConditionalBranch(after.getOpcode()) && sourceReturnType == Type.BOOLEAN_TYPE && captureType == Type.BOOLEAN_TYPE) {
             final Label end = generator.newLabel(), jumpElse = generator.newLabel();
             generator.visitJumpInsn(after.getOpcode(), jumpElse);
             final boolean reversal = annotation.branchReversal();

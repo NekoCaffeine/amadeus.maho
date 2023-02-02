@@ -128,38 +128,43 @@ public class AssignHandler {
     
     private static final String $$$BLOCK$$$ = "$$$BLOCK$$$";
     
-    @TransformTarget(targetClass = JavacParser.class, selector = "methodDeclaratorRest", metadata = @TransformMetadata(order = -1))
-    private static void methodDeclaratorRest(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
-        final AbstractInsnNode lbrace = StreamHelper.fromIterator(methodNode.instructions.iterator())
-                .filter(insn -> insn instanceof FieldInsnNode fieldInsn && fieldInsn.name.equals("LBRACE"))
-                .findFirst()
-                .orElseThrow();
-        final LabelNode jump = new LinkedIterator<>(AbstractInsnNode::getNext, StreamHelper.fromIterator(methodNode.instructions.iterator())
-                .filter(insn -> insn instanceof MethodInsnNode methodInsn && methodInsn.name.equals("block"))
-                .skip(1L)
-                .findFirst().orElseThrow())
-                .stream()
-                .cast(LabelNode.class)
-                .findFirst()
-                .orElseThrow();
-        final InsnList list = { };
-        final MethodGenerator generator = MethodGenerator.fromShadowMethodNode(methodNode, list);
-        generator.dup();
-        final org.objectweb.asm.Type tokenKind = org.objectweb.asm.Type.getType(Tokens.TokenKind.class);
-        generator.getStatic(tokenKind, "EQ", tokenKind);
-        final Label label = generator.newLabel();
-        generator.ifCmp(tokenKind, MethodGenerator.NE, label);
-        generator.loadThis();
-        generator.loadArg(2);
-        generator.invokeStatic(ASMHelper.TYPE_OBJECT, new Method($$$BLOCK$$$, org.objectweb.asm.Type.getMethodDescriptor(ASMHelper.TYPE_OBJECT, ASMHelper.TYPE_OBJECT, ASMHelper.TYPE_OBJECT)));
-        generator.visitVarInsn(ASTORE, 13);
-        generator.pushNull();
-        generator.visitVarInsn(ASTORE, 14);
-        generator.pop(tokenKind);
-        generator.goTo(jump.markLabel());
-        generator.mark(label);
-        methodNode.instructions.insertBefore(lbrace, list);
-        context.markModified().markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
+    @TransformProvider
+    interface Layer {
+        
+        @TransformTarget(targetClass = JavacParser.class, selector = "methodDeclaratorRest", metadata = @TransformMetadata(order = -1))
+        private static void methodDeclaratorRest(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
+            final AbstractInsnNode lbrace = StreamHelper.fromIterator(methodNode.instructions.iterator())
+                    .filter(insn -> insn instanceof FieldInsnNode fieldInsn && fieldInsn.name.equals("LBRACE"))
+                    .findFirst()
+                    .orElseThrow();
+            final LabelNode jump = new LinkedIterator<>(AbstractInsnNode::getNext, StreamHelper.fromIterator(methodNode.instructions.iterator())
+                    .filter(insn -> insn instanceof MethodInsnNode methodInsn && methodInsn.name.equals("block"))
+                    .skip(1L)
+                    .findFirst().orElseThrow())
+                    .stream()
+                    .cast(LabelNode.class)
+                    .findFirst()
+                    .orElseThrow();
+            final InsnList list = { };
+            final MethodGenerator generator = MethodGenerator.fromShadowMethodNode(methodNode, list);
+            generator.dup();
+            final org.objectweb.asm.Type tokenKind = org.objectweb.asm.Type.getType(Tokens.TokenKind.class);
+            generator.getStatic(tokenKind, "EQ", tokenKind);
+            final Label label = generator.newLabel();
+            generator.ifCmp(tokenKind, MethodGenerator.NE, label);
+            generator.loadThis();
+            generator.loadArg(2);
+            generator.invokeStatic(ASMHelper.TYPE_OBJECT, new Method($$$BLOCK$$$, org.objectweb.asm.Type.getMethodDescriptor(ASMHelper.TYPE_OBJECT, ASMHelper.TYPE_OBJECT, ASMHelper.TYPE_OBJECT)));
+            generator.visitVarInsn(ASTORE, 13);
+            generator.pushNull();
+            generator.visitVarInsn(ASTORE, 14);
+            generator.pop(tokenKind);
+            generator.goTo(jump.markLabel());
+            generator.mark(label);
+            methodNode.instructions.insertBefore(lbrace, list);
+            context.markModified().markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
+        }
+        
     }
     
     @Redirect(targetClass = JavacParser.class, selector = "methodDeclaratorRest", slice = @Slice(@At(method = @At.MethodInsn(name = $$$BLOCK$$$))))

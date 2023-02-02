@@ -58,16 +58,19 @@ public interface ScriptHelper {
     @SneakyThrows
     static Process run(final Path directory = Path.of(""), final boolean openTerminal = true, final List<String> args) {
         final ArrayList<String> commands = { };
-        if (openTerminal)
+        if (openTerminal) {
+            final String command = String.join(" ", args);
             switch (getOSType()) {
-                case WINDOWS -> commands *= List.of("cmd", "/c", "start", "/wait", "cmd", "/c");
-                case MAC     -> commands *= List.of("/usr/bin/open", "-a", "Terminal");
-                case LINUX   -> commands *= List.of("/usr/bin/xterm");
+                case WINDOWS -> commands *= List.of("cmd", "/c", "start", "/wait", "cmd", "/c", "%s & pause > nul".formatted(command));
+                case LINUX   -> commands *= List.of("xterm", "-e", "%s ; read -n 1 -s".formatted(command));
+                case MAC     -> commands *= List.of("osascript", "-e", "tell application 'Terminal' to do script '%s ; read -n 1 -s'".formatted(command));
                 default      -> throw unsupportedOSType();
             }
+        } else
+            commands *= args;
         return new ProcessBuilder()
                 .directory((~directory).toAbsolutePath().toFile())
-                .command(commands *= args)
+                .command(commands)
                 .start();
     }
     
