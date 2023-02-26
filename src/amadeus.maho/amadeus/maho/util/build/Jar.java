@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
@@ -53,15 +54,17 @@ public interface Jar {
     String DEFAULT_FORMATTER = "${name}-${version}${type}.jar", WITHOUT_VERSION_FORMATTER = "${name}${type}.jar";
     
     Attributes.Name
-            PREMAIN_CLASS = { "Premain-Class" },
-            AGENT_CLASS = { "Agent-Class" },
-            CAN_RETRANSFORM_CLASSES = { "Can-Retransform-Classes" },
-            CAN_REDEFINE_CLASSES = { "Can-Redefine-Classes" },
+            PREMAIN_CLASS                = { "Premain-Class" },
+            AGENT_CLASS                  = { "Agent-Class" },
+            CAN_RETRANSFORM_CLASSES      = { "Can-Retransform-Classes" },
+            CAN_REDEFINE_CLASSES         = { "Can-Redefine-Classes" },
             CAN_SET_NATIVE_METHOD_PREFIX = { "Can-Set-Native-Method-Prefix" },
-            MAHO_VERSION = { "Maho-Version" },
-            CREATED_TIME = { "Created-Time" },
-            LAUNCHER_AGENT_CLASS = { "Launcher-Agent-Class" },
-            TARGET_PLATFORM = { "Target-Platform" };
+            MAHO_VERSION                 = { "Maho-Version" },
+            CREATED_TIME                 = { "Created-Time" },
+            LAUNCHER_AGENT_CLASS         = { "Launcher-Agent-Class" },
+            TARGET_PLATFORM              = { "Target-Platform" };
+    
+    BiConsumer<Path, Path> defaultCopier = (a, b) -> a >> b;
     
     static Manifest manifest(final @Nullable String mainClass = null, final @Nullable Agent agent = null, final @Nullable ClassPath classPath = null, final @Nullable String targetPlatform = null) {
         final Manifest manifest = { };
@@ -88,7 +91,7 @@ public interface Jar {
     }
     
     @SneakyThrows
-    static Map<String, Result> pack(final Workspace workspace, final Module module, final Manifest manifest = manifest(), final String format = "${name}-${version}${type}.jar",
+    static Map<String, Result> pack(final Workspace workspace, final Module module, final Manifest manifest = manifest(), final BiConsumer<Path, Path> copier = defaultCopier, final String format = "${name}-${version}${type}.jar",
             final boolean packSources = true, final ModuleResolution resolution = ModuleResolution.empty()) {
         final Module.Metadata metadata = workspace.config().load(new Module.Metadata(), module.name());
         final Path modulesDir = ~(workspace.root() / workspace.output(MODULES_DIR, module)), classesDir = workspace.root() / workspace.output("classes", module), modulePath = workspace.root() / module.path();
@@ -108,7 +111,7 @@ public interface Jar {
             final String name = format.replace("${name}", entry.getKey()).replace("${version}", metadata.version);
             final Path binary = modulesDir / name.replace("${type}", "");
             modulesDir / name.replace("${type}", "") | root -> {
-                Files.walk(moduleSrcDir).filter(Files::isRegularFile).filter(path -> !Javac.javaFileMatcher().matches(path)).forEach(path -> path >> root / (moduleSrcDir % path).toString());
+                Files.walk(moduleSrcDir).filter(Files::isRegularFile).filter(path -> !Javac.javaFileMatcher().matches(path)).forEach(path -> copier.accept(path, root / (moduleSrcDir % path).toString()));
                 moduleClassesDir >> root;
                 try (final var output = Files.newOutputStream(~(root / META_INF) / MANIFEST_NAME)) { manifest.write(output); }
             };

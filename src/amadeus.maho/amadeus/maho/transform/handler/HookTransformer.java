@@ -51,6 +51,7 @@ import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.bytecode.remap.RemapContext;
 import amadeus.maho.util.runtime.ArrayHelper;
+import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.StringHelper;
 import amadeus.maho.util.tuple.Tuple2;
 
@@ -155,14 +156,12 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
         referenceTransformer = (referenceIndexMark = checkReferences()) == null ? null : new ReferenceTransformer();
         stackFlag = shouldMarkStack();
         jumpFlag = annotation.jump().length > 0;
-        if (!annotation.isStatic() && Type.getArgumentTypes(desc).length < 1)
-            throw new IllegalArgumentException("If the target method is not static, then the method needs at least one parameter to receive 'this'.");
         if (handler.isNotDefault(Hook::value))
             target = handler.<Type>lookupSourceValue(Hook::value).getClassName();
         else
-            target = annotation.target().isEmpty() && !annotation.isStatic() ? Type.getArgumentTypes(desc)[0].getClassName() : annotation.target();
+            target = annotation.target().isEmpty() && !annotation.isStatic() && !desc.startsWith("()") ? Type.getArgumentTypes(desc)[0].getClassName() : annotation.target();
         if (target.isEmpty())
-            throw new IllegalArgumentException("Unable to determine target class, missing required fields('value' or 'target').");
+            throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("Unable to determine target class, missing required fields('value' or 'target')."));
     }
     
     @Override

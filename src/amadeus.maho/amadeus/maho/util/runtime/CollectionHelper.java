@@ -3,7 +3,9 @@ package amadeus.maho.util.runtime;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Spliterators;
@@ -100,6 +102,19 @@ public interface CollectionHelper {
         deque.removeLast();
         return deque;
     }
+    
+    static <T> Iterator<T> descendingListIterator(final List<T> $this) {
+        final ListIterator<T> iterator = $this.listIterator($this.size());
+        return new Iterator<>() {
+            
+            public T next() = iterator.previous();
+            
+            public boolean hasNext() = iterator.hasPrevious();
+            
+        };
+    }
+    
+    static <T> Stream<T> descendingListStream(final List<T> $this) = StreamSupport.stream(Spliterators.spliteratorUnknownSize(descendingListIterator($this), 0), false);
     
     static <T> Stream<T> descendingStream(final Deque<T> $this) = StreamSupport.stream(Spliterators.spliteratorUnknownSize($this.descendingIterator(), 0), false);
     
