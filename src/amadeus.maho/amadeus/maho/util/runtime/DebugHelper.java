@@ -83,9 +83,13 @@ public interface DebugHelper {
         throw BreakException.instance();
     }
     
-    static <T> T breakpointThenError() {
+    static <T> T breakpointThenError(final String message) = breakpointThenError(new AssertionError(message));
+    
+    @SuppressWarnings("ThrowableNotThrown")
+    @SneakyThrows
+    static <T> T breakpointThenError(final Throwable throwable = new AssertionError()) {
         breakpoint();
-        throw new AssertionError();
+        throw throwable;
     }
     
     static <T> T notYetImplemented() {

@@ -8,6 +8,32 @@ import amadeus.maho.lang.inspection.Nullable;
 
 public interface JDWP {
     
+    sealed interface IDECommand {
+    
+        record Notification(Type type, String title, String content) implements IDECommand {
+            
+            enum Type {
+                
+                INFORMATION,
+                WARNING,
+                ERROR;
+                
+            }
+            
+        }
+    
+    }
+    
+    interface MessageQueue {
+        
+        static void send(final IDECommand command) {
+            breakpoint(); // set breakpoint here to enable message send
+        }
+        
+        private static void breakpoint() { }
+        
+    }
+    
     // libjdwp jdk.jdwp.agent\share\native\libjdwp\transport.c#L639 : transport_startTransport
     /*
          // Start the transport loop in a separate thread

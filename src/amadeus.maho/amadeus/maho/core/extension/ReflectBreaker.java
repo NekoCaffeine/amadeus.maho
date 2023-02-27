@@ -10,6 +10,7 @@ import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
 
 import jdk.internal.reflect.Reflection;
+import jdk.internal.reflect.UnsafeFieldAccessorImpl;
 
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Privilege;
@@ -28,6 +29,9 @@ public class ReflectBreaker {
         @Hook
         private static Hook.Result checkAccess(final AccessibleObject $this, final Class<?> caller, final Class<?> memberClass, final Class<?> targetClass, final int modifiers)
                 = Hook.Result.falseToVoid(accessFlag() || breakModules.contains(caller.getModule()));
+        
+        @Hook(forceReturn = true)
+        private static void throwFinalFieldIllegalAccessException(final UnsafeFieldAccessorImpl $this, final String attemptedType, final String attemptedValue) { }
         
     }
     
