@@ -49,7 +49,7 @@ import amadeus.maho.util.bytecode.Bytecodes;
 import amadeus.maho.util.runtime.StreamHelper;
 import amadeus.maho.util.tuple.Tuple2;
 
-import static com.sun.tools.javac.code.Flags.*;
+import static com.sun.tools.javac.code.Flags.PARAMETER;
 
 @TransformProvider
 @NoArgsConstructor
@@ -141,6 +141,8 @@ public class HandlerMarker extends JavacContext {
                             exception.consumer.accept(tree);
                             if (tree instanceof JCTree.JCLambda lambda && lambda.paramKind == JCTree.JCLambda.ParameterKind.IMPLICIT)
                                 lambda.params.forEach(parameter -> parameter.vartype = null);
+                            else if (tree instanceof JCTree.JCVariableDecl decl && decl.sym != null && decl.sym.owner instanceof Symbol.MethodSymbol)
+                                decl.sym = null;
                             super.scan(tree);
                         }
                         

@@ -192,7 +192,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         return Hook.Result.VOID;
     }
     
-    private static boolean skip(final @Nullable Type type) = type != null && !type.isErroneous();
+    private static boolean skip(final @Nullable Type type) = type != null && !type.isErroneous() && !(type instanceof Type.UnknownType);
     
     public @Nullable JCTree.JCExpression lowerSetter(final JCTree.JCMethodInvocation invocation, final UnaryOperator<JCTree.JCExpression> result,
             final UnaryOperator<JCTree.JCExpression> resultWrapper = UnaryOperator.identity()) {
@@ -219,7 +219,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         return null;
     }
     
-    public JCTree.JCExpression lower(final JCTree tree, final Env<AttrContext> env, final @Nullable JCTree.JCExpression lowerExpr) {
+    public @Nullable JCTree.JCExpression lower(final JCTree tree, final Env<AttrContext> env, final @Nullable JCTree.JCExpression lowerExpr) {
         if (lowerExpr != null)
             throw new ReAttrException(() -> tree.type = lowerExpr.type, lowerExpr.type == null, next -> {
                 switch (next) {
@@ -235,7 +235,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
     }
     
     @Privilege
-    public final JCTree.JCExpression methodInvocation(final Name name, final Env<AttrContext> env, final JCTree.JCExpression source, final Supplier<JCTree.JCExpression>... expressions) {
+    public final @Nullable JCTree.JCExpression methodInvocation(final Name name, final Env<AttrContext> env, final JCTree.JCExpression source, final Supplier<JCTree.JCExpression>... expressions) {
         final List<JCTree.JCExpression> args = List.from(expressions).map(Supplier::get);
         final Env<AttrContext> localEnv = env.dup(maker.at(source.pos).Apply(List.nil(), maker.Select(args.head, name), args.tail), env.info.dup());
         final ListBuffer<Type> argTypes = { };

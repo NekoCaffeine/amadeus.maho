@@ -1,5 +1,6 @@
 package amadeus.maho.util.concurrent;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -115,7 +116,26 @@ public class Looper implements Runnable {
     public self addPreTask(final Runnable task) = preQueue().add(task);
     
     @Extension.Operator("<<")
-    public self addPostTask(final Runnable task) = preQueue().add(task);
+    public self addPostTask(final Runnable task) = postQueue().add(task);
+    
+    @SneakyThrows
+    @Extension.Operator("*")
+    public <T> @Nullable T handshake(final Supplier<T> supplier) {
+        final @Nullable Thread context = context();
+        if (context == null || context == Thread.currentThread())
+            return supplier.get();
+        final CountDownLatch latch = { 1 };
+        final CompletableFuture p_result[] = { null };
+        addPreTask(() -> {
+            try {
+                p_result[0] = CompletableFuture.completedFuture(supplier.get());
+            } catch (final Throwable throwable) {
+                p_result[0] = CompletableFuture.failedFuture(throwable);
+            } finally { latch.countDown(); }
+        });
+        latch.await();
+        return (T) p_result[0].get();
+    }
     
     protected synchronized void markContext() {
         if (context() != null)
@@ -164,7 +184,10 @@ public class Looper implements Runnable {
         state().countDown();
         if (end().getCount() > 0)
             over().run();
-    }, end()::countDown);
+    }, () -> {
+        end().countDown();
+        context(null);
+    });
     
     public void stop() {
         state().countDown();
