@@ -15,6 +15,8 @@ public @interface TransformMetadata {
     
     boolean remap() default true;
     
+    boolean important() default true;
+    
     AOTTransformer.Level aotLevel() default AOTTransformer.Level.OPEN_WORLD;
     
 }

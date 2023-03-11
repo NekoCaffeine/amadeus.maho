@@ -158,21 +158,25 @@ public interface FileHelper {
     }
     
     static Path GTGT(final byte data[], final Path path) {
+        ~-path;
         Files.write(path, data);
         return path;
     }
     
     static Path GTGTGT(final byte data[], final Path path) {
+        ~-path;
         Files.write(path, data, APPEND);
         return path;
     }
     
     static Path GTGT(final CharSequence sequence, final Path path) {
+        ~-path;
         Files.writeString(path, sequence, StandardCharsets.UTF_8);
         return path;
     }
     
     static Path GTGTGT(final CharSequence sequence, final Path path) {
+        ~-path;
         Files.writeString(path, sequence, StandardCharsets.UTF_8, APPEND);
         return path;
     }
