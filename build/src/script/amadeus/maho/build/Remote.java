@@ -29,4 +29,9 @@ public interface Remote {
     
     static void release(final Path distributive = aotBuild()) = Distributive.release(workspace, module, repo, List.of(distributive));
     
+    static void releasePush(final Path distributive = aotBuild()) {
+        release(distributive);
+        push(distributive);
+    }
+    
 }
