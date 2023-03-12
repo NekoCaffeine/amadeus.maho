@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -30,5 +31,9 @@ public interface AtomicHelper {
     static int TILDE(final AtomicInteger reference) = reference.get();
     
     static long TILDE(final AtomicLong reference) = reference.get();
+    
+    static <E> @Nullable E GET(final AtomicReferenceArray<E> referenceArray, final int index) = referenceArray.get(index);
+    
+    static <E> void PUT(final AtomicReferenceArray<E> referenceArray, final int index, final @Nullable E value) = referenceArray.set(index, value);
     
 }
