@@ -9,6 +9,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.FieldNode;
+
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.bytecode.ASMHelper;
@@ -18,9 +21,6 @@ import amadeus.maho.util.runtime.ReflectionHelper;
 import amadeus.maho.util.type.InferredGenericType;
 import amadeus.maho.util.type.InferredParameterizedType;
 import amadeus.maho.util.type.TypeInferer;
-
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.FieldNode;
 
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 
@@ -101,7 +101,7 @@ public interface LambdaHelper {
         final Method target = lookupFunctionalMethodWithInterface(lambdaType);
         final MethodType sourceType = handle.type();
         final MethodType methodType = MethodType.methodType(target.getReturnType(), target.getParameterTypes());
-        handle = handle.asType(methodType); // check target, make throw WMT
+        handle.asType(methodType); // check target, make throw WMT
         try {
             return (T) LambdaMetafactory.metafactory(MethodHandleHelper.lookup(), target.getName(), MethodType.methodType(lambdaType), methodType.generic(), handle, methodType).getTarget().invokeExact();
         } catch (final Throwable ignored) { /* not DMH */ return lambda(handle, lambdaType, target, sourceType); }

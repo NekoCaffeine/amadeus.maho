@@ -19,6 +19,8 @@ class compiler_zh_CN {
             { "amadeus.maho.lang.err.doesnt.exist", "{0} 不存在" },
             { "amadeus.maho.lang.err.inconvertible.types", "{0} 无法转换为 {1}" },
             { "amadeus.maho.lang.err.address.of.type", "类型 {0} 无法被复制到堆外内存" },
+            { "amadeus.maho.lang.err.resource.agent.missing.key", "ResourceAgent 的正则表达式中缺少以下在方法中声明的参数的同名组: {0}" },
+            { "amadeus.maho.lang.err.resource.agent.invalid.parameter", "无效的参数类型，必须是字符串类型" },
             { "amadeus.maho.lang.err.resource.bundle.agent.repeat", "ResourceAgent 所在方法的路径正则表达式意外的重复\n  {0}\n  {1}" },
             { "amadeus.maho.lang.err.resource.bundle.ioe", "访问 ResourceBundle 对应路径时发生 IO 异常: {0}" },
             { "amadeus.maho.lang.err.resource.bundle.ioe", "同一路径被多个正则表达式重复匹配s.\n路径: {0}\n  {1}" },

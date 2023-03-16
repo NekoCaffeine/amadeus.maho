@@ -4,9 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -30,12 +29,10 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
+import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.StreamHelper;
-import amadeus.maho.util.tuple.Tuple;
-import amadeus.maho.util.tuple.Tuple2;
-import amadeus.maho.util.tuple.Tuple3;
 
 import static amadeus.maho.lang.javac.handler.ResourceBundleHandler.PRIORITY;
 
@@ -45,6 +42,8 @@ import static amadeus.maho.lang.javac.handler.ResourceBundleHandler.PRIORITY;
 public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     public static final int PRIORITY = -1 << 12;
+    
+    public record AgentMethod(Symbol.MethodSymbol methodSymbol, Pattern pattern, ResourceAgent agent) { }
     
     @Override
     public boolean shouldProcess(final boolean advance) = advance;
@@ -57,48 +56,62 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
             final FieldDefaultsHandler fieldDefaultsHandler = instance(FieldDefaultsHandler.class);
             maker.at(annotationTree.pos);
             final JCTree.JCAnnotation fieldDefaultAnnotationTree = maker.Annotation(IdentQualifiedName(FieldDefaults.class), List.nil());
-            final HashMap<String, Tuple2<Symbol.MethodSymbol, ResourceAgent>> agents = { };
+            final HashMap<String, AgentMethod> agents = { };
             final boolean itf = anyMatch(tree.mods.flags, Flags.INTERFACE);
+            final ResourceAgentHandler resourceAgentHandler = instance(ResourceAgentHandler.class);
             allSupers(tree.sym)
                     .map(Symbol.ClassSymbol::members)
                     .map(Scope::getSymbols)
                     .flatMap(StreamHelper::fromIterable)
                     .forEach(member -> {
                         if (!itf || anyMatch(member.flags_field, Flags.STATIC))
-                            if (member instanceof Symbol.MethodSymbol methodSymbol && methodSymbol.params().size() == 1 && methodSymbol.params().head.type.tsym == symtab.stringType.tsym) {
+                            if (member instanceof Symbol.MethodSymbol methodSymbol && resourceAgentHandler.valid(methodSymbol)) {
                                 final @Nullable ResourceAgent agentAnnotation = methodSymbol.getAnnotation(ResourceAgent.class);
-                                if (agentAnnotation != null)
-                                    agents.compute(agentAnnotation.value(), (regex, tuple) -> addAgent(regex, annotationTree, tuple, methodSymbol, agentAnnotation));
+                                if (agentAnnotation != null) {
+                                    try {
+                                        final Pattern pattern = Pattern.compile(agentAnnotation.value());
+                                        final Map<String, Integer> namedGroupsIndex = pattern.namedGroupsIndex();
+                                        final java.util.List<String> missingKey = methodSymbol.params().stream().map(symbol -> symbol.name.toString()).filterNot(namedGroupsIndex.keySet()::contains).toList();
+                                        if (missingKey.isEmpty())
+                                            agents.compute(agentAnnotation.value(), (regex, agentMethod) -> addAgent(regex, annotationTree, agentMethod, methodSymbol, pattern, agentAnnotation));
+                                    } catch (final PatternSyntaxException ignored) { }
+                                }
                             }
                     });
-            final List<Tuple3<Pattern, Symbol.MethodSymbol, ResourceAgent>> patterns = agents.entrySet().stream()
-                    .map(entry -> {
-                        try {
-                            return Tuple.tuple(Pattern.compile(entry.getKey()), entry.getValue().v1, entry.getValue().v2);
-                        } catch (final PatternSyntaxException e) { return null; }
-                    })
-                    .nonnull()
-                    .collect(List.collector());
             try {
                 Files.walk(location, annotation.visitOptions()).forEach(path -> {
                     final String arg = location % path | "/";
-                    final Set<Symbol.MethodSymbol> symbols = new HashSet<>();
-                    patterns.stream()
-                            .filter(tuple -> shouldHandle(path, tuple.v3))
-                            .map(tuple -> Tuple.tuple(tuple.v1.matcher(arg), tuple.v2))
-                            .filter(tuple -> tuple.v1.find())
-                            .forEach(tuple -> {
-                                if (symbols.isEmpty()) {
-                                    final boolean instance = itf || noneMatch(tuple.v2.flags_field, Flags.STATIC);
-                                    final JCTree.JCVariableDecl decl = maker.VarDef(maker.Modifiers(instance ? 0L : Flags.STATIC), name(tuple.v1, location, path), resourceType(path, tuple.v2),
-                                            maker.Apply(List.nil(), instance ? maker.Ident(tuple.v2) : maker.QualIdent(tuple.v2), List.of(maker.Literal(arg))));
-                                    fieldDefaultsHandler.processVariable(env, decl, tree, annotation.fieldDefaults(), fieldDefaultAnnotationTree, advance);
-                                    injectMember(env, decl);
+                    final Map<String, java.util.List<Symbol.MethodSymbol>> record = new HashMap<>();
+                    final boolean p_repeatedly[] = { false };
+                    agents.values().stream()
+                            .filter(agentMethod -> shouldHandle(path, agentMethod.agent()))
+                            .forEach(agentMethod -> {
+                                final Matcher matcher = agentMethod.pattern().matcher(arg);
+                                if (matcher.find()) {
+                                    final Symbol.MethodSymbol methodSymbol = agentMethod.methodSymbol;
+                                    final boolean instance = itf || noneMatch(methodSymbol.flags_field, Flags.STATIC);
+                                    final Name name = name(agentMethod.agent.format(), matcher, location, path);
+                                    final String nameString = name.toString();
+                                    final java.util.List<Symbol.MethodSymbol> symbols = record.computeIfAbsent(nameString, FunctionHelper.abandon(LinkedList::new));
+                                    symbols += methodSymbol;
+                                    if (symbols.size() > 1) {
+                                        p_repeatedly[0] = true;
+                                        return;
+                                    }
+                                    if (shouldInjectVariable(env, name)) {
+                                        final List<JCTree.JCExpression> args = methodSymbol.params().stream()
+                                                .map(parameter -> matcher.group(parameter.name.toString()))
+                                                .map(value -> maker.Literal(value))
+                                                .collect(List.collector());
+                                        final JCTree.JCVariableDecl decl = maker.VarDef(maker.Modifiers(instance ? 0L : Flags.STATIC), name, resourceType(path, methodSymbol),
+                                                maker.Apply(List.nil(), instance ? maker.Ident(methodSymbol) : maker.QualIdent(methodSymbol), args));
+                                        fieldDefaultsHandler.processVariable(env, decl, tree, annotation.fieldDefaults(), fieldDefaultAnnotationTree, advance);
+                                        injectMember(env, decl);
+                                    }
                                 }
-                                symbols += tuple.v2;
                             });
-                    if (symbols.size() > 1)
-                        log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "resource.bundle.repeatedly.matched", arg, symbols));
+                    if (p_repeatedly[0])
+                        log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "resource.bundle.repeatedly.matched", arg, record));
                 });
             } catch (final IOException e) {
                 e.printStackTrace();
@@ -109,9 +122,9 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     protected boolean shouldHandle(final Path path, final ResourceAgent agentAnnotation) = ArrayHelper.contains(agentAnnotation.types(), Files.isDirectory(path) ? ResourceAgent.Type.DIRECTORY : ResourceAgent.Type.FILE);
     
-    protected Name name(final Matcher matcher, final Path location, final Path path) {
+    protected Name name(final String format, final Matcher matcher, final Path location, final Path path) {
         final Map<String, Integer> map = matcher.pattern().namedGroupsIndex();
-        final @Nullable String group = map.containsKey("name") ? matcher.group("name") : null, name = group ?? defaultName(location, path);
+        final @Nullable String group = map.containsKey("name") ? matcher.group("name") : null, name = format.formatted(group ?? defaultName(location, path));
         final int p_index[] = { -1 };
         return name(name.codePoints().map(c -> (++p_index[0] == 0 ? Character.isJavaIdentifierStart(c) : Character.isJavaIdentifierPart(c)) ? c : '_').collectCodepoints());
     }
@@ -123,12 +136,12 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     protected JCTree.JCExpression resourceType(final Path path, final Symbol.MethodSymbol methodSymbol) = maker.Type(methodSymbol.getReturnType());
     
-    protected Tuple2<Symbol.MethodSymbol, ResourceAgent> addAgent(final String regex, final JCTree.JCAnnotation annotationTree, final @Nullable Tuple2<Symbol.MethodSymbol, ResourceAgent> tuple,
-            final Symbol.MethodSymbol agent, final ResourceAgent agentAnnotation) {
-        if (tuple == null)
-            return { agent, agentAnnotation };
-        log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "resource.bundle.agent.repeat", tuple.v1, agent));
-        return tuple;
+    protected AgentMethod addAgent(final String regex, final JCTree.JCAnnotation annotationTree, final @Nullable AgentMethod agentMethod,
+            final Symbol.MethodSymbol agent, final Pattern pattern, final ResourceAgent agentAnnotation) {
+        if (agentMethod == null)
+            return { agent, pattern, agentAnnotation };
+        log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "resource.bundle.agent.repeat", agentMethod.methodSymbol, agent));
+        return agentMethod;
     }
     
     protected Path location(final ResourceBundle annotation) {

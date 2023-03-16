@@ -19,6 +19,8 @@ class compiler {
             { "amadeus.maho.lang.err.doesnt.exist", "{0} does not exist" },
             { "amadeus.maho.lang.err.inconvertible.types", "{0} cannot be converted to {1}" },
             { "amadeus.maho.lang.err.address.of.type", "Type {0} cannot be copied to off-heap memory" },
+            { "amadeus.maho.lang.err.resource.agent.missing.key", "The following group with the same name as the parameter declared in the method is missing from the resource agent's regular expression: {0}" },
+            { "amadeus.maho.lang.err.resource.agent.invalid.parameter", "Invalid parameter type, must be string type" },
             { "amadeus.maho.lang.err.resource.bundle.agent.repeat", "Unexpected duplication of the path regular expression for the method in which the resource agent is located.\n  {0}\n  {1}" },
             { "amadeus.maho.lang.err.resource.bundle.ioe", "An IO exception occurred when visiting the path corresponding to the ResourceBundle: {0}" },
             { "amadeus.maho.lang.err.resource.bundle.repeatedly.matched", "The same path is repeatedly matched by multiple regular expressions.\npath: {0}\n  {1}" },
