@@ -16,6 +16,8 @@ class compiler_zh_CN {
             { "amadeus.maho.lang.err.accessor.method.non-interface", "{0} 标记的方法必须在 interface 域内" },
             { "amadeus.maho.lang.err.accessor.method.static", "{0} 标记的方法必须是非静态的" },
             { "amadeus.maho.lang.err.runtime.missing.type", "{0} 是运行时缺少的类型" },
+            { "amadeus.maho.lang.err.type-token.2nd.must-be.parameterized-type", "第二个类型参数必须是参数化类型" },
+            { "amadeus.maho.lang.err.type-token.missing.type-arg", "缺少编译期类型参数" },
             { "amadeus.maho.lang.err.doesnt.exist", "{0} 不存在" },
             { "amadeus.maho.lang.err.inconvertible.types", "{0} 无法转换为 {1}" },
             { "amadeus.maho.lang.err.address.of.type", "类型 {0} 无法被复制到堆外内存" },

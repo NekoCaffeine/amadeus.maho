@@ -55,6 +55,9 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
         protected AccessLevel accessLevel(final NoArgsConstructor annotation) = annotation.value();
         
         @Override
+        protected boolean varargs(final NoArgsConstructor annotation) = annotation.varargs();
+        
+        @Override
         protected List<JCTree.JCVariableDecl> fields(final Env<AttrContext> env, final JCTree.JCClassDecl decl) = List.nil();
         
         @Override
@@ -68,6 +71,9 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
         
         @Override
         protected AccessLevel accessLevel(final AllArgsConstructor annotation) = annotation.value();
+        
+        @Override
+        protected boolean varargs(final AllArgsConstructor annotation) = annotation.varargs();
         
         @Override
         protected List<JCTree.JCVariableDecl> fields(final Env<AttrContext> env, final JCTree.JCClassDecl decl) = decl.defs.stream()
@@ -87,6 +93,9 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
         
         @Override
         protected AccessLevel accessLevel(final RequiredArgsConstructor annotation) = annotation.value();
+        
+        @Override
+        protected boolean varargs(final RequiredArgsConstructor annotation) = annotation.varargs();
         
         @Override
         protected List<JCTree.JCVariableDecl> fields(final Env<AttrContext> env, final JCTree.JCClassDecl decl) = decl.defs.stream()
@@ -156,6 +165,8 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
     
     protected abstract AccessLevel accessLevel(A annotation);
     
+    protected abstract boolean varargs(A annotation);
+    
     protected abstract List<JCTree.JCVariableDecl> fields(final Env<AttrContext> env, JCTree.JCClassDecl decl);
     
     public boolean initializedField(final Symbol.VarSymbol symbol) = true;
@@ -187,7 +198,7 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
                 .forEach(symbol -> {
                     final Function<String, String> simplify = simplify(tree.name.toString());
                     final List<JCTree.JCVariableDecl> params = params(tree, symbol, simplify);
-                    final long varargs = fields.isEmpty() ? symbol.flags() & VARARGS : 0;
+                    final long varargs = varargs(annotation) ? VARARGS : fields.isEmpty() ? symbol.flags() & VARARGS : 0;
                     final List<JCTree.JCVariableDecl> decls = params.appendList(params(env, fields, simplify));
                     if (shouldInjectMethod(env, names.init, names(decls, env)))
                         injectMember(env, SyntheticConstructor(maker.Modifiers(access | varargs), names.init, maker.TypeIdent(TypeTag.VOID), List.nil(), decls, List.nil(),
@@ -196,7 +207,7 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
     }
     
     public JCTree.JCMethodDecl SyntheticConstructor(final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression returnType, final List<JCTree.JCTypeParameter> typarams, final List<JCTree.JCVariableDecl> params,
-            final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, final JCTree.JCExpression defaultValue)
+            final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, @Nullable final JCTree.JCExpression defaultValue)
             = new SyntheticConstructor(mods, name, returnType, typarams, null, params, thrown, body, defaultValue, null).let(result -> result.pos = maker.pos);
     
     protected List<JCTree.JCVariableDecl> params(final Env<AttrContext> env, final List<JCTree.JCVariableDecl> fields, final Function<String, String> simplify)

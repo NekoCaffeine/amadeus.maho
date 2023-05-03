@@ -12,6 +12,8 @@ public @interface AllArgsConstructor {
     
     AccessLevel value() default AccessLevel.PUBLIC;
     
+    boolean varargs() default false;
+    
     Annotation[] on() default { };
     
 }

@@ -77,8 +77,11 @@ public interface FileHelper {
     
     @Extension
     interface Zip {
+        
         ZipFileSystemProvider zipFileSystemProvider = { };
+        
         Map<String, ?> default_zip_env = Map.of("create", true, "encoding", "UTF-8", "compressionMethod", "DEFLATED");
+        
         static FileSystem zipFileSystem(final Path path, final Map<String, ?> env = default_zip_env) = zipFileSystemProvider.newFileSystem(path, env);
         
     }

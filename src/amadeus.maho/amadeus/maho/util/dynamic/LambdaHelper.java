@@ -92,7 +92,7 @@ public interface LambdaHelper {
     
     @SneakyThrows
     @IndirectCaller
-    static <T> T lambda(MethodHandle handle, final Class<T> lambdaType) {
+    static <T> T lambda(final MethodHandle handle, final Class<T> lambdaType) {
         if (handle.argsCount() == 1) {
             final Object bindArgLast = MethodHandleHelper.atLast(handle);
             if (lambdaType.isInstance(bindArgLast))

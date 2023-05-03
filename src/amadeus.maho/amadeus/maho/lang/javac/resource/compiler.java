@@ -16,6 +16,8 @@ class compiler {
             { "amadeus.maho.lang.err.accessor.method.non-interface", "The method marked by {0} must be in the interface scope" },
             { "amadeus.maho.lang.err.accessor.method.static", "The method marked by {0} must be non-static" },
             { "amadeus.maho.lang.err.runtime.missing.type", "Type {0} is the missing type at runtime" },
+            { "amadeus.maho.lang.err.type-token.2nd.must-be.parameterized-type", "The second type parameter must be a parameterized type" },
+            { "amadeus.maho.lang.err.type-token.missing.type-arg", "Missing compile-time type parameter" },
             { "amadeus.maho.lang.err.doesnt.exist", "{0} does not exist" },
             { "amadeus.maho.lang.err.inconvertible.types", "{0} cannot be converted to {1}" },
             { "amadeus.maho.lang.err.address.of.type", "Type {0} cannot be copied to off-heap memory" },

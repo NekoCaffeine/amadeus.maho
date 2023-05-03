@@ -86,16 +86,6 @@ public interface Github extends HttpApi {
         
     }
     
-    @RequiredArgsConstructor
-    @FieldDefaults(level = AccessLevel.PUBLIC)
-    class ReleasesID {
-        
-        // The unique identifier of the release.
-        @Default
-        int release_id;
-        
-    }
-    
     HttpApi.Adapter.Fallback adapter = { HttpApi.Adapter.Default.instance(), HttpApi.Adapter.Json.instance() };
     
     @Request(method = GET, path = "/repos/{owner}/{repo}/releases")
