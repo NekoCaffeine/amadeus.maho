@@ -1,16 +1,16 @@
 package amadeus.maho.lang.javac.handler;
 
-import amadeus.maho.lang.Extension;
-import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.lang.javac.handler.base.BaseHandler;
-import amadeus.maho.lang.javac.handler.base.Handler;
-
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
+
+import amadeus.maho.lang.Extension;
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.javac.handler.base.BaseHandler;
+import amadeus.maho.lang.javac.handler.base.Handler;
 
 import static amadeus.maho.lang.javac.handler.ExtensionOperatorHandler.PRIORITY;
 import static com.sun.tools.javac.code.Flags.*;
@@ -32,9 +32,11 @@ public class ExtensionOperatorHandler extends BaseHandler<Extension.Operator> {
             if (def)
                 modifiers(owner).flags |= DEFAULT;
             injectMember(env, maker.MethodDef(maker.Modifiers(tree.mods.flags & ~(ABSTRACT | NATIVE | SYNCHRONIZED) | (def ? DEFAULT : 0),
-                    tree.mods.annotations), name, tree.restype, tree.typarams, tree.params, tree.thrown, maker.Block(0L, generateBody(tree)), null));
+                    tree.mods.annotations), name, tree.restype, tree.typarams, params(tree.params), tree.thrown, maker.Block(0L, generateBody(tree)), null));
         }
     }
+    
+    protected List<JCTree.JCVariableDecl> params(final List<JCTree.JCVariableDecl> params) = params.map(decl -> ((JCTree.JCVariableDecl) decl.clone()).let(it -> it.init = null));
     
     protected List<JCTree.JCStatement> generateBody(final JCTree.JCMethodDecl decl) {
         final JCTree.JCExpression expr = maker.Apply(List.nil(), maker.Ident(decl.name), decl.params.map(param -> maker.Ident(param.name)));

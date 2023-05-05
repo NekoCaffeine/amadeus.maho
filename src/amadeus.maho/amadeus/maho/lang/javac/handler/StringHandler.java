@@ -22,7 +22,7 @@ public class StringHandler {
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
     private static Type adjustMethodReturnType(final Type capture, final Attr $this, final Symbol method, final Type qualifierType, final Name methodName, final List<Type> argTypes, final Type returnType) {
-        if (method.owner != null && method.owner.type == HandlerMarker.instance().symtab.stringType && method.name.toString().equals("formatted") && qualifierType.constValue() instanceof String format) {
+        if (method != null && method.owner != null && method.owner.type == HandlerMarker.instance().symtab.stringType && method.name.toString().equals("formatted") && qualifierType.constValue() instanceof String format) {
             final Object args[] = argTypes.stream()
                     .map(Type::constValue)
                     .takeWhile(ObjectHelper::nonNull)

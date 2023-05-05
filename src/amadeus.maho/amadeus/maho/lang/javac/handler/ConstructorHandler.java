@@ -206,8 +206,8 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
                 });
     }
     
-    public JCTree.JCMethodDecl SyntheticConstructor(final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression returnType, final List<JCTree.JCTypeParameter> typarams, final List<JCTree.JCVariableDecl> params,
-            final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, @Nullable final JCTree.JCExpression defaultValue)
+    public SyntheticConstructor SyntheticConstructor(final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression returnType, final List<JCTree.JCTypeParameter> typarams, final List<JCTree.JCVariableDecl> params,
+            final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, final @Nullable JCTree.JCExpression defaultValue)
             = new SyntheticConstructor(mods, name, returnType, typarams, null, params, thrown, body, defaultValue, null).let(result -> result.pos = maker.pos);
     
     protected List<JCTree.JCVariableDecl> params(final Env<AttrContext> env, final List<JCTree.JCVariableDecl> fields, final Function<String, String> simplify)
