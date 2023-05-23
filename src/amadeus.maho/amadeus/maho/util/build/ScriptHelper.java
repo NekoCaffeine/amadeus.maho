@@ -1,6 +1,7 @@
 package amadeus.maho.util.build;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -9,8 +10,10 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import amadeus.maho.core.MahoImage;
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.misc.Environment;
 
 import static com.sun.jna.Platform.*;
@@ -27,13 +30,27 @@ public interface ScriptHelper {
             XX_DISABLE    = "-XX:-%s",
             ENABLE_ASSERT = "-ea";
     
+    String MAHO_JAVA_EXECUTION = "maho.java.execution";
+    
+    static void useMahoImageIfPossible() {
+       final @Nullable String image = System.getenv(MahoImage.VARIABLE);
+       if (image != null) {
+           final Path imagePath = Path.of(image);
+           if (Files.isDirectory(imagePath)) {
+               final Path java = imagePath / "bin" / (getOSType() == WINDOWS ? "java.exe" : "java");
+               if (Files.isRegularFile(java))
+                   Environment.local().value(MAHO_JAVA_EXECUTION, java.toAbsolutePath().toString());
+           }
+       }
+    }
+    
     static Process run(final Workspace workspace, final Module module, final int debugPort = -1, final List<String> jvmArgs = List.of(), final boolean openTerminal = true,
             final Path runDir = workspace.root() / module.path() / "run", final Predicate<Path> useModulePath = path -> true) = run(runDir, openTerminal, runArgs(workspace, module, debugPort, jvmArgs, useModulePath));
     
     static List<String> runArgs(final Workspace workspace, final Module module, final int debugPort = -1, final List<String> jvmArgs = List.of(), final Predicate<Path> useModulePath = path -> true) {
         final ArrayList<String> args = { };
         final ArrayList<Path> p = { }, cp = { };
-        args += Environment.local().lookup("java.execution", "java");
+        args += Environment.local().lookup(MAHO_JAVA_EXECUTION, (Path.of(System.getProperty("java.home")) / "bin" / "java").toAbsolutePath().toString());
         if (debugPort != -1)
             args += "-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:" + debugPort;
         args *= jvmArgs;

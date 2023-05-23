@@ -28,6 +28,7 @@ import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ClassWriter;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.RemapContext;
+import amadeus.maho.util.misc.Environment;
 
 @RequiredArgsConstructor
 public abstract class BaseTransformer<A extends Annotation> implements ClassTransformer {
@@ -81,6 +82,7 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
         }
         return node;
     }
+    
     public abstract @Nullable ClassNode doTransform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain);
     
     public @Nullable ClassNode transformWithoutContext(final @Nullable ClassNode node, final @Nullable ClassLoader loader) = transform(new ClassWriter(loader).mark(node).context(), node, null, null, null);
@@ -162,15 +164,16 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
             final String enable[] = metadata.enable(), disable[] = metadata.disable();
             if (disable.length != 0 || enable.length != 0) {
                 final List<Predicate<ClassNode>>
-                        enableList = Stream.of(enable).map(BaseTransformer::mapPredicate).toList(),
-                        disableList = Stream.of(disable).map(BaseTransformer::mapPredicate).toList();
+                        enableList = Stream.of(enable).map(expr -> mapPredicate(expr, manager.environment())).toList(),
+                        disableList = Stream.of(disable).map(expr -> mapPredicate(expr, manager.environment())).toList();
                 return node -> disableList.stream().noneMatch(predicate -> predicate.test(node)) && enableList.stream().allMatch(predicate -> predicate.test(node));
             }
         }
         return node -> true;
     }
     
-    public static Predicate<ClassNode> mapPredicate(String expr) {
+    public static Predicate<ClassNode> mapPredicate(final String value, final Environment environment) {
+        String expr = value;
         boolean opposite = false;
         if (expr.startsWith("!")) {
             opposite = true;
@@ -182,7 +185,10 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
             return node -> name.tryLoad(false) != null == flag;
         }
         final String condition = expr;
-        return node -> (System.getProperty(condition) != null && !"false".equals(System.getProperty(condition))) == flag;
+        return node -> {
+            final @Nullable String lookup = environment.lookup(condition);
+            return lookup != null && environment.lookup(condition, false) == flag;
+        };
     }
     
     @Override

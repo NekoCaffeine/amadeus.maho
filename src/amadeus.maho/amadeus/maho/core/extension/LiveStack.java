@@ -1,4 +1,4 @@
-package amadeus.maho.hacking.lsf;
+package amadeus.maho.core.extension;
 
 import java.io.PrintStream;
 import java.lang.module.ModuleDescriptor;
@@ -27,38 +27,66 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import amadeus.maho.hacking.Hacker;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.inspection.APIStatus;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Hook;
+import amadeus.maho.transform.mark.Preload;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.TransformTarget;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.Experimental;
 import amadeus.maho.transform.mark.base.InvisibleType;
+import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.annotation.mark.HiddenDanger;
-import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.misc.Environment;
 
-import static amadeus.maho.core.MahoExport.MAHO_HACKING_LSF;
+import static amadeus.maho.util.bytecode.ASMHelper.*;
 import static org.objectweb.asm.Opcodes.*;
 
 @Experimental
 @HiddenDanger(HiddenDanger.JVM_NOT_CATCH) // java.lang.StackStreamFactory$AbstractStackWalker.fetchStackFrames(JJII[Ljava/lang/Object;)I
+@Preload
 @TransformProvider
 @APIStatus(design = APIStatus.Stage.β, implement = APIStatus.Stage.γ)
-public class HackerLiveStackFrame implements Hacker {
+public class LiveStack {
+    
+    @TransformProvider
+    private interface Layer {
+        
+        @TransformTarget(targetClass = Throwable.class, selector = _INIT_)
+        private static void priorityAssignment(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
+            if (methodNode.desc.equals(VOID_METHOD_DESC) || methodNode.desc.equals("(Ljava/lang/String;Ljava/lang/Throwable;ZZ)V"))
+                return;
+            final InsnList insnList = { };
+            for (final AbstractInsnNode insn : methodNode.instructions)
+                if (insn.getOpcode() == INVOKEVIRTUAL && ((MethodInsnNode) insn).name.equals("fillInStackTrace")) {
+                    final AbstractInsnNode previous = insn.getPrevious(), next = insn.getNext();
+                    Stream.of(previous, insn, next).forEach(methodNode.instructions::remove);
+                    insnList.add(previous);
+                    insnList.add(insn);
+                    insnList.add(next);
+                }
+            for (final AbstractInsnNode insn : methodNode.instructions)
+                if (insn.getOpcode() == RETURN) {
+                    methodNode.instructions.insertBefore(insn, insnList);
+                    context.markModified();
+                    context.markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
+                    return;
+                }
+        }
+    }
+    
+    private static boolean hackFlag;
     
     @Getter
-    private static final HackerLiveStackFrame instance = { };
-    
-    private static volatile boolean hackFlag;
+    private static final LiveStack instance = { };
     
     @Setter
     @Getter
@@ -72,51 +100,17 @@ public class HackerLiveStackFrame implements Hacker {
     @Getter
     private Function<Class<?>, ModuleDescriptor> descriptorMapper = clazz -> null;
     
-    @Override
-    public void irrupt() = hackFlag = true;
-    
-    @Override
-    public void recovery() = hackFlag = false;
-    
-    @Override
-    public boolean working() = hackFlag;
-    
     public void addDescriptorMapper(final Function<Class<?>, ModuleDescriptor> descriptorMapper) {
         final Function<Class<?>, ModuleDescriptor> source = descriptorMapper();
         descriptorMapper(clazz -> descriptorMapper.apply(clazz) ?? source.apply(clazz));
     }
     
-    static {
-        if (Environment.local().lookup(MAHO_HACKING_LSF, true))
-            instance().irrupt();
-    }
-    
-    @TransformTarget(targetClass = Throwable.class, selector = ASMHelper._INIT_)
-    private static void priorityAssignment(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
-        if (methodNode.desc.equals(ASMHelper.VOID_METHOD_DESC) || methodNode.desc.equals("(Ljava/lang/String;Ljava/lang/Throwable;ZZ)V"))
-            return;
-        final InsnList insnList = { };
-        for (final AbstractInsnNode insn : methodNode.instructions)
-            if (insn.getOpcode() == INVOKEVIRTUAL && ((MethodInsnNode) insn).name.equals("fillInStackTrace")) {
-                final AbstractInsnNode previous = insn.getPrevious(), next = insn.getNext();
-                Stream.of(previous, insn, next).forEach(methodNode.instructions::remove);
-                insnList.add(previous);
-                insnList.add(insn);
-                insnList.add(next);
-            }
-        for (final AbstractInsnNode insn : methodNode.instructions)
-            if (insn.getOpcode() == RETURN) {
-                methodNode.instructions.insertBefore(insn, insnList);
-                context.markModified();
-                context.markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
-                return;
-            }
-    }
+    static { hackFlag = Environment.local().lookup("amadeus.maho.live.stack", false); }
     
     @Proxy(INVOKEVIRTUAL)
     public static native StackTraceElement[] getOurStackTrace(Throwable $this);
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static Hook.Result printStackTrace(final Throwable $this, final PrintStream stream) {
         printStackTraceToStream($this, stream);
         return Hook.Result.NULL;
@@ -131,7 +125,7 @@ public class HackerLiveStackFrame implements Hacker {
             stream.println($this);
             final StackTraceElement[] trace = getOurStackTrace($this);
             for (final StackTraceElement traceElement : trace)
-                stream.println("\t" + (traceElement.getFileName().startsWith(ARROW) ? traceElement.getFileName() : "at " + traceElement));
+                stream.println("\t" + (traceElement.getFileName()?.startsWith(ARROW) ?? false ? traceElement.getFileName() : "at " + traceElement));
             for (final var suppressed : $this.getSuppressed())
                 printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, "\t", mark);
             @Nullable final Throwable ourCause = $this.getCause();
@@ -148,7 +142,7 @@ public class HackerLiveStackFrame implements Hacker {
             final StackTraceElement trace[] = getOurStackTrace($this);
             int m = trace.length - 1;
             int n = enclosingTrace.length - 1;
-            while (m >= 0 && n >=0 && trace[m].equals(enclosingTrace[n])) {
+            while (m >= 0 && n >= 0 && trace[m].equals(enclosingTrace[n])) {
                 m--;
                 n--;
             }
@@ -159,7 +153,7 @@ public class HackerLiveStackFrame implements Hacker {
             if (framesInCommon != 0)
                 stream.println(prefix + "\t... " + framesInCommon + " more");
             for (final var suppressed : $this.getSuppressed())
-                printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, prefix +"\t", mark);
+                printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, prefix + "\t", mark);
             @Nullable final Throwable ourCause = $this.getCause();
             if (ourCause != null)
                 printEnclosedStackTrace(ourCause, stream, trace, CAUSE_CAPTION, prefix, mark);
@@ -167,13 +161,13 @@ public class HackerLiveStackFrame implements Hacker {
     }
     
     private static final String
-            ExtendedOption = "java.lang.StackWalker$ExtendedOption",
-            LiveStackFrame = "java.lang.LiveStackFrame",
-            PrimitiveSlot = "java.lang.LiveStackFrame$PrimitiveSlot",
+            ExtendedOption                = "java.lang.StackWalker$ExtendedOption",
+            LiveStackFrame                = "java.lang.LiveStackFrame",
+            PrimitiveSlot                 = "java.lang.LiveStackFrame$PrimitiveSlot",
             CompletableFuture$AsyncSupply = "java.util.concurrent.CompletableFuture$AsyncSupply",
-            CompletableFuture$AsyncRun = "java.util.concurrent.CompletableFuture$AsyncRun",
-            CompletableFuture$UniAccept = "java.util.concurrent.CompletableFuture$UniAccept",
-            CompletableFuture$UniRun = "java.util.concurrent.CompletableFuture$UniRun";
+            CompletableFuture$AsyncRun    = "java.util.concurrent.CompletableFuture$AsyncRun",
+            CompletableFuture$UniAccept   = "java.util.concurrent.CompletableFuture$UniAccept",
+            CompletableFuture$UniRun      = "java.util.concurrent.CompletableFuture$UniRun";
     
     private static final ConcurrentWeakIdentityHashMap<StackTraceElement, LiveStackFrame> stackTraceLiveMap = { };
     
@@ -246,7 +240,7 @@ public class HackerLiveStackFrame implements Hacker {
     private static volatile int classRedefinedCount;
     
     private static synchronized void printStackTrace(final String message, final Throwable nested) {
-        final int count = classRedefinedCount(HackerLiveStackFrame.class);
+        final int count = classRedefinedCount(LiveStack.class);
         if (classRedefinedCount != count) {
             classRedefinedCount = count;
             return;
@@ -264,7 +258,7 @@ public class HackerLiveStackFrame implements Hacker {
         default                             -> false;
     }));
     
-    @Hook(avoidRecursion = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
+    @Hook(avoidRecursion = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void fillInStackTrace(final Throwable $this) {
         try {
             if ($this == reserved || !hackFlag || !contextStack().isEmpty() || inDefineClass())
@@ -304,7 +298,7 @@ public class HackerLiveStackFrame implements Hacker {
         } catch (final Throwable throwable) { fuseProtection(throwable); }
     }
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static StackTraceElement[] getOurStackTrace(final StackTraceElement result[], final Throwable $this) = result.length == 0 ? result : Stream.of(result)
             .filter(element -> {
                 final LiveStackFrame frame = stackTraceLiveMap.get(element);
@@ -313,10 +307,10 @@ public class HackerLiveStackFrame implements Hacker {
     
     private static boolean is64Bit(final int size) = size == 8;
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static String toString(final String result, final StackTraceElement $this) throws Throwable {
-        final String fileName = $this.getFileName();
-        if (fileName.startsWith("#"))
+        final @Nullable String fileName = $this.getFileName();
+        if (fileName?.startsWith("#") ?? false)
             return fileName;
         try {
             if (!hackFlag)
@@ -388,73 +382,73 @@ public class HackerLiveStackFrame implements Hacker {
     
     public static void fork(final Object target) = stackTraceExtender.computeIfAbsent(target, key -> walker.walk(stream ->
             Stream.concat(Stream.of(new StackTraceElement("amadeus.maho.hacking.lsf.HackerLiveStackFrame", "fork", "↑ " + Thread.currentThread(), -1)), stream
-                    .dropWhile(frame -> !frame.getDeclaringClass().isInstance(target))
-                    .dropWhile(frame -> frame.getDeclaringClass().isInstance(target))
-                    .map(HackerLiveStackFrame::of))
+                            .dropWhile(frame -> !frame.getDeclaringClass().isInstance(target))
+                            .dropWhile(frame -> frame.getDeclaringClass().isInstance(target))
+                            .map(LiveStack::of))
                     .toArray(StackTraceElement[]::new)));
     
     public static void push(final Object context) = contextExtender.get().addLast(context);
     
     public static void pop() = contextExtender.get().peekLast();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void _init__$Thread(final Thread $this) = fork($this);
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Enter(final Thread $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Exit(final Thread $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void _init__$FutureTask(final FutureTask<?> $this) = fork($this);
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Enter(final FutureTask<?> $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Exit(final FutureTask<?> $this) = pop();
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void runAndReset_$Enter(final FutureTask<?> $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void runAndReset_$Exit(final FutureTask<?> $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void _init__$AsyncSupply(final @InvisibleType(CompletableFuture$AsyncSupply) Object $this) = fork($this);
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Enter$AsyncSupply(final @InvisibleType(CompletableFuture$AsyncSupply) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Exit$AsyncSupply(final @InvisibleType(CompletableFuture$AsyncSupply) Object $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void _init__$AsyncRun(final @InvisibleType(CompletableFuture$AsyncRun) Object $this) = fork($this);
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Enter$AsyncRun(final @InvisibleType(CompletableFuture$AsyncRun) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void run_$Exit$AsyncRun(final @InvisibleType(CompletableFuture$AsyncRun) Object $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void _init__$UniAccept(final @InvisibleType(CompletableFuture$UniAccept) Object $this) = fork($this);
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void tryFire_$Enter$UniAccept(final @InvisibleType(CompletableFuture$UniAccept) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void tryFire_$Exit$UniAccept(final @InvisibleType(CompletableFuture$UniAccept) Object $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false)
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void _init__$UniRun(final @InvisibleType(CompletableFuture$UniRun) Object $this) = fork($this);
     
-    @Hook
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void tryFire_$Enter$UniRun(final @InvisibleType(CompletableFuture$UniRun) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void tryFire_$Exit$UniRun(final @InvisibleType(CompletableFuture$UniRun) Object $this) = pop();
     
 }

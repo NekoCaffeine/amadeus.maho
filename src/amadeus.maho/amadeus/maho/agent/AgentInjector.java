@@ -9,24 +9,72 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 
+import amadeus.maho.core.MahoExport;
+import amadeus.maho.core.MahoImage;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.util.build.Jar;
+import amadeus.maho.util.misc.Environment;
+import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.vm.JNI;
+
+import sun.instrument.InstrumentationImpl;
 
 import static java.nio.file.StandardOpenOption.*;
 
 public interface AgentInjector {
     
-    static void inject(final String prefix, final Class<?> agent, final Class<?>... resources) throws IOException = JNI.Instrument.INSTANCE.attachAgent(generateAgentJar(prefix, agent, resources));
+    static void inject(final String name, final Class<?> agent, final Class<?>... resources) throws IOException {
+        final String redirectKey = MahoExport.MAHO_AGENT_REDIRECT + "." + name, agentPath = Environment.local().lookup(redirectKey, "");
+        if (!agentPath.isEmpty()) {
+            final Path jarFile = Path.of(agentPath);
+            if (Files.isDirectory(jarFile))
+                throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("%s: %s".formatted(redirectKey, agentPath)));
+            if (!Files.isRegularFile(jarFile))
+                generateAgentJar(jarFile, agent, resources);
+            inject(jarFile);
+        } else {
+            final Path imageInlineAgent = Path.of(System.getProperty("java.home")) / "agent" / name;
+            if (Files.isRegularFile(imageInlineAgent))
+                inject(imageInlineAgent);
+            else
+                inject(generateAgentJar(name, agent, resources));
+        }
+    }
     
     @SneakyThrows
-    static String generateAgentJar(final String prefix, final Class<?> agent, final Class<?>... resources) throws IOException {
+    static void inject(final Path jarFile) throws IOException {
+        final String path = jarFile.toRealPath().toString();
+        try {
+            InstrumentationImpl.loadAgent(path);
+        } catch (final IllegalAccessError e) {
+            try {
+                if (MahoImage.isImage()) {
+                    DebugHelper.breakpoint();
+                    System.err.println("Fallback to JNA!");
+                }
+                JNI.Instrument.INSTANCE.attachAgent(path);
+            } catch (final Exception re) {
+                re.addSuppressed(e);
+                throw DebugHelper.breakpointBeforeThrow(re);
+            }
+        }
+    }
+    
+    @SneakyThrows
+    static Path generateAgentJar(final String prefix, final Class<?> agent, final Class<?>... resources) throws IOException {
         final Path jarFile = Files.createTempFile(prefix + "-Agent-", Jar.SUFFIX);
+        generateAgentJar(jarFile, agent, resources);
+        return jarFile;
+    }
+    
+    @SneakyThrows
+    static void generateAgentJar(final Path jarFile, final Class<?> agent, final Class<?>... resources) throws IOException {
         final Manifest manifest = { };
         final Attributes attributes = manifest.getMainAttributes();
         // Create manifest stating that agent is allowed to transform classes
         attributes[Attributes.Name.MANIFEST_VERSION] = "1.0";
         attributes[Jar.AGENT_CLASS] = agent.getName();
+        attributes[Jar.LAUNCHER_AGENT_CLASS] = agent.getName();
         attributes[Jar.CAN_RETRANSFORM_CLASSES] = Boolean.TRUE.toString();
         attributes[Jar.CAN_REDEFINE_CLASSES] = Boolean.TRUE.toString();
         try (final JarOutputStream output = { Files.newOutputStream(jarFile, CREATE, WRITE), manifest }) {
@@ -37,7 +85,6 @@ public interface AgentInjector {
                 output.write(getBytesFromClass(resource));
             }
         }
-        return jarFile.toRealPath().toString();
     }
     
     private static String path(final Class<?> clazz) = clazz.getName().replace('.', '/') + ".class";

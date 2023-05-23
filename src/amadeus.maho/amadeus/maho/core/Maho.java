@@ -48,7 +48,6 @@ import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ClassWriter;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.logging.LogLevel;
-import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.profile.Sampler;
 import amadeus.maho.util.resource.ResourcePath;
 import amadeus.maho.util.runtime.DebugHelper;
@@ -180,8 +179,7 @@ public final class Maho {
     private static void setupTransformer() {
         stage("setupTransformer");
         final Predicate<ResourcePath.ClassInfo> filter = info -> info.className().startsWith(MAHO_PACKAGE_NAME) && !info.className().startsWith(MAHO_SHADOW_PACKAGE_NAME), exportFilter = Setup.setupFilter();
-        final Environment env = Environment.local();
-        setupFromClass(Maho.class, exportFilter == null ? filter : filter.and(exportFilter), env.lookup(MAHO_SETUP_SCAN_ANNOTATION, true), env.lookup(MAHO_SETUP_SCAN_PROVIDER, true));
+        setupFromClass(Maho.class, exportFilter == null ? filter : filter.and(exportFilter));
     }
     
     @SneakyThrows
@@ -191,8 +189,12 @@ public final class Maho {
     public static void dump(final List<String> list, final String subHead) {
         list += "PID: " + ProcessHandle.current().pid();
         list += "VersionInfo: " + VERSION;
+        list += "MahoImage: " + MahoImage.isImage();
         list += "Experimental: " + experimental();
         list += "Debug: " + MahoExport.debug();
+        list += "JVM: " + System.getProperty("java.vm.name");
+        list += "RuntimeVersion: " + Runtime.version();
+        list += "JavaHome: " + Path.of(System.getProperty("java.home")).toRealPath();
         list += "Location: " + Path.of("").toRealPath();
         list += "ClassLoader: " + Maho.class.getClassLoader();
         list += "Instrumentation: " + instrumentation();
@@ -204,19 +206,16 @@ public final class Maho {
         new ArrayList<String>().let(result -> dump(result, " ".repeat(4))).forEach(Maho::debug);
         loadJavaSupport(instrumentation);
         loadClassLoaderBridge();
-        if (Setup.state())
-            setupTransformer();
+        setupTransformer();
     }
     
-    public static void setupFromClass(final Class<?> clazz = CallerContext.caller(), final Predicate<ResourcePath.ClassInfo> filter = info -> true,
-            final boolean scanAnnotation = true, final boolean scanProvider = true) {
+    public static void setupFromClass(final Class<?> clazz = CallerContext.caller(), final Predicate<ResourcePath.ClassInfo> filter = info -> true) {
         instrumentation();
         try (final var path = ResourcePath.of(clazz)) {
             final Module module = clazz.getModule();
             if (module != Maho.class.getModule())
                 accessRequires(module);
-            TransformerManager.runtime().setup(clazz.getClassLoader(), path, filter, module.isNamed() ? module.getDescriptor().toNameAndVersion() + "#" + clazz.getSimpleName() : clazz.getSimpleName(),
-                    AOTTransformer.Level.RUNTIME, scanAnnotation, scanProvider);
+            TransformerManager.runtime().setup(clazz.getClassLoader(), path, AOTTransformer.Level.RUNTIME, module.isNamed() ? module.getDescriptor().toNameAndVersion() + "#" + clazz.getSimpleName() : clazz.getSimpleName(), filter);
         }
     }
     

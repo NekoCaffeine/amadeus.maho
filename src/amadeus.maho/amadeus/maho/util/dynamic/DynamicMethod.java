@@ -32,12 +32,14 @@ import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.TransformerManager;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Preload;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.InvisibleType;
+import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.annotation.mark.HiddenDanger;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
@@ -77,13 +79,13 @@ public class DynamicMethod {
         @Proxy(NEW) // JIT inline
         static @InvisibleType(DelegatingClassLoader) ClassLoader delegating(final @Nullable ClassLoader parent) = (ClassLoader) constructor.invoke(parent); // rollback: before inline
         
-        @Hook(avoidRecursion = true)
+        @Hook(avoidRecursion = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static Hook.Result checkAccess(final MethodHandles.Lookup $this, final byte refKind, final Class<?> refClass, final @InvisibleType(MemberName) Object memberName)
                 = Hook.Result.falseToVoid(bridgeClass.isAssignableFrom($this.lookupClass()), null);
         
         // # Cross-package constructor reference support
         
-        @Hook(avoidRecursion = true, at = @At(field = @At.FieldInsn(name = "useImplMethodHandle")), capture = true)
+        @Hook(avoidRecursion = true, at = @At(field = @At.FieldInsn(name = "useImplMethodHandle")), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static boolean _init_(final boolean capture, final @InvisibleType(InnerClassLambdaMetafactory) Object $this,
                 final MethodHandles.Lookup caller,
                 final MethodType invokedType,
@@ -99,21 +101,24 @@ public class DynamicMethod {
         @Proxy(GETFIELD)
         private static boolean useImplMethodHandle(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
         
-        @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_newInvokeSpecial), ordinal = 0, offset = 1), capture = true, avoidRecursion = true)
+        @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_newInvokeSpecial), ordinal = 0, offset = 1), capture = true, avoidRecursion = true,
+                metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static boolean generate_$NEW_DUP(final boolean capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType)
                 = capture && !useImplMethodHandle(Privilege.Outer.access($this));
         
         @Proxy(GETFIELD)
         private static int implKind(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
         
-        @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_invokeStatic), ordinal = 0, offset = 1), capture = true, avoidRecursion = true)
+        @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_invokeStatic), ordinal = 0, offset = 1), capture = true, avoidRecursion = true,
+                metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static boolean generate_$insertParameterTypes(final boolean capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType)
                 = capture && implKind(Privilege.Outer.access($this)) != MethodHandleInfo.REF_newInvokeSpecial;
         
         @Proxy(GETFIELD)
         private static Class<?> implClass(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
         
-        @Hook(at = @At(method = @At.MethodInsn(name = "descriptorString"), ordinal = 0), capture = true, avoidRecursion = true)
+        @Hook(at = @At(method = @At.MethodInsn(name = "descriptorString"), ordinal = 0), capture = true, avoidRecursion = true,
+                metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static MethodType generate_$changeReturnType(final MethodType capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType) {
             final var metafactory = Privilege.Outer.access($this);
             return implKind(metafactory) != MethodHandleInfo.REF_newInvokeSpecial ? capture : capture.changeReturnType(implClass(metafactory));

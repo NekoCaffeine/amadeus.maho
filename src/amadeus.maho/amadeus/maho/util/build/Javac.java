@@ -231,8 +231,8 @@ public interface Javac {
         }
         
         @Override
-        public URL findResource(final String name) {
-            final String binaryName = binaryName(name);
+        public @Nullable URL findResource(final String name) {
+            final @Nullable String binaryName = binaryName(name);
             if (binaryName == null || sourceFileClasses[binaryName] == null)
                 return null;
             try { return { "memory", null, -1, name, handler }; } catch (final MalformedURLException e) { return null; }
@@ -255,7 +255,7 @@ public interface Javac {
             
         };
         
-        private static String binaryName(final String name) = !name.endsWith(".class") ? null : name.substring(0, name.length() - 6).replace('/', '.');
+        private static @Nullable String binaryName(final String name) = !name.endsWith(".class") ? null : name.substring(0, name.length() - 6).replace('/', '.');
         
     }
     
@@ -324,8 +324,7 @@ public interface Javac {
         if (!p.isEmptyOrNull()) {
             javacOpts += "-p";
             javacOpts += p;
-        } else
-            throw new IllegalStateException("Unable to get the module path at runtime.");
+        }
         final @Nullable String cp = System.getProperty("java.class.path");
         if (!cp.isEmptyOrNull()) {
             javacOpts += "-cp";

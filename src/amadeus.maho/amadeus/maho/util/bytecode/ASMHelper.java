@@ -33,6 +33,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
@@ -40,6 +41,9 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.TypeReference;
 import org.objectweb.asm.commons.Method;
+import org.objectweb.asm.commons.ModuleHashesAttribute;
+import org.objectweb.asm.commons.ModuleResolutionAttribute;
+import org.objectweb.asm.commons.ModuleTargetAttribute;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -246,7 +250,7 @@ public interface ASMHelper {
     
     static String classDesc(final String name) = "L" + className(name) + ";";
     
-    static String sourceName(final String name) = name == null ? null : className(name).replace('/', '.');
+    static @Nullable String sourceName(final @Nullable String name) = name == null ? null : className(name).replace('/', '.');
     
     static Type arrayType(final Type type, final int dim = 1) = dim < 1 ? type : Type.getType("[".repeat(dim) + type.getDescriptor());
     
@@ -839,12 +843,14 @@ public interface ASMHelper {
         return newClassNode(ClassWriter.toBytecode(node::accept));
     }
     
+    Attribute attributePrototypes[] = { new ModuleHashesAttribute(), new ModuleResolutionAttribute(), new ModuleTargetAttribute() };
+    
     static @Nullable ClassNode newClassNode(final @Nullable byte data[], final int flags = 0) {
         if (data == null)
             return null;
         final ClassReader reader = newClassReader(data);
         final ClassNode result = { };
-        reader.accept(result, flags);
+        reader.accept(result, attributePrototypes, flags);
         return result;
     }
     

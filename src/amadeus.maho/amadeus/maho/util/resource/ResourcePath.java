@@ -17,19 +17,25 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import jdk.nio.zipfs.ZipFileSystem;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
+import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.control.FunctionChain;
 
-@NoArgsConstructor
+@RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ResourcePath implements Closeable {
     
@@ -37,14 +43,41 @@ public class ResourcePath implements Closeable {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     public static class ResourceTree implements Closeable {
         
+        protected static final String JMOD_SUFFIX = ".jmod";
+        
         final Path root;
         
         @Nullable FileSystem domain;
         
-        protected ResourceTree(final Path root) = this.root = checkZipFile(root);
+        final boolean jmod ;
+        
+        final UnaryOperator<Path> classesRedirect;
+        
+        protected ResourceTree(final Path root) {
+            this.root = checkZipFile(root);
+            jmod = domain() instanceof ZipFileSystem && root.getFileName().toString().endsWith(JMOD_SUFFIX);
+            classesRedirect = jmod() ? it -> it / "classes" : UnaryOperator.identity();
+        }
         
         @SneakyThrows
-        public Stream<ResourceInfo> nodes() = Files.walk(root).filter(path -> path.getFileName() != null).map(path -> ResourceInfo.of(root(), path));
+        public Stream<ResourceInfo> nodes(final UnaryOperator<Path> redirect = UnaryOperator.identity()) {
+            final Path root = redirect.apply(root());
+            return Files.walk(root).filter(path -> path.getFileName() != null).map(path -> ResourceInfo.of(root, path));
+        }
+        
+        public Stream<ClassInfo> classes() = nodes(classesRedirect()).cast(ClassInfo.class);
+        
+        public @Nullable ResourceInfo findResource(final String name) {
+            final Path path = root / name;
+            return Files.isRegularFile(path) ? new ResourceInfo(root, path) : null;
+        }
+        
+        public @Nullable ClassInfo findClassInfo(final String name) {
+            final Path root = classesRedirect().apply(root()), path = root / (name.replace('.', '/') + ".class");
+            return Files.isRegularFile(path) ? new ClassInfo(root, path) : null;
+        }
+        
+        public @Nullable ClassInfo findModuleInfo() = findClassInfo("module-info");
         
         protected Path checkZipFile(final Path path) {
             if (Files.isReadable(path))
@@ -52,7 +85,7 @@ public class ResourcePath implements Closeable {
                     if (inputStream.available() < Integer.BYTES)
                         return path;
                     final int signature = inputStream.readInt();
-                    if (signature == 0x504B0304 || signature == 0x504B0506) // check zip file magic number
+                    if (signature == 0x504B0304 || signature == 0x504B0506 || signature == 0x4A4D0100) // check zip or jmod file magic number
                         return (domain = path.zipFileSystem(Map.of("readonly", "true"))).getPath("");
                 } catch (final IOException ignored) { }
             return path;
@@ -67,7 +100,7 @@ public class ResourcePath implements Closeable {
         @Override
         public String toString() {
             final FileSystem domain = domain();
-            return "%s/%s".formatted(domain == null ? "default" : domain.toString(), root());
+            return "%s | %s".formatted(domain == null ? "default" : domain.toString(), root());
         }
         
         @SneakyThrows
@@ -105,7 +138,7 @@ public class ResourcePath implements Closeable {
         @Override
         public String toString() {
             final FileSystem domain = path().getFileSystem();
-            return "%s/%s".formatted(domain == null ? "default" : domain.toString(), root());
+            return "%s | %s".formatted(domain == null ? "default" : domain.toString(), root() / path());
         }
         
     }
@@ -144,13 +177,16 @@ public class ResourcePath implements Closeable {
                     .map(CodeSource::getLocation));
     
     @Getter
+    @Default
     List<ResourceTree> trees = new ArrayList<>();
     
     public void addResourceTree(final @Nullable ResourceTree tree) = Optional.ofNullable(tree).ifPresent(trees()::add);
     
+    public ResourcePath sub(final Predicate<ResourceTree> predicate) = { trees().stream().filter(predicate).collect(Collectors.toList()) };
+    
     public Stream<ResourceInfo> resources() = trees().stream().flatMap(ResourceTree::nodes);
     
-    public Stream<ClassInfo> classes() = resources().cast(ClassInfo.class);
+    public Stream<ClassInfo> classes() = trees().stream().flatMap(ResourceTree::classes);
     
     public Stream<ClassInfo> topLevelClasses() = classes().filter(info -> info.name().indexOf('$') == -1);
     

@@ -72,7 +72,7 @@ public enum WhiteBox {
     @TransformProvider
     private interface Proxy {
         
-        @TransformTarget(target = Names.WhiteBox_Shadow, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.CLOSED_WORLD))
+        @TransformTarget(target = Names.WhiteBox_Shadow, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static void proxyMethod(final TransformContext context, final ClassNode node) {
             context.markModified();
             for (final MethodNode methodNode : node.methods)

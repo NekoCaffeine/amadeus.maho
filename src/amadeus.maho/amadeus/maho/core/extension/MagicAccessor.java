@@ -4,15 +4,14 @@ import org.objectweb.asm.tree.ClassNode;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.core.MahoExport;
-import amadeus.maho.util.bytecode.ASMHelper;
 
 import static org.objectweb.asm.Opcodes.*;
 
 public class MagicAccessor {
     
     public static final String
-            Impl = ASMHelper.className("jdk.internal.reflect.MagicAccessorImpl"),
-            Bridge = ASMHelper.className("jdk.internal.reflect.MagicAccessorMahoBridge");
+            Impl = "jdk/internal/reflect/MagicAccessorImpl",
+            Bridge = "jdk/internal/reflect/MagicAccessorMahoBridge";
     
     public static final Class<?> bridgeClass = Maho.shareClass(makeMagicAccessorBridge());
     

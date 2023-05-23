@@ -10,11 +10,13 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Erase;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Init;
 import amadeus.maho.transform.mark.Share;
 import amadeus.maho.transform.mark.base.At;
+import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 
 @AllArgsConstructor
@@ -135,55 +137,55 @@ public class DynamicLinkingContext {
             = { LinkingType.LINK_METHOD_HANDLE_CONSTANT, caller, name, type, null, null, refKind, defc };
     
     // runtime version <= 17
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkCallSite_$Enter(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
     = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkCallSite_$Exit(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
             = contextStack().pop();
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkDynamicConstant_$Enter(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
             = contextStack().push(withLinkDynamicConstant((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkDynamicConstant_$Exit(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
             = contextStack().pop();
     // end
     
     
     // runtime version > 17
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkCallSite_$Enter(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
     = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkCallSite_$Exit(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
             = contextStack().pop();
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkDynamicConstant_$Enter(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
             = contextStack().push(withLinkDynamicConstant((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkDynamicConstant_$Exit(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
             = contextStack().pop();
     // end
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkMethod_$Enter(final Class<?> callerClass, final int refKind, final Class<?> defc, final String name, final Object type, final Object appendixResult[])
             = contextStack().push(withLinkMethod(callerClass, name, type, refKind, defc));
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkMethod_$Exit(final Class<?> callerClass, final int refKind, final Class<?> defc, final String name, final Object type, final Object appendixResult[])
             = contextStack().pop();
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true)
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkMethodHandleConstant_$Enter(final Class<?> callerClass, final int refKind, final Class<?> defc, final String name, final Object type)
             = contextStack().push(withLinkMethodHandleConstant(callerClass, name, type, refKind, defc));
     
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkMethodHandleConstant_$Exit(final Class<?> callerClass, final int refKind, final Class<?> defc, final String name, final Object type)
             = contextStack().pop();
     

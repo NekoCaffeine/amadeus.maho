@@ -1,4 +1,4 @@
-package amadeus.maho.hacking.lsf;
+package amadeus.maho.core.extension;
 
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Executable;
@@ -14,12 +14,12 @@ import static amadeus.maho.util.bytecode.ASMHelper.*;
 
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PUBLIC)
-class LiveStackFrame {
+public class LiveStackFrame {
     
-    final Class<?> declaringClass;
-    final String name;
+    final Class<?>   declaringClass;
+    final String     name;
     final MethodType methodType;
-    final Object locals[], stack[];
+    final Object     locals[], stack[];
     
     @SneakyThrows
     @Getter(lazy = true)

@@ -23,10 +23,12 @@ import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.reference.Mutable;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.InvisibleType;
+import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.build.Javac;
@@ -117,7 +119,7 @@ public interface Shell {
     @Hook
     private static Hook.Result translateExceptionStack(final Eval $this, final Exception ex) = { ex.getStackTrace() };
     
-    @Hook(at = @At(method = @At.MethodInsn(name = "getName")), before = false, capture = true)
+    @Hook(at = @At(method = @At.MethodInsn(name = "getName")), before = false, capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     private static String toString(final String name, final Throwable $this) = $this instanceof EvalException evalEx ? evalEx.getExceptionClassName() : name;
     
 }

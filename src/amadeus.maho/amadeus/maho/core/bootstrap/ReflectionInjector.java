@@ -30,7 +30,7 @@ public enum ReflectionInjector implements Injector {
     @Override
     public @Nullable byte[] transform(final @Nullable Module module, final @Nullable ClassLoader loader, final @Nullable String className,
             final @Nullable Class<?> classBeingRedefined, final @Nullable ProtectionDomain protectionDomain, final @Nullable byte[] bytecode) {
-        if (classBeingRedefined != null && classBeingRedefined.getName().equals(target())) {
+        if (className != null && className.equals(target()) || classBeingRedefined != null && classBeingRedefined.getName().equals(target())) {
             Maho.debug("ReflectionInjector -> jdk.internal.reflect.Reflection");
             final ClassReader reader = { bytecode };
             final ClassNode node = { };

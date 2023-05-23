@@ -16,7 +16,9 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Hook;
+import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.CallerContext;
 
@@ -26,11 +28,11 @@ public class ReflectBreaker {
     @TransformProvider
     private interface Layer {
         
-        @Hook
+        @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static Hook.Result checkAccess(final AccessibleObject $this, final Class<?> caller, final Class<?> memberClass, final Class<?> targetClass, final int modifiers)
                 = Hook.Result.falseToVoid(accessFlag() || breakModules.contains(caller.getModule()));
         
-        @Hook(forceReturn = true)
+        @Hook(forceReturn = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static void throwFinalFieldIllegalAccessException(final UnsafeFieldAccessorImpl $this, final String attemptedType, final String attemptedValue) { }
         
     }

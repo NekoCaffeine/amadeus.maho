@@ -30,11 +30,9 @@ import amadeus.maho.simulation.reflection.accessor.ConstructorAccessorSimulator;
 import amadeus.maho.simulation.reflection.accessor.FieldAccessorSimulator;
 import amadeus.maho.simulation.reflection.accessor.MethodAccessorSimulator;
 import amadeus.maho.transform.mark.Hook;
-import amadeus.maho.transform.mark.Preload;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.MethodDescriptor;
-import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.runtime.DebugHelper;
@@ -44,8 +42,8 @@ import amadeus.maho.util.runtime.TypeHelper;
 
 import static org.objectweb.asm.Opcodes.*;
 
-@Preload(initialized = true)
-@TransformProvider
+// @Preload(initialized = true)
+// @TransformProvider
 public interface ReflectionSimulator {
     
     @Getter

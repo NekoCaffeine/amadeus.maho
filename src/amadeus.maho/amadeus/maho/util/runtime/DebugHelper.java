@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntPredicate;
 import java.util.function.IntUnaryOperator;
 
+import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
@@ -18,7 +19,6 @@ import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.throwable.BreakException;
-import amadeus.maho.vm.JDWP;
 
 @Getter
 public interface DebugHelper {
@@ -48,7 +48,7 @@ public interface DebugHelper {
     
     @EqualsAndHashCode
     record CodePath(Class<?> clazz, String fieldName, @Nullable Object debugInfo = null) {
-    
+        
         @Override
         public String toString() = clazz.getCanonicalName() + "#" + fieldName;
         
@@ -57,9 +57,7 @@ public interface DebugHelper {
     @NoArgsConstructor
     class NotImplementedError extends Error { }
     
-    boolean
-            inDebug              = Environment.local().lookup("maho.debug.helper", JDWP.isJDWPEnable()),
-            showBreakpoint       = Environment.local().lookup("maho.debug.show.breakpoint", inDebug());
+    boolean showBreakpoint = Environment.local().lookup("maho.debug.show.breakpoint", MahoExport.debug());
     
     Map<Object, Object> globalContext = new ConcurrentHashMap<>();
     
@@ -103,7 +101,7 @@ public interface DebugHelper {
     }
     
     static <T> @Nullable T breakpointWhenDebug(final @Nullable T value) {
-        if (inDebug())
+        if (MahoExport.debug())
             breakpoint();
         return value;
     }

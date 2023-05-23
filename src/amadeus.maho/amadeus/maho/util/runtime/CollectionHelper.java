@@ -118,4 +118,7 @@ public interface CollectionHelper {
     
     static <T> Stream<T> descendingStream(final Deque<T> $this) = StreamSupport.stream(Spliterators.spliteratorUnknownSize($this.descendingIterator(), 0), false);
     
+    @Extension.Operator("&")
+    static <T> Collection<T> intersection(final Collection<T> a, final Collection<T> b) = a.stream().filter(b::contains).toList();
+    
 }

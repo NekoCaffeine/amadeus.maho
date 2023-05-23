@@ -1,8 +1,10 @@
 import jdk.jshell.spi.ExecutionControlProvider;
 
 import amadeus.maho.lang.Extension;
+import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.shell.MahoExecutionControlProvider;
 
+@TransformProvider
 @Extension.Provider
 open module amadeus.maho {
     
@@ -11,6 +13,7 @@ open module amadeus.maho {
     requires transitive java.net.http;
     
     requires transitive jdk.compiler;
+    requires transitive jdk.jlink;
     requires transitive jdk.management;
     requires transitive jdk.jshell;
     requires transitive jdk.zipfs;

@@ -14,17 +14,21 @@ import java.util.stream.Collectors;
 import jdk.internal.loader.BuiltinClassLoader;
 
 import amadeus.maho.core.Maho;
+import amadeus.maho.core.MahoImage;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.util.build.Distributive;
 import amadeus.maho.util.build.IDEA;
 import amadeus.maho.util.build.Jar;
 import amadeus.maho.util.build.Javac;
+import amadeus.maho.util.build.Jlink;
 import amadeus.maho.util.build.Module;
 import amadeus.maho.util.build.Workspace;
 import amadeus.maho.util.depend.Project;
 import amadeus.maho.util.depend.Repository;
+import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.FileHelper;
 import amadeus.maho.util.shell.Main;
 import amadeus.maho.util.shell.Shell;
@@ -45,7 +49,16 @@ public interface Build {
             "net.java.dev.jna:jna-platform:+"
     ).dependencies());
     
-    Module module = { "amadeus.maho", dependencies() };
+    static Set<Module.Dependency> linkDependencies() = maven.resolveModuleDependencies(new Project.Dependency.Holder().all(
+            "org.ow2.asm:asm:+",
+            "org.ow2.asm:asm-tree:+",
+            "org.ow2.asm:asm-commons:+",
+            "org.ow2.asm:asm-util:+",
+            "net.java.dev.jna:jna-jpms:+",
+            "net.java.dev.jna:jna-platform-jpms:+"
+    ).dependencies());
+    
+    Module module = { "amadeus.maho", dependencies() }, linkModule = { module.name(), linkDependencies() };
     
     static void sync() {
         IDEA.deleteLibraries(workspace);
@@ -92,6 +105,14 @@ public interface Build {
     }
     
     static void aotPush() = push(aotBuild());
+    
+    static Path link(final Path output = workspace.output("maho-image")) {
+        final Path result = Jlink.createMahoImage(workspace, linkModule, --output);
+        final @Nullable String image = Environment.local().lookup(MahoImage.VARIABLE);
+        if (image != null)
+            result >> ~--Path.of(image);
+        return result;
+    }
     
     @SneakyThrows
     private static void closeModuleReaderAndPush(final Path build, final Path home, final Consumer<Path> copy) throws InterruptedException {

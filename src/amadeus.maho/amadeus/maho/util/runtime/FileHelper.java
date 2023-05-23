@@ -11,8 +11,10 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -246,5 +248,15 @@ public interface FileHelper {
     
     static void projection(final Path source, final Path target, final BiConsumer<Path, Path> projector = FileHelper::GTGT, final BiPredicate<Path, BasicFileAttributes> predicate = (_, _) -> true)
             = Files.walkFileTree(source, visitor((path, attributes) -> projector.accept(path, target / (source % path).toString()), predicate));
+    
+    static void markExecutable(final Path file) {
+        try {
+            final Set<PosixFilePermission> perms = Files.getPosixFilePermissions(file);
+            perms.add(PosixFilePermission.OWNER_EXECUTE);
+            perms.add(PosixFilePermission.GROUP_EXECUTE);
+            perms.add(PosixFilePermission.OTHERS_EXECUTE);
+            Files.setPosixFilePermissions(file, perms);
+        } catch (final UnsupportedOperationException ignored) { }
+    }
     
 }

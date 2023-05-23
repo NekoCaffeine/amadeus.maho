@@ -11,6 +11,7 @@ import java.lang.invoke.VarHandle;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
@@ -40,15 +41,12 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.LdcInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.core.MahoProfile;
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
@@ -74,7 +72,6 @@ import amadeus.maho.util.bytecode.remap.StreamRemapHandler;
 import amadeus.maho.util.concurrent.AsyncHelper;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.container.MapTable;
-import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.profile.Sampler;
@@ -89,7 +86,6 @@ import amadeus.maho.util.throwable.ExtraInformationThrowable;
 import static amadeus.maho.core.MahoExport.*;
 import static amadeus.maho.util.concurrent.AsyncHelper.*;
 import static java.nio.file.StandardOpenOption.*;
-import static org.objectweb.asm.Opcodes.*;
 
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -145,66 +141,12 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         
     }
     
-    private static final String TRANSFORMER_MANAGER = ASMHelper.className(TransformerManager.class);
-    
-    private static final ConcurrentHashMap<String, Map<String, Runnable>> callbackMapping = { };
-    
-    private static final String CallbackFlag = ASMHelper.className(TransformerManager.class.getName() + "$CallbackFlag");
-    
-    private static ClassNode makeCallbackFlag() {
-        final ClassNode result = { };
-        result.name = CallbackFlag;
-        result.access = ACC_PUBLIC | ACC_SYNTHETIC | ACC_INTERFACE;
-        result.version = bytecodeVersion();
-        return result;
-    }
-    
-    static { Maho.shareClass(makeCallbackFlag()); }
-    
-    public static void markClinitCallback(final ClassNode node, final Runnable runnable, final String debugInfo) {
-        callbackMapping.computeIfAbsent(node.name, FunctionHelper.abandon(HashMap::new)).put(debugInfo, runnable);
-        for (final String itf : node.interfaces)
-            if (itf.equals(CallbackFlag))
-                return;
-        node.interfaces += CallbackFlag;
-        MethodNode clinit = null;
-        for (final MethodNode methodNode : node.methods)
-            if (methodNode.name.equals(ASMHelper._CLINIT_)) {
-                clinit = methodNode;
-                break;
-            }
-        final boolean flag = clinit == null;
-        if (flag)
-            node.methods += clinit = { 0, ASMHelper._CLINIT_, ASMHelper.VOID_METHOD_DESC, null, null };
-        final InsnList list = { };
-        list.add(new LdcInsnNode(node.name));
-        list.add(new MethodInsnNode(INVOKESTATIC, TRANSFORMER_MANAGER, "callback", Type.getMethodDescriptor(Type.VOID_TYPE, ASMHelper.TYPE_STRING), false));
-        if (flag)
-            list.add(new InsnNode(RETURN));
-        clinit.instructions.insert(list);
-    }
-    
-    @SneakyThrows
-    public static void callback(final String name) {
-        final Class<?> caller = CallerContext.caller();
-        if (!ASMHelper.className(caller).equals(name))
-            throw new IllegalAccessException("Only the target class can call its own initialization callback, caller: " + caller);
-        final @Nullable Map<String, Runnable> callback = callbackMapping[name];
-        if (callback == null)
-            return;
-        transform("clinit", "callback: %s - %s".formatted(name, String.join(", ", callback.keySet())));
-        callback.forEach((debugInfo, runnable) -> {
-            try {
-                runnable.run();
-            } catch (final Throwable throwable) {
-                throwable.addSuppressed(new ExtraInformationThrowable("Throwable in callback " + name + " : " + debugInfo));
-                throw throwable;
-            }
-        });
-    }
-    
     @Getter
     final String name;
+    
+    @Getter
+    @Default
+    Environment environment = Environment.local();
     
     @Getter
     final Sampler<String> sampler = MahoProfile.sampler(getClass().getCanonicalName() + "#" + name());
@@ -221,6 +163,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     @Override
     public boolean hasRemapHandlers() = !remapHandlers.isEmpty();
     
+    @Getter
     final MapTable<
             Class<? extends BaseTransformer>,
             Class<? extends Annotation>,
@@ -286,8 +229,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     public synchronized void removeFromInstrumentation() {
         write.lock();
         try {
-            assert Maho.instrumentation().removeTransformer(this);
-            assert !Maho.instrumentation().removeTransformer(this);
+            final Instrumentation instrumentation = Maho.instrumentation();
+            instrumentation.removeTransformer(this);
+            if (instrumentation.removeTransformer(this))
+                DebugHelper.breakpoint();
         } finally { write.unlock(); }
         ready = false;
     }
@@ -339,10 +284,27 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         }
         
         @SneakyThrows
-        public void scanProvider(final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter)
-                = await(path.classes().filter(filter).map(info -> async(() -> scanProvider(info, ASMHelper.newClassNode(info.readAll())), Setup.executor())));
+        public Stream<ResourcePath.ClassInfo> scanMayCachedList(final ResourcePath path, final String cachedPath) {
+            final ArrayList<ResourcePath.ClassInfo> classInfoFromCachedList = { };
+            final ResourcePath sub = path.sub(resourceTree -> {
+                final @Nullable ResourcePath.ResourceInfo cacheInfo = resourceTree.findResource(cachedPath);
+                if (cacheInfo != null) {
+                    Files.readAllLines(cacheInfo.path(), StandardCharsets.UTF_8).stream()
+                            .map(resourceTree::findClassInfo)
+                            .nonnull()
+                            .forEach(classInfoFromCachedList::add);
+                    return false;
+                }
+                return true;
+            });
+            return Stream.concat(classInfoFromCachedList.stream(), sub.classes());
+        }
         
-        public void scanProvider(final ResourcePath.ClassInfo info, final ClassNode node) throws IOException {
+        @SneakyThrows
+        public void scanProviders(final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter)
+                = await(scanMayCachedList(path, "transform-providers").filter(filter).map(info -> async(() -> scanProviders(info, ASMHelper.newClassNode(info.readAll())), Setup.executor())));
+        
+        public void scanProviders(final ResourcePath.ClassInfo info, final ClassNode node) throws IOException {
             if (ASMHelper.hasAnnotation(node, Transformer.class))
                 if (info.load(false, loader).defaultInstance() instanceof ClassTransformer transformer)
                     addTransformer(transformer);
@@ -392,10 +354,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         });
         
         @SneakyThrows
-        protected void scanAnnotation(final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter)
-                = await(path.classes().filter(filter).map(info -> async(() -> scanAnnotation(info, ASMHelper.newClassNode(info.readAll(), ClassReader.SKIP_CODE)), Setup.executor())));
+        protected void scanMarks(final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter)
+                = await(scanMayCachedList(path, "transform-marks").filter(filter).map(info -> async(() -> scanMarks(info, ASMHelper.newClassNode(info.readAll(), ClassReader.SKIP_CODE)), Setup.executor())));
         
-        protected void scanAnnotation(final ResourcePath.ClassInfo info, final ClassNode node) throws IOException {
+        protected void scanMarks(final ResourcePath.ClassInfo info, final ClassNode node) throws IOException {
             final TransformMark mark = ASMHelper.findAnnotation(node, TransformMark.class, loader);
             if (mark != null) {
                 final Class<? extends Annotation> annotationType = (Class<? extends Annotation>) info.load(false, loader);
@@ -444,39 +406,44 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     }
     
     @SneakyThrows
-    public synchronized void setup(final @Nullable ClassLoader loader, final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter = _ -> true, final String debugInfo,
-            final AOTTransformer.Level aotLevel = AOTTransformer.Level.RUNTIME, final boolean scanAnnotation = true, final boolean scanProvider = true) {
+    public synchronized void setup(final @Nullable ClassLoader loader, final ResourcePath path, final AOTTransformer.Level level, final String debugInfo, final Predicate<ResourcePath.ClassInfo> filter = _ -> true) {
         final boolean aot = this != runtime();
         if (!aot)
             addToInstrumentation();
         Maho.debug("Setup start: " + debugInfo);
         final Context context = { this, path, loader };
         try {
-            if (scanAnnotation)
-                context.scanAnnotation(path, filter);
-            if (scanProvider) {
-                context.scanProvider(path, filter);
-                context.mergeTransformers();
-                if (!aot)
-                    context.runMarker(true);
-                context.asyncTasks().forEach(AsyncHelper::await);
-                if (!aot) {
-                    context.patch();
-                    context.runMarker(false);
-                } else {
-                    write.lock();
-                    try {
-                        final Set<String> classesNames = path.classes().map(ResourcePath.ClassInfo::className).collect(Collectors.toSet());
-                        transformerMap.values().forEach(collection -> collection.removeIf(transformer -> !transformer.canAOT() || transformer.aotLevel() > aotLevel ||
-                                transformer instanceof ClassTransformer.Limited limited && !classesNames.containsAll(limited.targets())));
-                        transformerMap.values().removeIf(Collection::isEmpty);
-                        new HashMap<>(transformerMap).forEach((target, transformers) -> {
-                            final AOTTransformer aotTransformer = { target };
-                            transformers.stream().cast(BaseTransformer.class).forEach(baseTransformer -> baseTransformer.onAOT(aotTransformer));
-                            transformerMap[target] += aotTransformer;
-                        });
-                    } finally { write.unlock(); }
+            final ResourcePath scanPath = path.sub(resourceTree -> {
+                final @Nullable ResourcePath.ClassInfo info = resourceTree.findModuleInfo();
+                if (info != null) {
+                    final ClassNode node = ASMHelper.newClassNode(info.readAll());
+                    return ASMHelper.hasAnnotation(node, TransformProvider.class);
                 }
+                return false;
+            });
+            context.scanMarks(scanPath, filter);
+            context.scanProviders(scanPath, filter);
+            context.mergeTransformers();
+            if (!aot)
+                context.runMarker(true);
+            context.asyncTasks().forEach(AsyncHelper::await);
+            if (!aot) {
+                context.patch();
+                context.runMarker(false);
+            } else {
+                write.lock();
+                try {
+                    final Set<String> classesNames = path.classes().map(ResourcePath.ClassInfo::className).collect(Collectors.toSet());
+                    transformerMap.values().forEach(collection -> collection.removeIf(transformer -> !transformer.canAOT() || transformer.aotLevel() > level ||
+                            transformer instanceof ClassTransformer.Limited limited && !classesNames.containsAll(limited.targets())));
+                    transformerMap.values().removeIf(Collection::isEmpty);
+                    final HashMap<String, AOTTransformer> aotTransformerMap = { };
+                    List.copyOf(transformerMap.values()).stream()
+                            .flatMap(Collection::stream)
+                            .cast(BaseTransformer.class)
+                            .forEach(transformer -> transformer.onAOT(aotTransformerMap.computeIfAbsent(ASMHelper.sourceName(transformer.sourceClass.name), AOTTransformer::new)));
+                    aotTransformerMap.forEach((target, aotTransformer) -> transformerMap.computeIfAbsent(target, FunctionHelper.abandon(CopyOnWriteArrayList::new)) += aotTransformer);
+                } finally { write.unlock(); }
             }
             if (!aot)
                 setupCallbacks.forEach(Runnable::run);
@@ -490,7 +457,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         }
     }
     
-    public List<ClassTransformer> debugClassTransformer() {
+    public List<ClassTransformer> debugClassTransformer(final int count = 0) {
         final Map<String, Class> classes = Stream.of(Maho.instrumentation().getAllLoadedClasses()).collect(Collectors.toMap(Class::getName, Function.identity(), (a, b) -> a));
         final ArrayList<ClassTransformer> result = { };
         final ClassNode fakeNode = { };
@@ -500,7 +467,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 if (classes.containsKey(target))
                     transformers.stream()
                             .cast(BaseTransformer.class)
-                            .filter(transformer -> transformer.debugTransformCount() == 0)
+                            .filter(transformer -> transformer.debugTransformCount() == count)
                             .filter(transformer -> transformer.nodeFilter().test(fakeNode))
                             .forEach(result::add);
             });
@@ -529,7 +496,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final TransformContext.WithSource context = writer.mark(p_node[0]).context(bytecode);
             transformers.forEach(transformer -> p_node[0] = transform(context, p_node[0], transformer, loader, clazz, domain));
             final @Nullable byte result[] = writeBytecodeAndMark(p_node[0], context, loader);
-            if (result != null) {
+            if (result != null && runtime() == this && DebugDumper.state()) {
                 DebugDumper.dumpBytecode(internalName, bytecode, DebugDumper.dump_transform_source);
                 DebugDumper.dumpBytecode(internalName, result, DebugDumper.dump_transform_result);
             }

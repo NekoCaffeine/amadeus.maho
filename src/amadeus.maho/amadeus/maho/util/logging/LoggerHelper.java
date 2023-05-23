@@ -28,8 +28,15 @@ import java.util.stream.Stream;
 
 import jdk.internal.logger.LoggerFinderLoader;
 
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.TransformTarget;
 import amadeus.maho.transform.mark.base.TransformMetadata;
@@ -38,12 +45,6 @@ import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.ObjectHelper;
-
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import static amadeus.maho.core.MahoExport.*;
 import static amadeus.maho.util.concurrent.AsyncHelper.*;
@@ -55,7 +56,7 @@ public interface LoggerHelper {
     
     String DISABLE_THREAD_GROUP_PRINT_THREAD_CONTEXT = "ThreadGroup.uncaughtException.dont_print_thread";
     
-    @TransformTarget(targetClass = ThreadGroup.class, selector = "uncaughtException", metadata = @TransformMetadata(enable = DISABLE_THREAD_GROUP_PRINT_THREAD_CONTEXT))
+    @TransformTarget(targetClass = ThreadGroup.class, selector = "uncaughtException", metadata = @TransformMetadata(enable = DISABLE_THREAD_GROUP_PRINT_THREAD_CONTEXT, aotLevel = AOTTransformer.Level.RUNTIME))
     private static void uncaughtException(final TransformContext context, final ClassNode classNode, final MethodNode methodNode) {
         boolean flag = false;
         for (final Iterator<AbstractInsnNode> iterator = methodNode.instructions.iterator(); iterator.hasNext(); ) {

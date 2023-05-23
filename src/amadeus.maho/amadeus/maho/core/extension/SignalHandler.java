@@ -3,8 +3,10 @@ package amadeus.maho.core.extension;
 import jdk.internal.misc.Signal;
 
 import amadeus.maho.lang.Getter;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Init;
+import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.control.FunctionChain;
 
@@ -15,7 +17,7 @@ public interface SignalHandler {
     @Getter
     FunctionChain<Integer, Boolean> signalHandlers = { };
     
-    @Hook(value = Signal.class, isStatic = true)
+    @Hook(value = Signal.class, isStatic = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     static Hook.Result dispatch(final int number) = Hook.Result.falseToVoid(signalHandlers().apply(number).orElse(Boolean.FALSE));
     
 }

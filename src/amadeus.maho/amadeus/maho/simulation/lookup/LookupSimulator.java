@@ -20,11 +20,9 @@ import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.simulation.dynamic.DynamicSimulator;
 import amadeus.maho.transform.mark.Hook;
-import amadeus.maho.transform.mark.Preload;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.InvisibleType;
-import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.annotation.mark.WIP;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.function.FunctionHelper;
@@ -33,8 +31,8 @@ import amadeus.maho.util.runtime.DebugHelper;
 import static org.objectweb.asm.Opcodes.*;
 
 @WIP
-@Preload(initialized = true)
-@TransformProvider
+// @Preload(initialized = true)
+// @TransformProvider
 public interface LookupSimulator {
     
     @ToString
