@@ -35,7 +35,8 @@ public class RepeatableHandler extends BaseHandler<Repeatable> {
             if (shouldInjectInnerClass(env, RepeatableList))
                 injectMember(env,maker.ClassDef(maker.Modifiers(ANNOTATION | INTERFACE, tree.mods.annotations.stream().filter(it -> shouldFollowAnnotation(it.type.tsym.getQualifiedName().toString())).collect(List.collector())), RepeatableList,
                         List.nil(), null, List.nil(), List.of(maker.MethodDef(maker.Modifiers(0L), names.value, maker.TypeArray(maker.Ident(tree.name)), List.nil(), List.nil(), List.nil(), null, null))));
-            annotationTree.args = annotationTree.args.append(maker.Select(maker.Select(maker.Ident(tree.name), RepeatableList), names._class));
+            if (annotationTree.args.isEmpty())
+                annotationTree.args = List.of(maker.Select(maker.Select(maker.Ident(tree.name), RepeatableList), names._class));
         }
     }
     

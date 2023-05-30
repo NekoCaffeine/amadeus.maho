@@ -46,7 +46,7 @@ public interface AgentInjector {
         final String path = jarFile.toRealPath().toString();
         try {
             InstrumentationImpl.loadAgent(path);
-        } catch (final IllegalAccessError e) {
+        } catch (final IllegalAccessError | InternalError e) {
             try {
                 if (MahoImage.isImage()) {
                     DebugHelper.breakpoint();

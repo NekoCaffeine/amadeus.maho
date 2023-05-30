@@ -25,6 +25,7 @@ import com.sun.management.OperatingSystemMXBean;
 import com.sun.management.ThreadMXBean;
 import com.sun.management.UnixOperatingSystemMXBean;
 
+import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.vm.JDWP;
@@ -37,8 +38,9 @@ public interface Environment {
 
     Map<Object, Object> mapping();
 
+    @Extension.Operator("GET")
     default @Nullable String lookup(final String key) {
-        @Nullable String result = (String) mapping().get(key);
+        @Nullable String result = mapping().get(key)?.toString() ?? null;
         if (result == null) {
             result = System.getenv(key);
             if (result != null)
@@ -48,7 +50,7 @@ public interface Environment {
     }
 
     default String lookup(final String key, final String defaultValue) {
-        @Nullable String result = (String) mapping().get(key);
+        @Nullable String result = mapping().get(key)?.toString() ?? null;
         if (result == null) {
             result = System.getenv(key);
             if (result != null)
@@ -66,7 +68,8 @@ public interface Environment {
     default long lookup(final String key, final long defaultValue) = Long.parseLong(lookup(key, String.valueOf(defaultValue)));
 
     default float lookup(final String key, final float defaultValue) = Float.parseFloat(lookup(key, String.valueOf(defaultValue)));
-
+    
+    @Extension.Operator("PUT")
     default void value(final String key, final Object value) = mapping().put(key, value.toString());
 
     default void enable(final String key) = value(key, Boolean.TRUE);

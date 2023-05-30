@@ -45,7 +45,6 @@ import amadeus.maho.util.annotation.mark.HiddenDanger;
 import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
-import amadeus.maho.util.misc.Environment;
 
 import static amadeus.maho.util.bytecode.ASMHelper.*;
 import static org.objectweb.asm.Opcodes.*;
@@ -83,6 +82,8 @@ public class LiveStack {
         }
     }
     
+    public static final String MAHO_LIVE_STACK = "amadeus.maho.live.stack";
+    
     private static boolean hackFlag;
     
     @Getter
@@ -105,12 +106,12 @@ public class LiveStack {
         descriptorMapper(clazz -> descriptorMapper.apply(clazz) ?? source.apply(clazz));
     }
     
-    static { hackFlag = Environment.local().lookup("amadeus.maho.live.stack", false); }
+    static { hackFlag = Boolean.getBoolean(MAHO_LIVE_STACK); }
     
     @Proxy(INVOKEVIRTUAL)
     public static native StackTraceElement[] getOurStackTrace(Throwable $this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static Hook.Result printStackTrace(final Throwable $this, final PrintStream stream) {
         printStackTraceToStream($this, stream);
         return Hook.Result.NULL;
@@ -121,17 +122,19 @@ public class LiveStack {
     public static void printStackTraceToStream(final Throwable $this, final PrintStream stream) {
         final Set<Throwable> mark = Collections.newSetFromMap(new IdentityHashMap<>());
         mark.add($this);
-        synchronized (stream) {
-            stream.println($this);
-            final StackTraceElement[] trace = getOurStackTrace($this);
-            for (final StackTraceElement traceElement : trace)
-                stream.println("\t" + (traceElement.getFileName()?.startsWith(ARROW) ?? false ? traceElement.getFileName() : "at " + traceElement));
-            for (final var suppressed : $this.getSuppressed())
-                printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, "\t", mark);
-            @Nullable final Throwable ourCause = $this.getCause();
-            if (ourCause != null)
-                printEnclosedStackTrace(ourCause, stream, trace, CAUSE_CAPTION, "", mark);
-        }
+        try {
+            synchronized (stream) {
+                stream.println($this);
+                final StackTraceElement[] trace = getOurStackTrace($this);
+                for (final StackTraceElement traceElement : trace)
+                    stream.println("\t" + (traceElement.getFileName()?.startsWith(ARROW) ?? false ? traceElement.getFileName() : "at " + traceElement));
+                for (final var suppressed : $this.getSuppressed())
+                    printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, "\t", mark);
+                @Nullable final Throwable ourCause = $this.getCause();
+                if (ourCause != null)
+                    printEnclosedStackTrace(ourCause, stream, trace, CAUSE_CAPTION, "", mark);
+            }
+        } catch (final Throwable throwable) { fuseProtection(throwable); }
     }
     
     private static void printEnclosedStackTrace(final Throwable $this, final PrintStream stream, final StackTraceElement enclosingTrace[], final String caption, final String prefix, final Set<Throwable> mark) {
@@ -149,7 +152,7 @@ public class LiveStack {
             final int framesInCommon = trace.length - 1 - m;
             stream.println(prefix + caption + $this);
             for (int i = 0; i <= m; i++)
-                stream.println(prefix + "\t" + (trace[i].getFileName().startsWith(ARROW) ? trace[i].getFileName() : "at " + trace[i]));
+                stream.println(prefix + "\t" + (trace[i].getFileName()?.startsWith(ARROW) ?? false ? trace[i].getFileName() : "at " + trace[i]));
             if (framesInCommon != 0)
                 stream.println(prefix + "\t... " + framesInCommon + " more");
             for (final var suppressed : $this.getSuppressed())
@@ -222,8 +225,7 @@ public class LiveStack {
         final ClassLoader loader = declaringClass.getClassLoader();
         final Module module = declaringClass.getModule();
         final ModuleDescriptor descriptor = !module.isNamed() ? instance().descriptorMapper().apply(declaringClass) : module.getDescriptor();
-        final String name = descriptor == null ? "<unnamed>" : descriptor.name(),
-                version = descriptor == null ? null : descriptor.version().map(ModuleDescriptor.Version::toString).orElse("?");
+        final String name = descriptor == null ? "<unnamed>" : descriptor.name(), version = descriptor == null ? null : descriptor.version().map(ModuleDescriptor.Version::toString).orElse("?");
         return { loaderName(loader), name, version, declaringClass.getName(), frame.getMethodName(), frame.getFileName(), frame.getLineNumber() };
     }
     
@@ -258,14 +260,14 @@ public class LiveStack {
         default                             -> false;
     }));
     
-    @Hook(avoidRecursion = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(avoidRecursion = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void fillInStackTrace(final Throwable $this) {
         try {
             if ($this == reserved || !hackFlag || !contextStack().isEmpty() || inDefineClass())
                 return;
             final LinkedList<Throwable> throwables = context.get();
             if (throwables.contains($this)) {
-                printStackTrace("Nested exceptions, the JVM may be about to crash. If you want to avoid this problem, please disable amadeus.maho.hacking.lsf.HackerLiveStackFrame.", $this);
+                printStackTrace("Nested exceptions, the JVM may be about to crash. If you want to avoid this problem, please disable amadeus.maho.core.extension.LiveStack", $this);
                 return;
             }
             if ($this instanceof LinkageError) // avoid jvm crash
@@ -298,7 +300,7 @@ public class LiveStack {
         } catch (final Throwable throwable) { fuseProtection(throwable); }
     }
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static StackTraceElement[] getOurStackTrace(final StackTraceElement result[], final Throwable $this) = result.length == 0 ? result : Stream.of(result)
             .filter(element -> {
                 final LiveStackFrame frame = stackTraceLiveMap.get(element);
@@ -307,7 +309,7 @@ public class LiveStack {
     
     private static boolean is64Bit(final int size) = size == 8;
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static String toString(final String result, final StackTraceElement $this) throws Throwable {
         final @Nullable String fileName = $this.getFileName();
         if (fileName?.startsWith("#") ?? false)
@@ -376,79 +378,84 @@ public class LiveStack {
         if (hackFlag) {
             hackFlag = false;
             context.set(null);
-            printStackTrace("Fuse protection, the JVM may be about to crash. If you want to avoid this problem, please disable amadeus.maho.hacking.lsf.HackerLiveStackFrame.", throwable);
+            stackTraceExtender.clear();
+            contextExtender.get().clear();
+            printStackTrace("Fuse protection, the JVM may be about to crash. If you want to avoid this problem, please disable amadeus.maho.core.extension.LiveStack", throwable);
         }
     }
     
-    public static void fork(final Object target) = stackTraceExtender.computeIfAbsent(target, key -> walker.walk(stream ->
-            Stream.concat(Stream.of(new StackTraceElement("amadeus.maho.hacking.lsf.HackerLiveStackFrame", "fork", "↑ " + Thread.currentThread(), -1)), stream
-                            .dropWhile(frame -> !frame.getDeclaringClass().isInstance(target))
-                            .dropWhile(frame -> frame.getDeclaringClass().isInstance(target))
-                            .map(LiveStack::of))
-                    .toArray(StackTraceElement[]::new)));
+    public static void fork(final Object target) {
+        if (hackFlag)
+            stackTraceExtender.computeIfAbsent(target, key -> walker.walk(stream ->
+                    Stream.concat(Stream.of(new StackTraceElement("amadeus.maho.hacking.lsf.HackerLiveStackFrame", "fork", "↑ " + Thread.currentThread(), -1)), stream
+                                    .dropWhile(frame -> !frame.getDeclaringClass().isInstance(target))
+                                    .dropWhile(frame -> frame.getDeclaringClass().isInstance(target))
+                                    .map(LiveStack::of))
+                            .toArray(StackTraceElement[]::new)));
+    }
     
     public static void push(final Object context) = contextExtender.get().addLast(context);
     
-    public static void pop() = contextExtender.get().peekLast();
+    public static void pop() = contextExtender.get().pollLast();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void _init__$Thread(final Thread $this) = fork($this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Enter(final Thread $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Exit(final Thread $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void _init__$FutureTask(final FutureTask<?> $this) = fork($this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Enter(final FutureTask<?> $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Exit(final FutureTask<?> $this) = pop();
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void runAndReset_$Enter(final FutureTask<?> $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void runAndReset_$Exit(final FutureTask<?> $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void _init__$AsyncSupply(final @InvisibleType(CompletableFuture$AsyncSupply) Object $this) = fork($this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Enter$AsyncSupply(final @InvisibleType(CompletableFuture$AsyncSupply) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Exit$AsyncSupply(final @InvisibleType(CompletableFuture$AsyncSupply) Object $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void _init__$AsyncRun(final @InvisibleType(CompletableFuture$AsyncRun) Object $this) = fork($this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Enter$AsyncRun(final @InvisibleType(CompletableFuture$AsyncRun) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void run_$Exit$AsyncRun(final @InvisibleType(CompletableFuture$AsyncRun) Object $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void _init__$UniAccept(final @InvisibleType(CompletableFuture$UniAccept) Object $this) = fork($this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void tryFire_$Enter$UniAccept(final @InvisibleType(CompletableFuture$UniAccept) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void tryFire_$Exit$UniAccept(final @InvisibleType(CompletableFuture$UniAccept) Object $this) = pop();
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), exactMatch = false, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void _init__$UniRun(final @InvisibleType(CompletableFuture$UniRun) Object $this) = fork($this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void tryFire_$Enter$UniRun(final @InvisibleType(CompletableFuture$UniRun) Object $this) = push($this);
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)), metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
     public static void tryFire_$Exit$UniRun(final @InvisibleType(CompletableFuture$UniRun) Object $this) = pop();
     
 }

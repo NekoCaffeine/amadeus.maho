@@ -74,6 +74,18 @@ public final class Maho {
     private static synchronized @Nullable Instrumentation injectAgent() {
         if (instrumentation == null)
             try {
+                final @Nullable String provider = System.getProperty("amadeus.maho.instrumentation.provider");
+                if (provider != null)
+                    try {
+                        final Class<?> providerClass = Class.forName(provider, true, ClassLoader.getSystemClassLoader());
+                        final Field fieldInstrumentation = providerClass.getDeclaredField("instrumentation");
+                        installation(null, (Instrumentation) fieldInstrumentation.get(null));
+                        return instrumentation;
+                    } catch (final Throwable throwable) {
+                        System.err.println("Unable to load instrumentation from instrumentation provider: " + provider);
+                        throwable.printStackTrace();
+                        DebugHelper.breakpoint();
+                    }
                 AgentInjector.inject(Maho.class.getName(), LiveInjector.class);
                 // Maho may not be loaded by SystemClassLoader
                 final Class<LiveInjector> classLiveInjector = (Class<LiveInjector>) ClassLoader.getSystemClassLoader().loadClass(LiveInjector.class.getName());

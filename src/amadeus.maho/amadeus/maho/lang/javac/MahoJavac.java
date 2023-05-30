@@ -59,6 +59,12 @@ public class MahoJavac {
             new JavacContext($this.getContext());
     }
     
+    @Hook(exactMatch = false, forceReturn = true)
+    private static void initProcessAnnotations(final JavaCompiler $this) { }
+    
+    @Hook(exactMatch = false, forceReturn = true)
+    private static void processAnnotations(final JavaCompiler $this) { }
+    
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.TAIL)))
     private static void prepareCompiler(final JavacTaskImpl $this, final boolean forParse) = $this.getContext().get(JavacContext.class).mark();
     

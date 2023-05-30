@@ -221,7 +221,9 @@ public class ResourcePath implements Closeable {
     
     public static ResourcePath of(final @Nullable Class<?>... target) {
         final ResourcePath result = { };
-        Stream.of(target).forEach(it -> classMapperChain().apply(it)
+        Stream.of(target)
+                .distinct()
+                .forEach(it -> classMapperChain().apply(it)
                 .map(ResourceTree::of)
                 .ifPresent(result::addResourceTree));
         return result;
@@ -229,9 +231,8 @@ public class ResourcePath implements Closeable {
     
     public static ResourcePath of(final @Nullable Path path) {
         final ResourcePath result = { };
-        Optional.ofNullable(path)
-                .map(ResourceTree::of)
-                .ifPresent(result::addResourceTree);
+        if (path != null)
+            result.addResourceTree(ResourceTree.of(path));
         return result;
     }
     

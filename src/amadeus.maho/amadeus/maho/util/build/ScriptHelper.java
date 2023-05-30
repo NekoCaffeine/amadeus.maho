@@ -39,10 +39,14 @@ public interface ScriptHelper {
            if (Files.isDirectory(imagePath)) {
                final Path java = imagePath / "bin" / (getOSType() == WINDOWS ? "java.exe" : "java");
                if (Files.isRegularFile(java))
-                   Environment.local().value(MAHO_JAVA_EXECUTION, java.toAbsolutePath().toString());
+                   Environment.local()[MAHO_JAVA_EXECUTION] = java.toAbsolutePath().toString();
            }
        }
     }
+    
+    static void useDefaultImage() = Environment.local()[MAHO_JAVA_EXECUTION] = "java";
+    
+    static void useContextImage() = Environment.local()[MAHO_JAVA_EXECUTION] = (Path.of(System.getProperty("java.home")) / "bin" / "java").toAbsolutePath().toString();
     
     static Process run(final Workspace workspace, final Module module, final int debugPort = -1, final List<String> jvmArgs = List.of(), final boolean openTerminal = true,
             final Path runDir = workspace.root() / module.path() / "run", final Predicate<Path> useModulePath = path -> true) = run(runDir, openTerminal, runArgs(workspace, module, debugPort, jvmArgs, useModulePath));

@@ -12,6 +12,8 @@ class compiler {
             { "amadeus.maho.lang.err.reference.mark.nesting", "Reference mark nesting" },
             { "amadeus.maho.lang.err.delegate.method.must.have.no.parameters", "The delegate method {0} must have no parameters" },
             { "amadeus.maho.lang.err.getter.method.lazy", "The @Getter marked on the method does not support the 'lazy' attribute" },
+            { "amadeus.maho.lang.err.lazy.getter.must.not.interface", "The fields marked with @Getter(lazy = true) do not support declarations in interfaces" },
+            { "amadeus.maho.lang.err.lazy.getter.must.has.init", "The fields marked with @Getter(lazy = true) must have initialization expressions" },
             { "amadeus.maho.lang.err.accessor.method.has-parameter", "The methods marked by {0} must have no parameters" },
             { "amadeus.maho.lang.err.accessor.method.non-interface", "The method marked by {0} must be in the interface scope" },
             { "amadeus.maho.lang.err.accessor.method.static", "The method marked by {0} must be non-static" },

@@ -47,6 +47,6 @@ public class JavaSourceHandler extends JavacContext {
             maker.Assign(maker.Ident(time), maker.Literal(System.currentTimeMillis()))
     ));
     
-    protected String importCode(final Env<AttrContext> env) = env.toplevel.getImports().stream().map(JCTree::toString).collect(Collectors.joining("\n"));
+    protected String importCode(final Env<AttrContext> env) = env.toplevel.getImports().stream().map(JCTree::toString).collect(Collectors.joining());
     
 }

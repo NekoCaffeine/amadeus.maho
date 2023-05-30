@@ -78,9 +78,9 @@ public interface Jlink {
         
         HashMap<Object, Object> properties = { System.getProperties() };
         
-        { properties()[MAHO_LINK_CONTEXT] = true; }
-        
         Environment environment = this::properties;
+        
+        { environment()[MAHO_LINK_CONTEXT] = true; }
         
         TransformerManager manager = { "jink-t", environment() };
         

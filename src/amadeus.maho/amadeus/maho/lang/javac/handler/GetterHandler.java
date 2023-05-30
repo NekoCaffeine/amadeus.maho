@@ -3,7 +3,6 @@ package amadeus.maho.lang.javac.handler;
 import java.util.concurrent.Callable;
 
 import com.sun.source.tree.CaseTree;
-import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.comp.AttrContext;
@@ -33,24 +32,27 @@ public class GetterHandler extends BaseHandler<Getter> {
     
     @Override
     public void processVariable(final Env<AttrContext> env, final JCTree.JCVariableDecl tree, final JCTree owner, final Getter annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
-        if (owner instanceof JCTree.JCClassDecl clazz) {
-            if (annotation.lazy()) {
-                boolean error;
-                if (error = anyMatch(clazz.mods.flags, INTERFACE))
-                    log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "lazy.getter.must.not.interface"));
-                if (error |= tree.init == null)
-                    log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "lazy.getter.must.has.init"));
-                if (error)
-                    return;
-            }
-            final JCTree.JCExpression unpackedType= ReferenceHandler.unpackedType(tree.vartype, this);
-            final List<JCTree.JCStatement> body = generateBody(env, tree, unpackedType, annotation, annotationTree);
+        if (owner instanceof JCTree.JCClassDecl clazz)
             if (shouldInjectMethod(env, tree.sym.name)) {
+                if (annotation.lazy()) {
+                    boolean error = false;
+                    if (anyMatch(clazz.mods.flags, INTERFACE)) {
+                        log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "lazy.getter.must.not.interface"));
+                        error = true;
+                    }
+                    if (tree.init == null) {
+                        log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "lazy.getter.must.has.init"));
+                        error = true;
+                    }
+                    if (error)
+                        return;
+                }
+                final JCTree.JCExpression unpackedType = ReferenceHandler.unpackedType(tree.vartype, this);
+                final List<JCTree.JCStatement> body = generateBody(env, tree, unpackedType, annotation, annotationTree);
                 final long flags = accessLevel(annotation.value()) | (annotation.nonStatic() ? 0 : tree.mods.flags & STATIC) | (anyMatch(env.enclClass.mods.flags, INTERFACE) ? STATIC : 0);
                 injectMember(env, maker.MethodDef(maker.Modifiers(flags).let(modifiers -> followAnnotation(env, tree.mods, modifiers)), tree.name, unpackedType, List.nil(), List.nil(), List.nil(),
                         maker.Block(0L, body), null).let(it -> followAnnotation(annotationTree, "on", it.mods)));
             }
-        }
     }
     
     protected List<JCTree.JCStatement> generateBody(final Env<AttrContext> env, final JCTree.JCVariableDecl tree, final JCTree.JCExpression unpackedType, final Getter getter, final JCTree.JCAnnotation annotationTree) {

@@ -12,6 +12,8 @@ class compiler_zh_CN {
             { "amadeus.maho.lang.err.reference.mark.nesting", "引用标记嵌套" },
             { "amadeus.maho.lang.err.delegate.method.must.have.no.parameters", "委托方法 {0} 必须没有参数" },
             { "amadeus.maho.lang.err.getter.method.lazy", "@Getter 标记的方法不支持 'lazy' 属性" },
+            { "amadeus.maho.lang.err.lazy.getter.must.not.interface", "@Getter(lazy = true) 标记的字段不支持声明在接口中" },
+            { "amadeus.maho.lang.err.lazy.getter.must.has.init", "@Getter(lazy = true) 标记的字段必须有初始化表达式" },
             { "amadeus.maho.lang.err.accessor.method.has-parameter", "{0} 标记的方法必须没有参数" },
             { "amadeus.maho.lang.err.accessor.method.non-interface", "{0} 标记的方法必须在 interface 域内" },
             { "amadeus.maho.lang.err.accessor.method.static", "{0} 标记的方法必须是非静态的" },
