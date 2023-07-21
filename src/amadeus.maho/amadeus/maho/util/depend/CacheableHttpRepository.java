@@ -1,5 +1,11 @@
 package amadeus.maho.util.depend;
 
+import amadeus.maho.lang.*;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.control.Interrupt;
+import amadeus.maho.util.link.http.HttpSetting;
+import amadeus.maho.util.throwable.RetryException;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -12,47 +18,37 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.Default;
-import amadeus.maho.lang.Delegate;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.control.Interrupt;
-import amadeus.maho.util.link.http.HttpSetting;
-import amadeus.maho.util.throwable.RetryException;
-
-import static amadeus.maho.util.link.http.HttpHelper.StatesCode.*;
-import static amadeus.maho.util.logging.LogLevel.*;
+import static amadeus.maho.util.link.http.HttpHelper.StatesCode.NOT_FOUND;
+import static amadeus.maho.util.link.http.HttpHelper.StatesCode.OK;
+import static amadeus.maho.util.logging.LogLevel.DEBUG;
+import static amadeus.maho.util.logging.LogLevel.WARNING;
 
 @Getter
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public abstract class CacheableHttpRepository implements Repository {
-    
+
     Path cacheDir;
-    
+
     String rootUrl;
-    
+
     @Default
     @Getter(on = @Delegate)
     HttpSetting setting = HttpSetting.defaultInstance();
-    
+
     ConcurrentHashMap<Project.Dependency, Collection<Project.Dependency>> recursiveResolveCache = { };
-    
+
     @Override
     public String debugInfo() = getClass().getSimpleName() + ": " + rootUrl();
-    
+
     public abstract String uri(final Project project, final String extension);
-    
+
     public boolean checkCacheCompleteness(final Path cache) = true;
-    
+
     public void onDownloadCompleted(final Path relative, final Path cache, final boolean completenessMetadata) { }
-    
+
     public Path relative(final Project project, final String extension) throws IOException = Path.of(uri(project, extension) + "." + extension);
-    
+
     public Path cache(final Path relative, final Path cache = cacheDir() / relative) throws IOException {
         if (Files.exists(cache))
             if (checkCacheCompleteness(cache)) {
@@ -64,12 +60,12 @@ public abstract class CacheableHttpRepository implements Repository {
             logger().accept(DEBUG, "The local cache of %s could not be detected and will be downloaded.".formatted(relative));
         return downloadDataFormRemote(relative, cache);
     }
-    
+
     public @Nullable Path tryCache(final Path relative, final Path cache = cacheDir() / relative) { try { return cache(relative, cache); } catch (final IOException e) { return null; } }
-    
+
     public HttpRequest.Builder request(final Path relative) = HttpRequest.newBuilder().GET().let(builder -> setting().headers().forEach(builder::header))
             .uri(URI.create(rootUrl() + relative.toString().replace(relative.getFileSystem().getSeparator(), "/")));
-    
+
     @SneakyThrows
     public Path downloadDataFormRemote(final Path relative, final Path cache = cacheDir() / relative, final boolean completenessMetadata = false) throws IOException {
         int retries = maxRetries();
@@ -93,7 +89,7 @@ public abstract class CacheableHttpRepository implements Repository {
         } while (--retries > 0);
         throw new FileNotFoundException().let(it -> it.addSuppressed(new RetryException(throwables)));
     }
-    
+
     @SneakyThrows
     public boolean exists(final Path relative) throws IOException {
         int retries = maxRetries();
@@ -112,5 +108,5 @@ public abstract class CacheableHttpRepository implements Repository {
         } while (--retries > 0);
         throw new IOException(new RetryException(throwables));
     }
-    
+
 }

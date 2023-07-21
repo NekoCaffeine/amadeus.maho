@@ -1,10 +1,16 @@
 package amadeus.maho.lang.javac.handler;
 
-import java.util.EnumSet;
-import java.util.LinkedList;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
-
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
+import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.Syntax;
+import amadeus.maho.transform.mark.Hook;
+import amadeus.maho.transform.mark.base.At;
+import amadeus.maho.transform.mark.base.InvisibleType;
+import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.util.runtime.DebugHelper;
 import com.sun.tools.javac.code.Kinds;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -21,20 +27,14 @@ import com.sun.tools.javac.util.ListBuffer;
 import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Names;
 
-import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.lang.Privilege;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
-import amadeus.maho.lang.javac.handler.base.Syntax;
-import amadeus.maho.transform.mark.Hook;
-import amadeus.maho.transform.mark.base.At;
-import amadeus.maho.transform.mark.base.InvisibleType;
-import amadeus.maho.transform.mark.base.TransformProvider;
-import amadeus.maho.util.runtime.DebugHelper;
+import java.util.EnumSet;
+import java.util.LinkedList;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import static amadeus.maho.lang.javac.handler.OperatorOverloadingHandler.PRIORITY;
-import static com.sun.tools.javac.code.Flags.*;
+import static com.sun.tools.javac.code.Flags.FINAL;
+import static com.sun.tools.javac.code.Flags.STATIC;
 import static com.sun.tools.javac.code.Kinds.Kind.MTH;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
 
@@ -164,18 +164,23 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         final TreeMaker maker = handler.maker;
         final Env<AttrContext> env = env($this);
         @Nullable JCTree.JCExpression lowerExpr = handler.methodInvocation(handler.name(tree.getTag()), env, tree, () -> tree.arg);
-        if (lowerExpr == null && tree.arg instanceof JCTree.JCMethodInvocation invocation && invocation.args.isEmpty() && switch (tree.getTag()) {
-            case PREINC, PREDEC, POSTINC, POSTDEC -> true;
-            default                               -> false;
-        }) {
-            final boolean flag = switch (tree.getTag()) {
+        if (lowerExpr == null) {
+            final @Nullable Boolean flag = switch (tree.getTag()) {
                 case PREINC, PREDEC   -> true;
                 case POSTINC, POSTDEC -> false;
-                default               -> throw new IllegalStateException("Unexpected value: " + tree.getTag());
+                default               -> null;
             };
-            lowerExpr = handler.lowerSetter(invocation,
-                    flag ? getter -> maker.Binary(tree.getTag() == PREINC ? PLUS : MINUS, getter, maker.Literal(1)) : UnaryOperator.identity(),
-                    flag ? UnaryOperator.identity() : getter -> maker.Binary(tree.getTag() == POSTINC ? PLUS : MINUS, getter, maker.Literal(1)));
+            if (flag != null) {
+                final UnaryOperator<JCTree.JCExpression>
+                        pre = flag ? getter -> maker.Binary(tree.getTag() == PREINC ? PLUS : MINUS, getter, maker.Literal(1)) : UnaryOperator.identity(),
+                        post = flag ? UnaryOperator.identity() : getter -> maker.Binary(tree.getTag() == POSTINC ? PLUS : MINUS, getter, maker.Literal(1));
+                switch (tree.arg) {
+                    case JCTree.JCMethodInvocation invocation && invocation.args.isEmpty()                                                    -> lowerExpr = handler.lowerSetter(invocation, pre, post);
+                    case OperatorOverloadingHandler.OperatorInvocation invocation && invocation.source instanceof JCTree.JCArrayAccess access -> lowerExpr = handler.lowerPutter(access, pre, post);
+                    default                                                                                                                   -> { }
+                }
+            }
+            
         }
         return Hook.Result.nullToVoid(handler.lower(tree, env, lowerExpr));
     }
@@ -194,8 +199,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
     
     private static boolean skip(final @Nullable Type type) = type != null && !type.isErroneous() && !(type instanceof Type.UnknownType);
     
-    public @Nullable JCTree.JCExpression lowerSetter(final JCTree.JCMethodInvocation invocation, final UnaryOperator<JCTree.JCExpression> result,
-            final UnaryOperator<JCTree.JCExpression> resultWrapper = UnaryOperator.identity()) {
+    public @Nullable JCTree.JCExpression lowerSetter(final JCTree.JCMethodInvocation invocation, final UnaryOperator<JCTree.JCExpression> pre, final UnaryOperator<JCTree.JCExpression> post = UnaryOperator.identity()) {
         final Name name = name(invocation.meth);
         final Names names = name.table.names;
         if (name != names._this && name != names._super) {
@@ -205,18 +209,29 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                 final Name varName = LetHandler.nextName(names);
                 return maker.LetExpr(List.of(
                                 maker.VarDef(maker.Modifiers(FINAL), varName, null, access.selected),
-                                maker.VarDef(maker.Modifiers(FINAL), resultName, null, result.apply(maker.Apply(List.nil(), maker.Select(maker.Ident(varName), access.name), List.nil()))),
-                                maker.Exec(maker.Apply(List.nil(), maker.Select(maker.Ident(varName), access.name), List.of(resultWrapper.apply(maker.Ident(resultName)))))),
+                                maker.VarDef(maker.Modifiers(FINAL), resultName, null, pre.apply(maker.Apply(List.nil(), maker.Select(maker.Ident(varName), access.name), List.nil()))),
+                                maker.Exec(maker.Apply(List.nil(), maker.Select(maker.Ident(varName), access.name), List.of(post.apply(maker.Ident(resultName)))))),
                         maker.Ident(resultName));
             } else {
                 final TreeCopier<?> copier = { maker };
                 return maker.LetExpr(List.of(
-                                maker.VarDef(maker.Modifiers(FINAL), resultName, null, result.apply(copier.copy(invocation))),
-                                maker.Exec(maker.Apply(List.nil(), copier.copy(invocation.meth), List.of(resultWrapper.apply(maker.Ident(resultName)))))),
+                                maker.VarDef(maker.Modifiers(FINAL), resultName, null, pre.apply(copier.copy(invocation))),
+                                maker.Exec(maker.Apply(List.nil(), copier.copy(invocation.meth), List.of(post.apply(maker.Ident(resultName)))))),
                         maker.Ident(resultName));
             }
         }
         return null;
+    }
+    
+    public @Nullable JCTree.JCExpression lowerPutter(final JCTree.JCArrayAccess access, final UnaryOperator<JCTree.JCExpression> pre, final UnaryOperator<JCTree.JCExpression> post = UnaryOperator.identity()) {
+        maker.at(access.pos);
+        final TreeCopier<?> copier = { maker };
+        final Name resultName = LetHandler.nextName(names);
+        final JCTree.JCExpression let = maker.LetExpr(List.of(
+                        maker.VarDef(maker.Modifiers(FINAL), resultName, null, pre.apply(access)),
+                        maker.Exec(maker.Assign(access, post.apply(maker.Ident(resultName))))),
+                maker.Ident(resultName));
+        return copier.copy(instance(LetHandler.class).let(let, access.indexed, access.index));
     }
     
     public @Nullable JCTree.JCExpression lower(final JCTree tree, final Env<AttrContext> env, final @Nullable JCTree.JCExpression lowerExpr) {

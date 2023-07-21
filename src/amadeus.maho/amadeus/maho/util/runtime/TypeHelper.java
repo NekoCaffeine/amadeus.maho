@@ -1,31 +1,22 @@
 package amadeus.maho.util.runtime;
 
+import amadeus.maho.lang.*;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.dynamic.ClassLocal;
+import amadeus.maho.util.type.InferredGenericType;
+import jdk.internal.ValueBased;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
-import java.lang.reflect.Array;
-import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.lang.reflect.WildcardType;
+import java.lang.reflect.*;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.lang.ToString;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.dynamic.ClassLocal;
-import amadeus.maho.util.type.InferredGenericType;
 
 public interface TypeHelper {
     
@@ -189,7 +180,7 @@ public interface TypeHelper {
         
         public <T> T zero(final Class<T> type) = type.cast(zero());
         
-        public Object wrap(final int value) = switch (this) {
+        public @Nullable Object wrap(final int value) = switch (this) {
             case VOID    -> null;
             case INT     -> value;
             case LONG    -> (long) value;
@@ -201,7 +192,7 @@ public interface TypeHelper {
             case BOOLEAN -> (value & 1) > 0;
         };
         
-        public Object wrap(final Object value) = switch (this) {
+        public @Nullable Object wrap(final Object value) = switch (this) {
             case VOID -> null;
             default   -> {
                 final Number number = numberValue(value);
@@ -270,7 +261,9 @@ public interface TypeHelper {
         }
         return clazz;
     }
-    
+
+    static boolean isValueBased(final Class<?> clazz) = clazz.isAnnotationPresent(ValueBased.class);
+
     ClassLocal<Class<?>> arrayTypeLocal = { type -> Array.newInstance(type, 0).getClass() };
     
     static <T> Class<T[]> arrayType(final Class<T> type) = (Class<T[]>) arrayTypeLocal[type];

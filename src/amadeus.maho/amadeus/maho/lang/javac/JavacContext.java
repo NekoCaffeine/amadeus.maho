@@ -1,85 +1,8 @@
 package amadeus.maho.lang.javac;
 
-import java.lang.annotation.Annotation;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import jdk.internal.misc.Unsafe;
-
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassVisitor;
-
-import com.sun.tools.javac.code.AnnoConstruct;
-import com.sun.tools.javac.code.ClassFinder;
-import com.sun.tools.javac.code.Kinds;
-import com.sun.tools.javac.code.Lint;
-import com.sun.tools.javac.code.Scope;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Symtab;
-import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.code.Types;
-import com.sun.tools.javac.comp.Annotate;
-import com.sun.tools.javac.comp.ArgumentAttr;
-import com.sun.tools.javac.comp.Attr;
-import com.sun.tools.javac.comp.AttrContext;
-import com.sun.tools.javac.comp.Check;
-import com.sun.tools.javac.comp.DeferredAttr;
-import com.sun.tools.javac.comp.Enter;
-import com.sun.tools.javac.comp.Env;
-import com.sun.tools.javac.comp.InferenceContext;
-import com.sun.tools.javac.comp.Lower;
-import com.sun.tools.javac.comp.MemberEnter;
-import com.sun.tools.javac.comp.Operators;
-import com.sun.tools.javac.comp.Resolve;
-import com.sun.tools.javac.comp.TypeEnter;
-import com.sun.tools.javac.jvm.ByteCodes;
-import com.sun.tools.javac.jvm.ClassReader;
-import com.sun.tools.javac.jvm.Code;
-import com.sun.tools.javac.jvm.Gen;
-import com.sun.tools.javac.jvm.Items;
-import com.sun.tools.javac.jvm.PoolConstant;
-import com.sun.tools.javac.main.JavaCompiler;
-import com.sun.tools.javac.parser.JavaTokenizer;
-import com.sun.tools.javac.parser.JavacParser;
-import com.sun.tools.javac.parser.Tokens;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.Pretty;
-import com.sun.tools.javac.tree.TreeInfo;
-import com.sun.tools.javac.tree.TreeMaker;
-import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.JCDiagnostic;
-import com.sun.tools.javac.util.List;
-import com.sun.tools.javac.util.ListBuffer;
-import com.sun.tools.javac.util.Log;
-import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
-import com.sun.tools.javac.util.Warner;
-
 import amadeus.maho.core.MahoExport;
 import amadeus.maho.core.extension.DynamicLookupHelper;
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.Default;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.lang.Privilege;
-import amadeus.maho.lang.RequiredArgsConstructor;
-import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.*;
 import amadeus.maho.lang.inspection.Callback;
 import amadeus.maho.lang.inspection.ConstructorContract;
 import amadeus.maho.lang.inspection.Nullable;
@@ -105,10 +28,39 @@ import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
 import amadeus.maho.util.tuple.Tuple3;
 import amadeus.maho.vm.JVM;
+import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.comp.*;
+import com.sun.tools.javac.jvm.*;
+import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.parser.JavaTokenizer;
+import com.sun.tools.javac.parser.JavacParser;
+import com.sun.tools.javac.parser.Tokens;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.Pretty;
+import com.sun.tools.javac.tree.TreeInfo;
+import com.sun.tools.javac.tree.TreeMaker;
+import com.sun.tools.javac.util.List;
+import com.sun.tools.javac.util.*;
+import jdk.internal.misc.Unsafe;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassVisitor;
+
+import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static amadeus.maho.util.bytecode.Bytecodes.NEW;
-import static com.sun.tools.javac.code.Flags.*;
-import static com.sun.tools.javac.code.Kinds.Kind.*;
+import static com.sun.tools.javac.code.Flags.PUBLIC;
+import static com.sun.tools.javac.code.Flags.STATIC;
+import static com.sun.tools.javac.code.Kinds.Kind.MTH;
+import static com.sun.tools.javac.code.Kinds.Kind.TYP;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
 import static org.objectweb.asm.Opcodes.*;
 
@@ -230,7 +182,7 @@ public class JavacContext {
         int debugCount[] = { 0 };
         
         @Override
-        public <T extends JCTree> T translate(final T tree) {
+        public <T extends JCTree> @Nullable T translate(final T tree) {
             if (tree == null)
                 return null;
             final T value = (T) mapping.getOrDefault(tree, tree);
@@ -239,7 +191,7 @@ public class JavacContext {
             return value != tree ? value : super.translate(tree);
         }
         
-        public static void translate(final Map<JCTree, JCTree> mapping, final boolean debug = false, final JCTree... trees) {
+        public static void translate(final Map<? extends JCTree, ? extends JCTree> mapping, final boolean debug = false, final JCTree... trees) {
             final TreeTranslator translator = { new IdentityHashMap<>(mapping) };
             Stream.of(trees).forEach(translator::translate);
             if (debug && mapping.entrySet().stream().anyMatch(entry -> entry.getKey() != entry.getValue()) && translator.debugCount[0] == 0)

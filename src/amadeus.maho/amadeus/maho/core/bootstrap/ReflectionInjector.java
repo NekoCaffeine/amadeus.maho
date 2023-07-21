@@ -1,23 +1,13 @@
 package amadeus.maho.core.bootstrap;
 
-import java.security.ProtectionDomain;
-
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FrameNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.JumpInsnNode;
-import org.objectweb.asm.tree.LabelNode;
-import org.objectweb.asm.tree.LdcInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.VarInsnNode;
-
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.inspection.Nullable;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.tree.*;
+
+import java.security.ProtectionDomain;
 
 import static amadeus.maho.util.math.MathHelper.max;
 import static org.objectweb.asm.Opcodes.*;
@@ -30,7 +20,7 @@ public enum ReflectionInjector implements Injector {
     @Override
     public @Nullable byte[] transform(final @Nullable Module module, final @Nullable ClassLoader loader, final @Nullable String className,
             final @Nullable Class<?> classBeingRedefined, final @Nullable ProtectionDomain protectionDomain, final @Nullable byte[] bytecode) {
-        if (className != null && className.equals(target()) || classBeingRedefined != null && classBeingRedefined.getName().equals(target())) {
+        if (className != null && className.equals(className()) || classBeingRedefined != null && classBeingRedefined.getName().equals(target())) {
             Maho.debug("ReflectionInjector -> jdk.internal.reflect.Reflection");
             final ClassReader reader = { bytecode };
             final ClassNode node = { };
@@ -58,6 +48,9 @@ public enum ReflectionInjector implements Injector {
         }
         return null;
     }
+    
+    @Override
+    public String className() = "jdk/internal/reflect/Reflection";
     
     @Override
     public String target() = "jdk.internal.reflect.Reflection";

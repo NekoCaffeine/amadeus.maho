@@ -1,36 +1,19 @@
 package amadeus.maho.util.runtime;
 
+import amadeus.maho.lang.*;
+import amadeus.maho.lang.inspection.Nullable;
+import jdk.nio.zipfs.ZipFileSystemProvider;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystem;
-import java.nio.file.FileVisitOption;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-
-import jdk.nio.zipfs.ZipFileSystemProvider;
-
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.Extension;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.lang.inspection.Nullable;
+import java.util.function.*;
 
 import static java.nio.file.StandardOpenOption.APPEND;
 
@@ -258,5 +241,7 @@ public interface FileHelper {
             Files.setPosixFilePermissions(file, perms);
         } catch (final UnsupportedOperationException ignored) { }
     }
+    
+    static void updateLastModifiedTime(final Path file, final long millis = System.currentTimeMillis()) = Files.setLastModifiedTime(file,  FileTime.fromMillis(millis));
     
 }

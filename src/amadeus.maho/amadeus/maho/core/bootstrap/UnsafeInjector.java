@@ -1,17 +1,16 @@
 package amadeus.maho.core.bootstrap;
 
-import java.security.ProtectionDomain;
-import java.util.List;
-
+import amadeus.maho.core.Maho;
+import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.inspection.Nullable;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import amadeus.maho.core.Maho;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.inspection.Nullable;
+import java.security.ProtectionDomain;
+import java.util.List;
 
 import static org.objectweb.asm.Opcodes.RETURN;
 
@@ -23,7 +22,7 @@ public enum UnsafeInjector implements Injector {
     @Override
     public @Nullable byte[] transform(final @Nullable Module module, final @Nullable ClassLoader loader, final @Nullable String className,
             final @Nullable Class<?> classBeingRedefined, final @Nullable ProtectionDomain protectionDomain, final @Nullable byte[] bytecode) {
-        if (className != null && className.equals(target()) || classBeingRedefined != null && classBeingRedefined.getName().equals(target())) {
+        if (className != null && className.equals(className()) || classBeingRedefined != null && classBeingRedefined.getName().equals(target())) {
             Maho.debug("UnsafeInjector -> jdk.internal.misc.Unsafe");
             final ClassReader reader = { bytecode };
             final ClassNode node = { };
@@ -43,6 +42,9 @@ public enum UnsafeInjector implements Injector {
         }
         return null;
     }
+    
+    @Override
+    public String className() = "jdk/internal/misc/Unsafe";
     
     @Override
     public String target() = "jdk.internal.misc.Unsafe";

@@ -1,5 +1,16 @@
 package amadeus.maho.util.event;
 
+import amadeus.maho.lang.*;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
+import amadeus.maho.util.dynamic.LambdaHelper;
+import amadeus.maho.util.function.FunctionHelper;
+import amadeus.maho.util.runtime.MethodHandleHelper;
+import amadeus.maho.util.runtime.ReflectionHelper;
+import amadeus.maho.util.runtime.TypeHelper;
+import amadeus.maho.util.type.TypeInferer;
+import amadeus.maho.util.type.TypeToken;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -10,23 +21,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
-
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.Extension;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.lang.Setter;
-import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
-import amadeus.maho.util.dynamic.LambdaHelper;
-import amadeus.maho.util.function.FunctionHelper;
-import amadeus.maho.util.runtime.MethodHandleHelper;
-import amadeus.maho.util.runtime.ReflectionHelper;
-import amadeus.maho.util.runtime.TypeHelper;
-import amadeus.maho.util.type.TypeInferer;
-import amadeus.maho.util.type.TypeToken;
 
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PROTECTED)
@@ -110,7 +104,7 @@ public class EventBus {
             .toList();
     
     @SneakyThrows
-    protected EventDispatcher.OrdinalWrapper toOrdinalWrapper(final Method method, final @Nullable Object instance) {
+    protected @Nullable EventDispatcher.OrdinalWrapper toOrdinalWrapper(final Method method, final @Nullable Object instance) {
         final Listener listener = method.getAnnotation(Listener.class);
         if (listener == null)
             return null;

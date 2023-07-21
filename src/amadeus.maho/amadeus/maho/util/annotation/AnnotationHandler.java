@@ -1,5 +1,16 @@
 package amadeus.maho.util.annotation;
 
+import amadeus.maho.core.Maho;
+import amadeus.maho.lang.*;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.annotation.mark.DisallowLoading;
+import amadeus.maho.util.bytecode.ASMHelper;
+import amadeus.maho.util.dynamic.ClassLocal;
+import amadeus.maho.util.dynamic.Wrapper;
+import amadeus.maho.util.runtime.*;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AnnotationNode;
+
 import java.lang.annotation.Annotation;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Array;
@@ -13,27 +24,6 @@ import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AnnotationNode;
-
-import amadeus.maho.core.Maho;
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.annotation.mark.DisallowLoading;
-import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.dynamic.ClassLocal;
-import amadeus.maho.util.dynamic.Wrapper;
-import amadeus.maho.util.runtime.ArrayHelper;
-import amadeus.maho.util.runtime.DebugHelper;
-import amadeus.maho.util.runtime.MethodHandleHelper;
-import amadeus.maho.util.runtime.ObjectHelper;
-import amadeus.maho.util.runtime.TypeHelper;
-import amadeus.maho.util.runtime.UnsafeHelper;
 
 import static amadeus.maho.util.function.FunctionHelper.lazy;
 
@@ -140,7 +130,7 @@ public class AnnotationHandler<T> {
     public static <T extends Annotation> AnnotationHandler<T> asOneOfUs(final T object) = BaseAnnotation.handler(object);
     
     public static <K, V> Map<K, V> valueToMap(final @Nullable List<?> list) {
-        if (list == null || list.size() == 0)
+        if (list == null || list.isEmpty())
             return new HashMap<>();
         if (list.size() % 2 != 0)
             throw new RuntimeException("objects.size() % 2 != 0");
@@ -278,11 +268,16 @@ public class AnnotationHandler<T> {
         return annotationData().members().values().stream().allMatch(method -> ArrayHelper.deepEquals(lookupValue(method.getName()), handler != null ? handler.lookupValue(method.getName()) : method.invoke(obj)));
     }
     
-    protected String toStringImpl() = "@%s(%s)".formatted(type().getName(), sourceMemberValues().entrySet().stream().map(entry -> "%s = %s".formatted(entry.getKey(), toStringValue(entry.getValue()))).collect(Collectors.joining(", ")));
+    protected String toStringImpl() = "@%s(%s)".formatted(type().getName(), sourceMemberValues().entrySet().stream()
+            .map(entry -> "%s = %s".formatted(entry.getKey(), toStringValue(switch (entry.getValue()) {
+                case AnnotationNode ignored -> lookupValue(entry.getKey());
+                case Object it              -> it;
+            })))
+            .collect(Collectors.joining(", ")));
     
-    private static String toStringValue(final Object object) = switch (object) {
+    private String toStringValue(final Object object) = switch (object) {
         case Type type      -> type.getClassName();
-        case Object[] array -> Stream.of(array).map(AnnotationHandler::toStringValue).collect(Collectors.joining(", ", "[", "]"));
+        case Object[] array -> Stream.of(array).map(this::toStringValue).collect(Collectors.joining(", ", "[", "]"));
         default             -> ObjectHelper.toString(object);
     };
     
