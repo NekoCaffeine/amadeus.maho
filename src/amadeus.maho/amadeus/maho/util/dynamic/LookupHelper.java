@@ -7,6 +7,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.function.Function;
 
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
@@ -47,11 +52,6 @@ import amadeus.maho.util.function.Function8;
 import amadeus.maho.util.function.Function9;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
-
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.MethodNode;
 
 @OptimizedBy(LookupHandler.class) // inline dynamic constant
 public interface LookupHelper {

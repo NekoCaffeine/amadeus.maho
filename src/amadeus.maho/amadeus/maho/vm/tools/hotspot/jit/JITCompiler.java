@@ -1,15 +1,15 @@
 package amadeus.maho.vm.tools.hotspot.jit;
 
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.vm.tools.hotspot.WhiteBox;
-
-import java.lang.reflect.Executable;
-import java.lang.reflect.Method;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 public enum JITCompiler {
     

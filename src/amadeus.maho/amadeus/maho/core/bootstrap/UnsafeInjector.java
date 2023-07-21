@@ -1,16 +1,17 @@
 package amadeus.maho.core.bootstrap;
 
-import amadeus.maho.core.Maho;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.inspection.Nullable;
+import java.security.ProtectionDomain;
+import java.util.List;
+
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.security.ProtectionDomain;
-import java.util.List;
+import amadeus.maho.core.Maho;
+import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.inspection.Nullable;
 
 import static org.objectweb.asm.Opcodes.RETURN;
 

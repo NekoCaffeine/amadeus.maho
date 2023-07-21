@@ -1,13 +1,13 @@
 package amadeus.maho.lang.javac.handler;
 
+import com.sun.tools.javac.comp.AttrContext;
+import com.sun.tools.javac.comp.Env;
+import com.sun.tools.javac.tree.JCTree;
+
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
-
-import com.sun.tools.javac.comp.AttrContext;
-import com.sun.tools.javac.comp.Env;
-import com.sun.tools.javac.tree.JCTree;
 
 import static amadeus.maho.lang.javac.handler.FieldDefaultsHandler.PRIORITY;
 import static com.sun.tools.javac.code.Flags.*;

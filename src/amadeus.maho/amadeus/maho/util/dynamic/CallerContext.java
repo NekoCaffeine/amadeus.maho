@@ -4,6 +4,7 @@ import java.lang.reflect.Executable;
 
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
 
 import static amadeus.maho.util.bytecode.ASMHelper.*;
@@ -38,7 +39,7 @@ public interface CallerContext {
     static Executable callerExecutable(final int depth) = executable(callerFrame(1 + depth));
     
     @SneakyThrows
-    static Executable executable(final StackWalker.StackFrame frame)
+    static @Nullable Executable executable(final StackWalker.StackFrame frame)
             = frame.getMethodName().equals(_CLINIT_) ? null : frame.getMethodName().equals(_INIT_) ?
             frame.getDeclaringClass().getConstructor(frame.getMethodType().parameterArray()) :
             frame.getDeclaringClass().getDeclaredMethod(frame.getMethodName(), frame.getMethodType().parameterArray());

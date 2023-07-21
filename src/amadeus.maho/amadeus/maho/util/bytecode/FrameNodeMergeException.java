@@ -4,13 +4,13 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.FrameNode;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.util.misc.ConstantLookup;
-
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.FrameNode;
 
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

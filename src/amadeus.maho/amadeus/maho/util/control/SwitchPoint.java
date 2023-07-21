@@ -41,8 +41,8 @@ public class SwitchPoint<T> {
         
     }
     
-    volatile @Nullable T context;
-    final Deque<Handle> deque = new LinkedList<>();
+    volatile @Nullable T             context;
+    final              Deque<Handle> deque = new LinkedList<>();
     final Lock lock = new ReentrantLock();
     final Condition condition = lock.newCondition();
     

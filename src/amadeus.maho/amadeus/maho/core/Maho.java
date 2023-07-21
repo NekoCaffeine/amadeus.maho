@@ -1,5 +1,30 @@
 package amadeus.maho.core;
 
+import java.io.InputStream;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.Instrumentation;
+import java.lang.instrument.UnmodifiableClassException;
+import java.lang.module.ModuleDescriptor;
+import java.lang.reflect.Field;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Path;
+import java.security.ProtectionDomain;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import jdk.internal.module.Modules;
+
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
+
 import amadeus.maho.agent.AgentInjector;
 import amadeus.maho.agent.LiveInjector;
 import amadeus.maho.core.bootstrap.HookResultInjector;
@@ -9,7 +34,12 @@ import amadeus.maho.core.bootstrap.UnsafeInjector;
 import amadeus.maho.core.extension.AllClassesPublic;
 import amadeus.maho.core.extension.ModuleAdder;
 import amadeus.maho.core.extension.ReflectBreaker;
-import amadeus.maho.lang.*;
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.RequiredArgsConstructor;
+import amadeus.maho.lang.Setter;
+import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.APIStatus;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.AOTTransformer;
@@ -24,25 +54,6 @@ import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.ModuleHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.runtime.UnsafeHelper;
-import jdk.internal.module.Modules;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodNode;
-
-import java.io.InputStream;
-import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.Instrumentation;
-import java.lang.instrument.UnmodifiableClassException;
-import java.lang.module.ModuleDescriptor;
-import java.lang.reflect.Field;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Path;
-import java.security.ProtectionDomain;
-import java.util.*;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static amadeus.maho.core.MahoExport.*;
 

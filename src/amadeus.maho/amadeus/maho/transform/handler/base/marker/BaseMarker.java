@@ -3,12 +3,12 @@ package amadeus.maho.transform.handler.base.marker;
 import java.lang.annotation.Annotation;
 import java.security.ProtectionDomain;
 
+import org.objectweb.asm.tree.ClassNode;
+
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.handler.base.BaseTransformer;
 import amadeus.maho.util.bytecode.context.TransformContext;
-
-import org.objectweb.asm.tree.ClassNode;
 
 @RequiredArgsConstructor
 public abstract class BaseMarker<A extends Annotation> extends BaseTransformer<A> implements Marker {

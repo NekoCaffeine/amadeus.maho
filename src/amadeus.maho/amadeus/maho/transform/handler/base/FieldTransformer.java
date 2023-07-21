@@ -2,13 +2,13 @@ package amadeus.maho.transform.handler.base;
 
 import java.lang.annotation.Annotation;
 
+import org.objectweb.asm.tree.FieldNode;
+
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.base.Experimental;
 import amadeus.maho.util.annotation.mark.Freeze;
 import amadeus.maho.util.bytecode.ASMHelper;
-
-import org.objectweb.asm.tree.FieldNode;
 
 @RequiredArgsConstructor
 public abstract class FieldTransformer<A extends Annotation> extends BaseTransformer<A> {

@@ -1,5 +1,30 @@
 package amadeus.maho.lang.javac.handler;
 
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.stream.Stream;
+
+import com.sun.source.tree.Tree;
+import com.sun.source.tree.TreeVisitor;
+import com.sun.tools.javac.code.Kinds;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.comp.ArgumentAttr;
+import com.sun.tools.javac.comp.Attr;
+import com.sun.tools.javac.comp.AttrContext;
+import com.sun.tools.javac.comp.DeferredAttr;
+import com.sun.tools.javac.comp.Env;
+import com.sun.tools.javac.jvm.ByteCodes;
+import com.sun.tools.javac.jvm.Gen;
+import com.sun.tools.javac.jvm.Items;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.List;
+import com.sun.tools.javac.util.Name;
+import com.sun.tools.javac.util.Names;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Privilege;
@@ -9,26 +34,6 @@ import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.runtime.DebugHelper;
-import com.sun.source.tree.Tree;
-import com.sun.source.tree.TreeVisitor;
-import com.sun.tools.javac.code.Kinds;
-import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.comp.*;
-import com.sun.tools.javac.jvm.ByteCodes;
-import com.sun.tools.javac.jvm.Gen;
-import com.sun.tools.javac.jvm.Items;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.util.List;
-import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
-
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
 import static com.sun.tools.javac.code.Flags.FINAL;
 

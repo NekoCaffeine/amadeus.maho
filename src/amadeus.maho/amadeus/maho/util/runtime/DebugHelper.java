@@ -1,11 +1,5 @@
 package amadeus.maho.util.runtime;
 
-import amadeus.maho.core.MahoExport;
-import amadeus.maho.lang.*;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.misc.Environment;
-import amadeus.maho.util.throwable.BreakException;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -17,6 +11,16 @@ import java.util.function.IntPredicate;
 import java.util.function.IntUnaryOperator;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+
+import amadeus.maho.core.MahoExport;
+import amadeus.maho.lang.EqualsAndHashCode;
+import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.Setter;
+import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.misc.Environment;
+import amadeus.maho.util.throwable.BreakException;
 
 @Getter
 public interface DebugHelper {

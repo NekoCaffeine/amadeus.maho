@@ -1,10 +1,5 @@
 package amadeus.maho.util.bytecode.remap;
 
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.util.bytecode.ASMHelper;
-
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
@@ -15,6 +10,11 @@ import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.AllArgsConstructor;
+import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.util.bytecode.ASMHelper;
 
 public interface RemapHandler {
     

@@ -5,6 +5,9 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
 
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.FieldInsnNode;
+
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.Getter;
@@ -15,9 +18,6 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.runtime.StreamHelper;
 import amadeus.maho.vm.tools.hotspot.WhiteBox;
-
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.FieldInsnNode;
 
 import static org.objectweb.asm.Opcodes.*;
 

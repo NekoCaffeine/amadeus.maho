@@ -2,6 +2,10 @@ package amadeus.maho.transform.access;
 
 import java.util.LinkedList;
 
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.MethodNode;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
@@ -9,10 +13,6 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
-
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import static amadeus.maho.util.math.MathHelper.max;
 import static amadeus.maho.util.runtime.ArrayHelper.indexOf;

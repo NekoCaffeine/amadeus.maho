@@ -2,10 +2,6 @@ package amadeus.maho.lang.javac.handler.base;
 
 import java.util.Optional;
 
-import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.lang.javac.JavacContext;
-
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.comp.AttrContext;
@@ -13,6 +9,10 @@ import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
+
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.JavacContext;
 
 @NoArgsConstructor
 public abstract class BaseSyntaxHandler extends JavacContext {

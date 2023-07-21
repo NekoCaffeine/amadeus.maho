@@ -4,6 +4,8 @@ import java.security.ProtectionDomain;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.tree.ClassNode;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
@@ -15,8 +17,6 @@ import amadeus.maho.util.annotation.AnnotationHandler;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.ClassNameRemapHandler;
-
-import org.objectweb.asm.tree.ClassNode;
 
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

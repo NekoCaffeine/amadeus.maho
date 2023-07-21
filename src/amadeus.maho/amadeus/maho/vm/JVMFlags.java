@@ -3,6 +3,8 @@ package amadeus.maho.vm;
 import java.util.List;
 import java.util.stream.Stream;
 
+import com.sun.management.VMOption;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
@@ -10,8 +12,6 @@ import amadeus.maho.lang.ToString;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.transform.mark.base.TransformProvider;
-
-import com.sun.management.VMOption;
 
 import static org.objectweb.asm.Opcodes.*;
 

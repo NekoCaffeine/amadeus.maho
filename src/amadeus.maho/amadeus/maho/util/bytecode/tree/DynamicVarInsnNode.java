@@ -2,13 +2,13 @@ package amadeus.maho.util.bytecode.tree;
 
 import java.util.function.Predicate;
 
-import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.runtime.StreamHelper;
-
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.VarInsnNode;
+
+import amadeus.maho.util.bytecode.ASMHelper;
+import amadeus.maho.util.runtime.StreamHelper;
 
 import static amadeus.maho.util.math.MathHelper.max;
 

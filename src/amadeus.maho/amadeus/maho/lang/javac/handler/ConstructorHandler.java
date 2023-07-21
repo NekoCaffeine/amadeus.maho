@@ -1,6 +1,34 @@
 package amadeus.maho.lang.javac.handler;
 
-import amadeus.maho.lang.*;
+import java.lang.annotation.Annotation;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import com.sun.tools.javac.code.Attribute;
+import com.sun.tools.javac.code.Scope;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.TypeTag;
+import com.sun.tools.javac.comp.Attr;
+import com.sun.tools.javac.comp.AttrContext;
+import com.sun.tools.javac.comp.Env;
+import com.sun.tools.javac.comp.Flow;
+import com.sun.tools.javac.jvm.Gen;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeInfo;
+import com.sun.tools.javac.util.JCDiagnostic;
+import com.sun.tools.javac.util.List;
+import com.sun.tools.javac.util.ListBuffer;
+import com.sun.tools.javac.util.Name;
+import com.sun.tools.javac.util.Position;
+
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.AllArgsConstructor;
+import amadeus.maho.lang.Default;
+import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
@@ -10,20 +38,6 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.runtime.StreamHelper;
-import com.sun.tools.javac.code.*;
-import com.sun.tools.javac.comp.Attr;
-import com.sun.tools.javac.comp.AttrContext;
-import com.sun.tools.javac.comp.Env;
-import com.sun.tools.javac.comp.Flow;
-import com.sun.tools.javac.jvm.Gen;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.TreeInfo;
-import com.sun.tools.javac.util.*;
-
-import java.lang.annotation.Annotation;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.sun.tools.javac.code.Flags.*;
 

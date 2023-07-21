@@ -1,8 +1,5 @@
 package amadeus.maho.lang.javac.handler;
 
-import amadeus.maho.transform.mark.Hook;
-import amadeus.maho.transform.mark.base.TransformProvider;
-
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
@@ -11,6 +8,9 @@ import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.tree.JCTree;
+
+import amadeus.maho.transform.mark.Hook;
+import amadeus.maho.transform.mark.base.TransformProvider;
 
 import static amadeus.maho.lang.javac.JavacContext.anyMatch;
 import static com.sun.tools.javac.code.Flags.STATIC;

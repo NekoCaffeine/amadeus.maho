@@ -45,14 +45,11 @@ import static org.objectweb.asm.Opcodes.*;
 @APIStatus(design = APIStatus.Stage.α, implement = APIStatus.Stage.β)
 public enum InterceptorManager implements ClassTransformer {
     
-    @Getter
-    instance;
+    @Getter instance;
     
     private static final Type TYPE_INTERCEPTOR_MANAGER = Type.getType(InterceptorManager.class);
     
-    private static final Method
-            ENTER = { "enter", Type.getMethodDescriptor(Type.VOID_TYPE, TYPE_CLASS, TYPE_STRING, TYPE_METHOD_TYPE, TYPE_OBJECT_ARRAY) },
-            EXIT  = { "exit", VOID_METHOD_DESC };
+    private static final Method ENTER = { "enter", Type.getMethodDescriptor(Type.VOID_TYPE, TYPE_CLASS, TYPE_STRING, TYPE_METHOD_TYPE, TYPE_OBJECT_ARRAY) }, EXIT = { "exit", VOID_METHOD_DESC };
     
     @Getter
     private final List<TransformInterceptor> handlers = new CopyOnWriteArrayList<>();
@@ -98,10 +95,8 @@ public enum InterceptorManager implements ClassTransformer {
     @Override
     public ClassNode transform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
         final String name = sourceName(node.name);
-        if (isTarget(loader, name))
-            for (final MethodNode methodNode : node.methods)
-                if (!methodNode.name.equals(_CLINIT_) && methodNode.instructions.size() != 0)
-                    hookMethod(context, node, methodNode);
+        if (isTarget(loader, name)) for (final MethodNode methodNode : node.methods)
+            if (!methodNode.name.equals(_CLINIT_) && methodNode.instructions.size() != 0) hookMethod(context, node, methodNode);
         return node;
     }
     
@@ -139,21 +134,18 @@ public enum InterceptorManager implements ClassTransformer {
     // }
     public void hookMethod(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
         final boolean isInit = isInit(methodNode);
-        if (isInit)
-            return;
+        if (isInit) return;
         TransformerManager.transform("interceptor", "%s#%s%s".formatted(sourceName(node.name), methodNode.name, methodNode.desc));
         context.markModified();
         AbstractInsnNode superCall = null;
-        if (isInit)
-            superCall = findSuperCall(methodNode, node.superName);
+        if (isInit) superCall = findSuperCall(methodNode, node.superName);
         // if (superCall != null)
         //     methodNode.instructions.insert(superCall, hookHead(node, methodNode));
         // else
         methodNode.instructions.insert(hookHead(node, methodNode));
         final ArrayList<AbstractInsnNode> tailNodes = { };
         for (final AbstractInsnNode insn : methodNode.instructions)
-            if (Bytecodes.isReturn(insn.getOpcode()))
-                tailNodes += insn;
+            if (Bytecodes.isReturn(insn.getOpcode())) tailNodes += insn;
         tailNodes.forEach(tailInsnNode -> methodNode.instructions.insertBefore(tailInsnNode, hookTail(node, methodNode)));
         final LabelNode start = { }, end = { };
         final TryCatchBlockNode tryCatchBlock = { start, end, end, null };
@@ -161,8 +153,7 @@ public enum InterceptorManager implements ClassTransformer {
         if (superCall != null) {
             methodNode.instructions.insert(superCall, start);
             methodNode.instructions.insert(superCall, new InsnNode(NOP));
-        } else
-            methodNode.instructions.insert(start);
+        } else methodNode.instructions.insert(start);
         methodNode.instructions.add(end); // Throwable
         final boolean isStatic = anyMatch(methodNode.access, ACC_STATIC);
         final Object locals[] = empty(), stack[] = array("java/lang/Throwable");
@@ -235,16 +226,11 @@ public enum InterceptorManager implements ClassTransformer {
     @Override
     public boolean isTarget(final @Nullable ClassLoader loader, final String name) = handlers().stream().anyMatch(handler -> handler.isTarget(loader, name));
     
-    public <I extends Interceptor> TransformInterceptor install(final Supplier<I> supplier, final BiPredicate<ClassLoader, String> predicate)
-            = new TransformInterceptor.Base(predicate).let(this::addTransformInterceptor).let(it -> it.supplier(supplier));
+    public <I extends Interceptor> TransformInterceptor install(final Supplier<I> supplier, final BiPredicate<ClassLoader, String> predicate) = new TransformInterceptor.Base(predicate).let(this::addTransformInterceptor).let(it -> it.supplier(supplier));
     
     public Collection<TransformInterceptor> install(final Map<Supplier<? extends Interceptor>, BiPredicate<ClassLoader, String>> map) {
         final ArrayList<Runnable> deferred = { map.size() };
-        final List<TransformInterceptor> result = map.entrySet().stream()
-                .map(entry -> Tuple.tuple(new TransformInterceptor.Base<>(entry.getValue()), entry.getKey()))
-                .peek(tuple -> deferred += () -> tuple.v1.supplier((Supplier<Interceptor>) tuple.v2))
-                .map(Tuple2::v1)
-                .collect(Collectors.toCollection(ArrayList::new));
+        final List<TransformInterceptor> result = map.entrySet().stream().map(entry -> Tuple.tuple(new TransformInterceptor.Base<>(entry.getValue()), entry.getKey())).peek(tuple -> deferred += () -> tuple.v1.supplier((Supplier<Interceptor>) tuple.v2)).map(Tuple2::v1).collect(Collectors.toCollection(ArrayList::new));
         addTransformInterceptors(result);
         deferred.forEach(Runnable::run);
         return result;

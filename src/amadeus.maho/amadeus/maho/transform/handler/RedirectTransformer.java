@@ -6,6 +6,13 @@ import java.util.ListIterator;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
@@ -20,13 +27,6 @@ import amadeus.maho.util.annotation.AnnotationHandler;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.RemapContext;
-
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.*;
 import static org.objectweb.asm.Opcodes.*;

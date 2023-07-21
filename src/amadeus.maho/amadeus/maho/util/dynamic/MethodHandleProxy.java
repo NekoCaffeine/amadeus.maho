@@ -7,19 +7,18 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.FieldNode;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.UnsafeHelper;
-
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.FieldNode;
 
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 

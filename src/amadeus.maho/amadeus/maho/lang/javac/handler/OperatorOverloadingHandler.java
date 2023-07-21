@@ -1,16 +1,10 @@
 package amadeus.maho.lang.javac.handler;
 
-import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.lang.Privilege;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
-import amadeus.maho.lang.javac.handler.base.Syntax;
-import amadeus.maho.transform.mark.Hook;
-import amadeus.maho.transform.mark.base.At;
-import amadeus.maho.transform.mark.base.InvisibleType;
-import amadeus.maho.transform.mark.base.TransformProvider;
-import amadeus.maho.util.runtime.DebugHelper;
+import java.util.EnumSet;
+import java.util.LinkedList;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+
 import com.sun.tools.javac.code.Kinds;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -27,14 +21,20 @@ import com.sun.tools.javac.util.ListBuffer;
 import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Names;
 
-import java.util.EnumSet;
-import java.util.LinkedList;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
+import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.Syntax;
+import amadeus.maho.transform.mark.Hook;
+import amadeus.maho.transform.mark.base.At;
+import amadeus.maho.transform.mark.base.InvisibleType;
+import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.lang.javac.handler.OperatorOverloadingHandler.PRIORITY;
-import static com.sun.tools.javac.code.Flags.FINAL;
-import static com.sun.tools.javac.code.Flags.STATIC;
+import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.Kind.MTH;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
 

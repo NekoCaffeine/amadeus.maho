@@ -10,7 +10,7 @@ import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
 
-import static com.sun.tools.javac.code.Flags.*;
+import static com.sun.tools.javac.code.Flags.STATIC;
 
 @TransformProvider
 public class InterfaceHandler {

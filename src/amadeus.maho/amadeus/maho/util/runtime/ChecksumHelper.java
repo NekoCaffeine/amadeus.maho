@@ -20,10 +20,8 @@ public interface ChecksumHelper {
     
     static String hex(final MessageDigest digest) {
         final StringBuilder builder = { 1 << 5 };
-        for (final byte b : digest.digest()) {
-            builder.append(hex[(b & 0xF0) >> 4]); // high
-            builder.append(hex[b & 0x0F]);      // low
-        }
+        for (final byte b : digest.digest())
+            builder.append(hex[(b & 0xF0) >> 4]).append(hex[b & 0x0F]);
         return builder.toString();
     }
     
@@ -54,7 +52,7 @@ public interface ChecksumHelper {
                     return checksum(channel, algorithm, bufferSize);
                 }
             } else
-               return checksum(channel, algorithm, bufferSize);
+                return checksum(channel, algorithm, bufferSize);
         }
     }
     

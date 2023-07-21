@@ -3,6 +3,10 @@ package amadeus.maho.transform.handler;
 import java.security.ProtectionDomain;
 import java.util.Set;
 
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.MethodNode;
+
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
@@ -13,10 +17,6 @@ import amadeus.maho.transform.handler.base.BaseTransformer;
 import amadeus.maho.transform.mark.Erase;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
-
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
-import org.objectweb.asm.tree.MethodNode;
 
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

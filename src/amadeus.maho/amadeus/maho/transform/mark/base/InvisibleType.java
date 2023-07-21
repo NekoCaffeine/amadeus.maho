@@ -6,17 +6,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.List;
 
-import amadeus.maho.transform.TransformerManager;
-import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.bytecode.remap.RemapHandler;
-import amadeus.maho.util.bytecode.type.TypePathFilter;
-
 import org.objectweb.asm.Type;
 import org.objectweb.asm.TypeReference;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeAnnotationNode;
+
+import amadeus.maho.transform.TransformerManager;
+import amadeus.maho.util.bytecode.ASMHelper;
+import amadeus.maho.util.bytecode.remap.RemapHandler;
+import amadeus.maho.util.bytecode.type.TypePathFilter;
 
 @Target({ ElementType.TYPE_USE, ElementType.TYPE_PARAMETER, ElementType.LOCAL_VARIABLE })
 @Retention(RetentionPolicy.RUNTIME)

@@ -3,12 +3,6 @@ package amadeus.maho.lang.javac.handler;
 import java.util.Iterator;
 import java.util.stream.Stream;
 
-import amadeus.maho.lang.Cloneable;
-import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.lang.javac.handler.base.BaseHandler;
-import amadeus.maho.lang.javac.handler.base.Handler;
-
 import com.sun.tools.javac.code.Scope;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.TypeTag;
@@ -17,6 +11,12 @@ import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
+
+import amadeus.maho.lang.Cloneable;
+import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.handler.base.BaseHandler;
+import amadeus.maho.lang.javac.handler.base.Handler;
 
 import static amadeus.maho.lang.javac.handler.CloneableHandler.PRIORITY;
 import static com.sun.tools.javac.code.Flags.*;
