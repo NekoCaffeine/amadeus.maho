@@ -26,6 +26,7 @@ import amadeus.maho.util.function.Consumer12;
 import amadeus.maho.util.function.Consumer13;
 import amadeus.maho.util.function.Consumer14;
 import amadeus.maho.util.function.Consumer15;
+import amadeus.maho.util.function.Consumer16;
 import amadeus.maho.util.function.Consumer2;
 import amadeus.maho.util.function.Consumer3;
 import amadeus.maho.util.function.Consumer4;
@@ -42,6 +43,7 @@ import amadeus.maho.util.function.Function12;
 import amadeus.maho.util.function.Function13;
 import amadeus.maho.util.function.Function14;
 import amadeus.maho.util.function.Function15;
+import amadeus.maho.util.function.Function16;
 import amadeus.maho.util.function.Function2;
 import amadeus.maho.util.function.Function3;
 import amadeus.maho.util.function.Function4;
@@ -156,6 +158,10 @@ public interface LookupHelper {
     
     static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R> Method method15(final Function15<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R> methodReference) = lookupMethod(methodReference);
     
+    static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> Method methodV16(final Consumer16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> methodReference) = lookupMethod(methodReference);
+    
+    static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, R> Method method16(final Function16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, R> methodReference) = lookupMethod(methodReference);
+    
     static <R> Constructor<R> constructor0(final Function0<R> methodReference) = lookupConstructor(methodReference);
     
     static <T1, R> Constructor<R> constructor1(final Function1<T1, R> methodReference) = lookupConstructor(methodReference);
@@ -187,6 +193,8 @@ public interface LookupHelper {
     static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, R> Constructor<R> constructor14(final Function14<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, R> methodReference) = lookupConstructor(methodReference);
     
     static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R> Constructor<R> constructor15(final Function15<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R> methodReference) = lookupConstructor(methodReference);
+    
+    static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, R> Constructor<R> constructor16(final Function16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, R> methodReference) = lookupConstructor(methodReference);
     
     static MethodHandle methodHandleV0(final Consumer0 methodReference) = lookupMethodHandle(methodReference);
     
@@ -251,5 +259,9 @@ public interface LookupHelper {
     static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> MethodHandle methodHandleV15(final Consumer15<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> methodReference) = lookupMethodHandle(methodReference);
     
     static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R> MethodHandle methodHandle15(final Function15<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R> methodReference) = lookupMethodHandle(methodReference);
+    
+    static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> MethodHandle methodHandleV16(final Consumer16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> methodReference) = lookupMethodHandle(methodReference);
+    
+    static <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, R> MethodHandle methodHandle16(final Function16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, R> methodReference) = lookupMethodHandle(methodReference);
     
 }

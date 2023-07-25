@@ -226,11 +226,16 @@ public enum InterceptorManager implements ClassTransformer {
     @Override
     public boolean isTarget(final @Nullable ClassLoader loader, final String name) = handlers().stream().anyMatch(handler -> handler.isTarget(loader, name));
     
-    public <I extends Interceptor> TransformInterceptor install(final Supplier<I> supplier, final BiPredicate<ClassLoader, String> predicate) = new TransformInterceptor.Base(predicate).let(this::addTransformInterceptor).let(it -> it.supplier(supplier));
+    public <I extends Interceptor> TransformInterceptor install(final Supplier<I> supplier, final BiPredicate<ClassLoader, String> predicate)
+            = new TransformInterceptor.Base(predicate).let(this::addTransformInterceptor).let(it -> it.supplier(supplier));
     
     public Collection<TransformInterceptor> install(final Map<Supplier<? extends Interceptor>, BiPredicate<ClassLoader, String>> map) {
         final ArrayList<Runnable> deferred = { map.size() };
-        final List<TransformInterceptor> result = map.entrySet().stream().map(entry -> Tuple.tuple(new TransformInterceptor.Base<>(entry.getValue()), entry.getKey())).peek(tuple -> deferred += () -> tuple.v1.supplier((Supplier<Interceptor>) tuple.v2)).map(Tuple2::v1).collect(Collectors.toCollection(ArrayList::new));
+        final List<TransformInterceptor> result = map.entrySet().stream()
+                .map(entry -> Tuple.tuple(new TransformInterceptor.Base<>(entry.getValue()), entry.getKey()))
+                .peek(tuple -> deferred += () -> tuple.v1.supplier((Supplier<Interceptor>) tuple.v2))
+                .map(Tuple2::v1)
+                .collect(Collectors.toCollection(ArrayList::new));
         addTransformInterceptors(result);
         deferred.forEach(Runnable::run);
         return result;
