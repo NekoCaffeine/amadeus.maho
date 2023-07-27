@@ -12,6 +12,7 @@ import java.util.stream.Stream;
 
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.dynamic.CallerContext;
 
 import static java.lang.constant.ConstantDescs.*;
@@ -34,11 +35,11 @@ public interface ConstantHelper {
     static <T> DynamicConstantDesc<T> array(final ClassDesc arrayType, final ConstantDesc... components)
             = DynamicConstantDesc.ofNamed(BSM_RESOLVE_ARRAY, "_", arrayType.isArray() ? arrayType : arrayType.arrayType(), components);
     
-    static <D extends ConstantDesc> D describe(final Constable constable) = (D) constable.describeConstable().get();
+    static <D extends ConstantDesc> @Nullable D describe(final Constable constable) = (D) constable.describeConstable().orElse(null);
     
     static ConstantDesc[] describes(final Constable... constables) = Stream.of(constables).map(Constable::describeConstable).map(Optional::get).toArray(ConstantDesc[]::new);
     
     @SneakyThrows
-    static <T> T resolveConstantDesc(final ConstantDesc desc, final Class<?> caller = CallerContext.caller()) = (T) desc.resolveConstantDesc(MethodHandleHelper.lookup().in(caller));
+    static <T> T resolveConstantDesc(final ConstantDesc desc, final Class<?> context = CallerContext.caller()) = (T) desc.resolveConstantDesc(MethodHandleHelper.lookupIn(context));
     
 }

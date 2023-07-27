@@ -60,7 +60,7 @@ public interface ClassHelper {
     static <T> T tryInstantiation(final Class<T> $this) {
         final @Nullable MethodHandle handle = noArgConstructorLocal[$this];
         if (handle == null)
-            throw new UnsupportedOperationException();
+            throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException());
         return (T) handle.invoke();
     }
     

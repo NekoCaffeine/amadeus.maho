@@ -15,6 +15,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.ASMHelper;
+import amadeus.maho.util.dynamic.CallerContext;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -24,6 +25,10 @@ public interface MethodHandleHelper {
     
     @Getter
     MethodHandles.Lookup lookup = (MethodHandles.Lookup) MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP").get(null);
+    
+    static MethodHandles.Lookup lookupIn(final Class<?> context) = lookup().in(context);
+    
+    static MethodHandles.Lookup lookupInCaller() = lookup().in(CallerContext.caller());
     
     @SneakyThrows
     static MethodHandle lookup(final int opcode, final Class<?> owner, final String name, final Object type) = switch (opcode) {
