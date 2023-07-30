@@ -1,5 +1,7 @@
 package amadeus.maho.lang.javac.handler;
 
+import java.lang.reflect.Field;
+
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.JCTree;
@@ -25,7 +27,7 @@ public class DebugHelperHandler extends JavacContext {
     
     Name
             CodePathPerceptionName = name(DebugHelper.CodePathPerception.class.getName()),
-            codePathSetter         = name(LookupHelper.<DebugHelper.CodePathPerception, DebugHelper.CodePath>methodV2(DebugHelper.CodePathPerception::codePath).getName());
+            codePathSetter         = name(LookupHelper.<DebugHelper.CodePathPerception, Field>methodV2(DebugHelper.CodePathPerception::codePath).getName());
     
     @Hook(at = @At(method = @At.MethodInsn(name = "initEnv")))
     private static void visitVarDef(final Attr $this, final JCTree.JCVariableDecl tree) = instance(DebugHelperHandler.class).markCodePath(tree);
@@ -37,12 +39,9 @@ public class DebugHelperHandler extends JavacContext {
         } catch (final Symbol.CompletionFailure failure) { return; }
         if (!symbol.type.isErroneous())
             if (tree.sym != null && tree.sym.owner instanceof Symbol.ClassSymbol && tree.init instanceof JCTree.JCNewClass newClass && types.isAssignable(attr.attribType(newClass.clazz, env(attr)), symbol.type)) {
-                final JCTree.JCNewClass codePath = maker.at(newClass.pos).NewClass(null, List.nil(), IdentQualifiedName(DebugHelper.CodePath.class), List.of(
-                        maker.ClassLiteral(tree.sym.owner.type),
-                        maker.Literal(tree.sym.name.toString())
-                ), null);
                 final Name let = name("$new$let");
-                tree.init = maker.LetExpr(List.of(maker.VarDef(maker.Modifiers(FINAL), let, tree.vartype, tree.init), maker.Exec(maker.Apply(List.nil(), maker.Select(maker.Ident(let), codePathSetter), List.of(codePath)))), maker.Ident(let));
+                tree.init = maker.LetExpr(List.of(maker.VarDef(maker.Modifiers(FINAL), let, tree.vartype, tree.init),
+                        maker.Exec(maker.Apply(List.nil(), maker.Select(maker.Ident(let), codePathSetter), List.of(maker.Ident(fieldConstant(tree, env(attr), tree.sym)))))), maker.Ident(let));
             }
     }
     

@@ -125,7 +125,7 @@ public class GetterHandler extends BaseHandler<Getter> {
     public void processMethod(final Env<AttrContext> env, final JCTree.JCMethodDecl tree, final JCTree owner, final Getter annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
         if (annotation.lazy())
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "getter.method.lazy"));
-        if (tree.params.size() > 0)
+        if (!tree.params.isEmpty())
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "accessor.method.has-parameter", "@Getter"));
         if (owner instanceof JCTree.JCClassDecl && noneMatch(((JCTree.JCClassDecl) owner).mods.flags, INTERFACE))
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "accessor.method.non-interface", "@Getter"));

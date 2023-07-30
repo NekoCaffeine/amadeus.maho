@@ -203,7 +203,7 @@ interface DynamicLookup {
     static Method method(final Class<?> owner, final String name, final MethodType methodType) = owner.getDeclaredMethod(name, methodType.parameterArray());
     
     @Callback
-    static Constructor<?> constrictor(final Class<?> owner, final MethodType methodType) = owner.getConstructor(methodType.parameterArray());
+    static Constructor<?> constructor(final Class<?> owner, final MethodType methodType) = owner.getConstructor(methodType.parameterArray());
     
     @Callback
     static VarHandle varHandle(final Class<?> owner, final String name) = lookup().unreflectVarHandle(field(owner, name));
@@ -212,6 +212,6 @@ interface DynamicLookup {
     static MethodHandle methodHandle(final Class<?> owner, final String name, final MethodType methodType) = lookup().unreflect(method(owner, name, methodType));
     
     @Callback
-    static MethodHandle constrictorHandle(final Class<?> owner, final MethodType methodType) = lookup().unreflectConstructor(constrictor(owner, methodType));
+    static MethodHandle constructorHandle(final Class<?> owner, final MethodType methodType) = lookup().unreflectConstructor(constructor(owner, methodType));
     
 }

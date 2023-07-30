@@ -78,7 +78,11 @@ public class LookupHandler extends JavacContext {
     }
     
     public JavacContext.DynamicVarSymbol constant(final JCDiagnostic.DiagnosticPosition position, final Env<AttrContext> env, final String name, final Class<?> targetType, final Symbol symbol) {
-        final PoolConstant.LoadableConstant constants[] = { lookupDynamicLookupMethod(name(name)).asHandle(), (Type.ClassType) symbol.owner.type, PoolConstant.LoadableConstant.String(symbol.name.toString()) };
+        final PoolConstant.LoadableConstant constants[];
+        if (symbol.name == symbol.name.table.names.init)
+            constants = { lookupDynamicLookupMethod(name(name)).asHandle(), (Type.ClassType) symbol.owner.type };
+        else
+            constants = { lookupDynamicLookupMethod(name(name)).asHandle(), (Type.ClassType) symbol.owner.type, PoolConstant.LoadableConstant.String(symbol.name.toString()) };
         return { nextName(names, symbol.owner.getQualifiedName().toString().replace('.', '_') + "#" + symbol.name), symtab.noSymbol, constantInvokeBSM(position, env).asHandle(), symtab.enterClass(symtab.java_base, name(targetType)).type,
                 symbol instanceof Symbol.MethodSymbol methodSymbol ? ArrayHelper.addAll(constants, methodSymbol.type.asMethodType()) : constants };
     }

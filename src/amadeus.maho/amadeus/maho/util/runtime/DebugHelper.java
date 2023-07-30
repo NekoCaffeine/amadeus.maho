@@ -4,6 +4,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,17 +43,12 @@ public interface DebugHelper {
         String renderCodePath = "codePathString()"; // must be const
         
         @Setter
-        @Nullable CodePath codePath();
+        @Nullable Field codePath();
         
-        default String codePathString() = codePath()?.toString() ?? "";
-        
-    }
-    
-    @EqualsAndHashCode
-    record CodePath(Class<?> clazz, String fieldName, @Nullable Object debugInfo = null) {
-        
-        @Override
-        public String toString() = clazz.getCanonicalName() + "#" + fieldName;
+        default String codePathString() {
+            final @Nullable Field field = codePath();
+            return field != null ? "%s#%s".formatted(field.getDeclaringClass().getCanonicalName(), field.getName()) : "";
+        }
         
     }
     

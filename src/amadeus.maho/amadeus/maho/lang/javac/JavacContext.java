@@ -676,7 +676,7 @@ public class JavacContext {
     
     public static boolean noneMatch(final long flags, final long mask) = (flags & mask) == 0;
     
-    public static Symbol symbol(final JCTree tree) = switch (TreeInfo.skipParens(tree)) {
+    public static @Nullable Symbol symbol(final JCTree tree) = switch (TreeInfo.skipParens(tree)) {
         case JCTree.JCIdent it           -> it.sym;
         case JCTree.JCFieldAccess it     -> it.sym;
         case JCTree.JCMemberReference it -> it.sym;
