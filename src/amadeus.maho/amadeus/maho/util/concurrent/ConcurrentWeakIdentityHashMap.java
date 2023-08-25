@@ -156,17 +156,14 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
                 return task.get();
             } catch (final IllegalStateException recursiveEx) {
                 if (guard) {
-                    final @Nullable Supplier<V> advance = recursiveCall.get();
-                    if (advance != null) {
-                        advance.get();
-                        continue;
-                    }
+                    recursiveCall.get()?.get();
+                    continue;
                 }
                 throw recursiveEx;
             } finally {
                 if (guard) {
-                    recursiveGuard.set(null);
-                    recursiveCall.set(null);
+                    recursiveGuard.remove();
+                    recursiveCall.remove();
                 }
             }
     }

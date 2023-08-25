@@ -63,9 +63,9 @@ public interface DebugHelper {
     
     static Map<Object, Object> localContext() = contextLocal().get();
     
-    static void breakpoint() {
-        if (showBreakpoint)
-            new Exception("Breakpoint stack trace").printStackTrace();
+    static void breakpoint(final Throwable throwable = null) {
+        if (showBreakpoint())
+            (throwable ?? new Exception("Breakpoint stack trace")).printStackTrace();
     }
     
     @SneakyThrows
