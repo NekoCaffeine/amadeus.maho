@@ -19,7 +19,7 @@ public final class InitMarker extends BaseMarker<Init> {
     
     @Override
     @SneakyThrows
-    public void onMark(final TransformerManager.Context context) = manager.addSetupCallback(() -> {
+    public void onMark(final TransformerManager.Context context) = context.addSetupCallback(() -> {
         TransformerManager.transform("init", ASMHelper.sourceName(sourceClass.name));
         init(annotation, Class.forName(ASMHelper.sourceName(sourceClass.name), false, contextClassLoader()));
     });

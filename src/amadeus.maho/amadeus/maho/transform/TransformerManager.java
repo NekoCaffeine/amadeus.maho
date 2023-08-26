@@ -75,6 +75,7 @@ import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.profile.Sampler;
+import amadeus.maho.util.resource.ClassLoadable;
 import amadeus.maho.util.resource.ResourcePath;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.DebugHelper;
@@ -179,10 +180,6 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     
     final ConcurrentHashMap<String, CopyOnWriteArrayList<ClassTransformer>> transformerMap = { };
     
-    final ConcurrentLinkedQueue<Runnable> setupCallbacks = { };
-    
-    public void addSetupCallback(final Runnable callback) = setupCallbacks += callback;
-    
     public Class<? extends BaseTransformer> lookupTransformerType(final Class<? extends BaseTransformer<?>> type) {
         if (ReflectionHelper.anyMatch(type, ReflectionHelper.ABSTRACT) || type.isEnum())
             throw new IllegalArgumentException("Transformer can only be a class that can be instantiated");
@@ -237,14 +234,13 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         ready = false;
     }
     
-    @Getter
     @RequiredArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+    @FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = true)
     public static class Context {
         
-        TransformerManager manager;
+        private static final Function<String, ConcurrentLinkedQueue<ClassTransformer>> queueMaker = FunctionHelper.abandon(ConcurrentLinkedQueue::new);
         
-        ResourcePath resourcePath;
+        TransformerManager manager;
         
         @Nullable ClassLoader loader;
         
@@ -254,7 +250,9 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         
         ConcurrentLinkedQueue<Future<?>> asyncTasks = { };
         
-        private static final Function<String, ConcurrentLinkedQueue<ClassTransformer>> queueMaker = FunctionHelper.abandon(ConcurrentLinkedQueue::new);
+        ConcurrentLinkedQueue<Runnable> setupCallbacks = { };
+        
+        public void addSetupCallback(final Runnable callback) = setupCallbacks += callback;
         
         public void addTransformer(final ClassTransformer transformer) {
             logAddTransformer(transformer);
@@ -266,7 +264,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 derived.derivedTransformers().forEach(this::addTransformer);
         }
         
-        public void logAddTransformer(final ClassTransformer transformer) {
+        private void logAddTransformer(final ClassTransformer transformer) {
             final String info;
             if (transformer instanceof Enum e)
                 info = e.getClass().getCanonicalName() + "#" + e.name();
@@ -300,13 +298,18 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             return Stream.concat(classInfoFromCachedList.stream(), sub.classes());
         }
         
+        public void scan(final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter) {
+            scanMarks(path, filter);
+            scanProviders(path, filter);
+        }
+        
         @SneakyThrows
         public void scanProviders(final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter)
-                = await(scanMayCachedList(path, "transform-providers").filter(filter).map(info -> async(() -> scanProviders(info, ASMHelper.newClassNode(info.readAll())), Setup.executor())));
+                = await(scanMayCachedList(path, "transform-providers").filter(filter).map(info -> async(() -> scanProvider(info, ASMHelper.newClassNode(info.readAll())), Setup.executor())));
         
-        public void scanProviders(final ResourcePath.ClassInfo info, final ClassNode node) throws IOException {
+        public void scanProvider(final ClassLoadable classLoadable, final ClassNode node) {
             if (ASMHelper.hasAnnotation(node, Transformer.class))
-                if (info.load(false, loader).defaultInstance() instanceof ClassTransformer transformer)
+                if (classLoadable.load(false, loader).defaultInstance() instanceof ClassTransformer transformer)
                     addTransformer(transformer);
                 else
                     throw new IllegalArgumentException("The target marked by @Transformer can only be an implementation of ClassTransformer");
@@ -342,7 +345,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final MethodHandle constructor = MethodHandleHelper.lookup().findConstructor(handlerType, subNode != null ?
                     MethodType.methodType(void.class, TransformerManager.class, annotation.annotationType(), ClassNode.class, subNode.getClass()) :
                     MethodType.methodType(void.class, TransformerManager.class, annotation.annotationType(), ClassNode.class));
-            return subNode != null ? (T) constructor.invoke(manager(), annotation, node, subNode) : (T) constructor.invoke(manager(), annotation, node);
+            return subNode != null ? (T) constructor.invoke(manager, annotation, node, subNode) : (T) constructor.invoke(manager, annotation, node);
         }, subNode != null ? "%s#%s".formatted(node.name, subNode instanceof MethodNode methodNode ? methodNode.name + methodNode.desc : ((FieldNode) subNode).name) : node.name);
         
         private static <T> T debugCall(final Supplier<T> supplier, final Function<Throwable, T> handler) { try { return supplier.get(); } catch (final Throwable throwable) { return handler.apply(throwable); } }
@@ -381,7 +384,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 }, Setup.executor())));
         
         public void mergeTransformers() {
-            manager.write.lock();
+            if (transformerMap.isEmpty())
+                return;
+            final ReentrantReadWriteLock.WriteLock lock = manager.write;
+            lock.lock();
             try {
                 transformerMap.forEach((target, queue) -> {
                     final @Nullable CopyOnWriteArrayList<ClassTransformer> prev = manager.transformerMap[target];
@@ -393,15 +399,76 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                         queue.stream()
                                 .filter(transformer -> copy.stream().noneMatch(identity -> identity == transformer))
                                 .forEach(copy::add);
+                        if (prev.size() == copy.size())
+                            return;
                         array = copy.toArray(new ClassTransformer[0]);
                     }
                     ArrayHelper.sort(array, ClassTransformer::compareTo);
                     manager.transformerMap[target] = { array };
                 });
-            } finally { manager.write.unlock(); }
+            } finally { lock.unlock(); }
+        }
+        
+        public void separateTransformers() {
+            if (transformerMap.isEmpty())
+                return;
+            final ReentrantReadWriteLock.WriteLock lock = manager.write;
+            lock.lock();
+            try {
+                transformerMap.forEach((target, queue) -> {
+                    final @Nullable CopyOnWriteArrayList<ClassTransformer> prev = manager.transformerMap[target];
+                    if (prev != null) {
+                        final LinkedList<ClassTransformer> copy = { prev };
+                        queue.stream()
+                                .filter(transformer -> copy.stream().noneMatch(identity -> identity == transformer))
+                                .forEach(copy::add);
+                        if (copy.isEmpty())
+                            manager.transformerMap -= target;
+                        else {
+                            final ClassTransformer array[] = copy.toArray(new ClassTransformer[0]);
+                            ArrayHelper.sort(array, ClassTransformer::compareTo);
+                            manager.transformerMap[target] = { array };
+                        }
+                    }
+                });
+            } finally { lock.unlock(); }
+            patch();
         }
         
         public void patch() = Patcher.patch(transformerMap.values().stream().flatMap(Collection::stream).toList());
+        
+        public void setup(final @Nullable ResourcePath path, final AOTTransformer.Level level, final boolean aot) {
+            mergeTransformers();
+            if (!aot)
+                runMarker(true);
+            asyncTasks.forEach(AsyncHelper::await);
+            if (!aot) {
+                patch();
+                runMarker(false);
+            } else {
+                final ReentrantReadWriteLock.WriteLock lock = manager.write;
+                lock.lock();
+                try {
+                    final ConcurrentHashMap<String, CopyOnWriteArrayList<ClassTransformer>> transformerMap = manager.transformerMap;
+                    if (path != null) {
+                        final Set<String> classesNames = path.classes().map(ResourcePath.ClassInfo::className).collect(Collectors.toSet());
+                        transformerMap.values().forEach(collection -> collection.removeIf(transformer -> !transformer.canAOT() || transformer.aotLevel() > level ||
+                                                                                                         transformer instanceof ClassTransformer.Limited limited && limited.targets().stream().noneMatch(classesNames::contains)));
+                        transformerMap.values().removeIf(Collection::isEmpty);
+                    }
+                    final HashMap<String, AOTTransformer> aotTransformerMap = { };
+                    List.copyOf(transformerMap.values()).stream()
+                            .flatMap(Collection::stream)
+                            .cast(BaseTransformer.class)
+                            .forEach(transformer -> transformer.onAOT(aotTransformerMap.computeIfAbsent(ASMHelper.sourceName(transformer.sourceClass.name), AOTTransformer::new)));
+                    aotTransformerMap.forEach((target, aotTransformer) -> transformerMap.computeIfAbsent(target, FunctionHelper.abandon(CopyOnWriteArrayList::new)) += aotTransformer);
+                } finally { lock.unlock(); }
+            }
+            if (!aot) {
+                setupCallbacks.forEach(Runnable::run);
+                setupCallbacks.clear();
+            }
+        }
         
     }
     
@@ -411,7 +478,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         if (!aot)
             addToInstrumentation();
         Maho.debug("Setup start: " + debugInfo);
-        final Context context = { this, path, loader };
+        final Context context = { this, loader };
         try {
             final ResourcePath scanPath = path.sub(resourceTree -> {
                 final @Nullable ResourcePath.ClassInfo info = resourceTree.findModuleInfo();
@@ -421,40 +488,21 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 }
                 return false;
             });
-            context.scanMarks(scanPath, filter);
-            context.scanProviders(scanPath, filter);
-            context.mergeTransformers();
-            if (!aot)
-                context.runMarker(true);
-            context.asyncTasks().forEach(AsyncHelper::await);
-            if (!aot) {
-                context.patch();
-                context.runMarker(false);
-            } else {
-                write.lock();
-                try {
-                    final Set<String> classesNames = path.classes().map(ResourcePath.ClassInfo::className).collect(Collectors.toSet());
-                    transformerMap.values().forEach(collection -> collection.removeIf(transformer -> !transformer.canAOT() || transformer.aotLevel() > level ||
-                            transformer instanceof ClassTransformer.Limited limited && !classesNames.containsAll(limited.targets())));
-                    transformerMap.values().removeIf(Collection::isEmpty);
-                    final HashMap<String, AOTTransformer> aotTransformerMap = { };
-                    List.copyOf(transformerMap.values()).stream()
-                            .flatMap(Collection::stream)
-                            .cast(BaseTransformer.class)
-                            .forEach(transformer -> transformer.onAOT(aotTransformerMap.computeIfAbsent(ASMHelper.sourceName(transformer.sourceClass.name), AOTTransformer::new)));
-                    aotTransformerMap.forEach((target, aotTransformer) -> transformerMap.computeIfAbsent(target, FunctionHelper.abandon(CopyOnWriteArrayList::new)) += aotTransformer);
-                } finally { write.unlock(); }
-            }
-            if (!aot)
-                setupCallbacks.forEach(Runnable::run);
+            context.scan(scanPath, filter);
+            context.setup(path, level, aot);
         } catch (final Throwable t) {
             Maho.debug("Setup failed: " + debugInfo);
             t.printStackTrace();
             throw DebugHelper.breakpointBeforeThrow(t);
-        } finally {
-            setupCallbacks.clear();
-            Maho.debug("Setup end: " + debugInfo);
-        }
+        } finally { Maho.debug("Setup end: " + debugInfo); }
+    }
+    
+    public synchronized Context setupRuntimeClass(final Class<?> clazz, final ClassNode node = Maho.getClassNodeFromClass(clazz)) {
+        final Context context = { this, clazz.getClassLoader() };
+        final ClassLoadable.Loaded loaded = { clazz };
+        context.scanProvider(loaded, node);
+        context.setup(null, AOTTransformer.Level.RUNTIME, this != runtime());
+        return context;
     }
     
     public List<ClassTransformer> debugClassTransformer(final int count = 0) {
@@ -535,8 +583,8 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         source >> target;
     }
     
-    public static @Nullable ClassNode transform(final TransformContext context, final @Nullable ClassNode node,
-            final ClassTransformer transformer, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz = null, final @Nullable ProtectionDomain domain = null) {
+    public static @Nullable ClassNode transform(final TransformContext context, final @Nullable ClassNode node, final ClassTransformer transformer, final @Nullable ClassLoader loader,
+            final @Nullable Class<?> clazz = null, final @Nullable ProtectionDomain domain = null) {
         try {
             final @Nullable ClassNode result = transformer.transform(context, node, loader, clazz, domain);
             return result == null ? node : result;

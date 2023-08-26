@@ -329,6 +329,18 @@ public class MavenRepository extends CacheableHttpRepository {
     });
     
     @SneakyThrows
+    public boolean latest(final String group, final String artifact, final String version) throws IOException = version.equals(resolveVersionInfo(group, artifact).latest);
+    
+    @SneakyThrows
+    public boolean latest(final Project project) throws IOException = latest(project.group(), project.artifact(), project.version());
+    
+    @SneakyThrows
+    public boolean valid(final String group, final String artifact, final String version) throws IOException = exists(Path.of("%s/%s/%s/maven-metadata.xml".formatted(group.replace('.', '/'), artifact, version)));
+    
+    @SneakyThrows
+    public boolean valid(final Project project) throws IOException = valid(project.group(), project.artifact(), project.version());
+    
+    @SneakyThrows
     protected Path tryUpdateCache(final Path relative) { try { return downloadDataFormRemote(relative); } catch (final IOException e) { return cache(relative); } }
     
     @Override
@@ -373,15 +385,12 @@ public class MavenRepository extends CacheableHttpRepository {
     }
     
     @Getter
-    private static final List<Function<HttpSetting, MavenRepository>> defaultRepositories = new CopyOnWriteArrayList<>(List.of(MavenRepository::releases, MavenRepository::snapshots, MavenRepository::jitpack));
+    private static final List<Function<HttpSetting, MavenRepository>> defaultRepositories = new CopyOnWriteArrayList<>(List.of(MavenRepository::releases, MavenRepository::snapshots));
     
     public static MavenRepository snapshots(final HttpSetting setting = HttpSetting.defaultInstance(), final Path cacheDir = Repository.defaultCachePath() / "snapshots")
             = { cacheDir, "https://oss.sonatype.org/content/repositories/snapshots/", setting };
     
     public static MavenRepository releases(final HttpSetting setting = HttpSetting.defaultInstance(), final Path cacheDir = Repository.defaultCachePath() / "releases")
             = { cacheDir, "https://repo1.maven.org/maven2/", setting };
-    
-    public static MavenRepository jitpack(final HttpSetting setting = HttpSetting.defaultInstance(), final Path cacheDir = Repository.defaultCachePath() / "jitpack")
-            = { cacheDir, "https://jitpack.io/", setting };
     
 }

@@ -139,7 +139,7 @@ public class DynamicLinkingContext {
     // runtime version <= 17
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkCallSite_$Enter(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
-    = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
+            = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkCallSite_$Exit(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])

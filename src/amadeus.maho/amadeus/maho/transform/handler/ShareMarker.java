@@ -75,36 +75,11 @@ public final class ShareMarker extends BaseMarker<Share> {
         final @Nullable String target = handler.isNotDefault(Share::value) ?  handler.<Type>lookupSourceValue(Share::value).getClassName() : handler.isNotDefault(Share::target) ? annotation.target() : null;
         ClassNode node = ASMHelper.newClassNode(sourceClass);
         TransformerManager.transform("share", ASMHelper.sourceName(node.name) + (target == null ? "" : "\n->  " + target));
-        if (annotation.privilegeEscalation())
-            node.superName = MagicAccessor.Bridge;
-        if (annotation.shareAnonymousInnerClass()) {
-            final @Nullable ResourcePath contextResourcePath = context.resourcePath() ?? null;
-            if (contextResourcePath != null)
-                node.innerClasses.stream()
-                        .filter(innerClassNode -> ASMHelper.isAnonymousInnerClass(innerClassNode.name))
-                        .forEach(innerClassNode -> {
-                            final String name = ASMHelper.sourceName(innerClassNode.name);
-                            final ResourcePath.ClassInfo innerClassInfo = contextResourcePath.classes()
-                                    .parallel()
-                                    .filter(classInfo -> classInfo.className().equals(name))
-                                    .findAny()
-                                    .orElseThrow();
-                            final byte bytecode[] = innerClassInfo.readAll();
-                            if (target != null) {
-                                final String newName = name.replace(ASMHelper.sourceName(sourceClass.name), target);
-                                TransformerManager.transform("share", "%s\n->  %s".formatted(name, newName));
-                                Maho.shareClass(newName, ClassNameRemapper.changeName(bytecode, name, newName), null);
-                            } else {
-                                TransformerManager.transform("share", name);
-                                Maho.shareClass(name, bytecode, null);
-                            }
-                        });
-        }
         if (handler.isNotDefault(Share::erase)) {
             final Erase erase = annotation.erase();
             final List<AnnotationNode> reservedAnnotationNodes = reservedAnnotationNodes(node, Retention.class, Target.class);
             node = new EraseTransformer(manager, erase, node).transformWithoutContext(node, null);
-            if (node.visibleAnnotations == null && reservedAnnotationNodes.size() != 0)
+            if (node.visibleAnnotations == null && !reservedAnnotationNodes.isEmpty())
                 node.visibleAnnotations = reservedAnnotationNodes;
         }
         if (node.visibleAnnotations == null)
@@ -127,7 +102,7 @@ public final class ShareMarker extends BaseMarker<Share> {
                     .filter(tuple -> tuple.v1.isEmpty())
                     .peek(markerQueue::remove)
                     .map(tuple -> async(tuple.v2, MahoExport.Setup.executor()))
-                    .forEach(context.asyncTasks()::offer);
+                    .forEach(context.asyncTasks::offer);
         }
         if (handler.isNotDefault(Share::init))
             InitMarker.init(annotation.init(), shared);

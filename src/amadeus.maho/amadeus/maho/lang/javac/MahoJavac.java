@@ -124,6 +124,7 @@ public class MahoJavac {
     }
     
     public static final Set<String> disableErrorKeys = new HashSet<>(java.util.List.of(
+            "compiler.err.module.not.found",
             "compiler.err.initializer.not.allowed",
             "compiler.err.except.never.thrown.in.try",
             "compiler.err.record.component.and.old.array.syntax",

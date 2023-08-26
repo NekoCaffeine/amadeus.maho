@@ -26,8 +26,6 @@ public @interface Share { // Share class to boot class loader
     @IgnoredDefaultValue("target")
     String target() default "";
     
-    boolean privilegeEscalation() default false;
-    
     boolean makePublic() default false;
     
     boolean shareAnonymousInnerClass() default true;

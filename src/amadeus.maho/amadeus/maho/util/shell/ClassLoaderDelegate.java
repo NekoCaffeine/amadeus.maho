@@ -36,10 +36,16 @@ import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.TransformerManager;
+import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.transform.mark.base.Transformer;
+import amadeus.maho.util.bytecode.ASMHelper;
 
 @ToString
 @EqualsAndHashCode
-public record ClassLoaderDelegate(ShellClassLoader loader = { Thread.currentThread().getContextClassLoader() }, Map<String, Class<?>> classes = new HashMap<>()) implements LoaderDelegate {
+public record ClassLoaderDelegate(
+        ShellClassLoader loader = { Thread.currentThread().getContextClassLoader() },
+        Map<String, Class<?>> classes = new HashMap<>(),
+        Map<String, TransformerManager.Context> contexts = new HashMap<>()) implements LoaderDelegate {
     
     @Getter
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -49,10 +55,6 @@ public record ClassLoaderDelegate(ShellClassLoader loader = { Thread.currentThre
         @EqualsAndHashCode
         private record ClassFile(byte data[], long timestamp) { }
         
-        Map<String, ShellClassLoader.ClassFile> classFiles = new HashMap<>();
-        
-        public ShellClassLoader(final @Nullable ClassLoader parent = null, final String name = "shell") = super(name, new URL[0], parent);
-    
         @Getter
         @AllArgsConstructor
         @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -103,10 +105,10 @@ public record ClassLoaderDelegate(ShellClassLoader loader = { Thread.currentThre
                 }
                 
                 @Override
-                public String getHeaderFieldKey(final int n) = n < fieldNames.size() ? fieldNames.get(n) : null;
+                public @Nullable String getHeaderFieldKey(final int n) = n < fieldNames.size() ? fieldNames.get(n) : null;
                 
                 @Override
-                public String getHeaderField(final int n) {
+                public @Nullable String getHeaderField(final int n) {
                     final String name = getHeaderFieldKey(n);
                     return name != null ? getHeaderField(name) : null;
                 }
@@ -117,8 +119,12 @@ public record ClassLoaderDelegate(ShellClassLoader loader = { Thread.currentThre
             
             @Override
             protected URLConnection openConnection(final URL u) throws IOException = new Connection(u);
-        
+            
         }
+        
+        Map<String, ShellClassLoader.ClassFile> classFiles = new HashMap<>();
+        
+        public ShellClassLoader(final @Nullable ClassLoader parent = null, final String name = "shell") = super(name, new URL[0], parent);
         
         public void declare(final String name, final byte bytes[]) {
             classFiles[toResourceString(name)] = { bytes, System.currentTimeMillis() };
@@ -127,21 +133,21 @@ public record ClassLoaderDelegate(ShellClassLoader loader = { Thread.currentThre
     
         @Override
         protected Class<?> findClass(final String name) throws ClassNotFoundException {
-            final ShellClassLoader.ClassFile file = classFiles[toResourceString(name)];
+            final @Nullable ShellClassLoader.ClassFile file = classFiles[toResourceString(name)];
             if (file == null)
                 return super.findClass(name);
             return defineClass(name, file.data(), 0, file.data().length, (CodeSource) null);
         }
         
         @Override
-        public URL findResource(final String name) {
-            final URL u = doFindResource(name);
+        public @Nullable URL findResource(final String name) {
+            final @Nullable URL u = doFindResource(name);
             return u != null ? u : super.findResource(name);
         }
         
         @Override
         public Enumeration<URL> findResources(final String name) throws IOException {
-            final URL u = doFindResource(name);
+            final @Nullable URL u = doFindResource(name);
             final Enumeration<URL> sup = super.findResources(name);
             if (u == null)
                 return sup;
@@ -152,7 +158,7 @@ public record ClassLoaderDelegate(ShellClassLoader loader = { Thread.currentThre
             return Collections.enumeration(result);
         }
         
-        private URL doFindResource(final String name) {
+        private @Nullable URL doFindResource(final String name) {
             if (classFiles.containsKey(name))
                 try {
                     return { null, new URI("jshell", null, "/" + name, null).toString(), new ResourceURLStreamHandler(name) };
@@ -169,19 +175,25 @@ public record ClassLoaderDelegate(ShellClassLoader loader = { Thread.currentThre
     
     @Override
     public void load(final ExecutionControl.ClassBytecodes bytecodes[]) throws ExecutionControl.ClassInstallException, ExecutionControl.EngineTerminationException {
-        final boolean loaded[] = new boolean[bytecodes.length];
+        final boolean loadedMark[] = new boolean[bytecodes.length];
         try {
             for (final ExecutionControl.ClassBytecodes cbc : bytecodes)
                 loader.declare(cbc.name(), cbc.bytecodes());
             for (int i = 0; i < bytecodes.length; i++) {
                 final ExecutionControl.ClassBytecodes cbc = bytecodes[i];
-                final Class<?> klass = loader.loadClass(cbc.name());
-                classes.put(cbc.name(), klass);
-                loaded[i] = true;
+                final String name = cbc.name();
+                final Class<?> loaded = loader.loadClass(name);
+                final @Nullable Class<?> unloaded = classes.put(name, loaded);
+                if (unloaded != null)
+                    contexts[name]?.separateTransformers();
+                if (loaded.isAnnotationPresent(Transformer.class) || loaded.isAnnotationPresent(TransformProvider.class))
+                    contexts[name] = TransformerManager.runtime().setupRuntimeClass(loaded, ASMHelper.newClassNode(cbc.bytecodes()));
+                loadedMark[i] = true;
                 // Get class loaded to the point of, at least, preparation
-                klass.getDeclaredMethods();
+                loaded.getDeclaredMethods();
             }
-        } catch (final Throwable ex) { throw new ExecutionControl.ClassInstallException("load: " + ex.getMessage(), loaded); }
+            
+        } catch (final Throwable ex) { throw new ExecutionControl.ClassInstallException("load: " + ex.getMessage(), loadedMark); }
     }
     
     @Override

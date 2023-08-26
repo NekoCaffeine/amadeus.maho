@@ -145,7 +145,7 @@ public class ResourcePath implements Closeable {
     
     @AllArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-    public static class ClassInfo extends ResourceInfo {
+    public static class ClassInfo extends ResourceInfo implements ClassLoadable {
         
         public String className() {
             final String path = (root() % path()).toString().replace(path().getFileSystem().getSeparator(), ".");
@@ -158,7 +158,8 @@ public class ResourcePath implements Closeable {
             return slash == -1 ? "" : path.substring(0, slash);
         }
         
-        public Class<?> load(final boolean initialize, final @Nullable ClassLoader loader) throws IOException {
+        @SneakyThrows
+        public Class<?> load(final boolean initialize, final @Nullable ClassLoader loader) {
             try { return Class.forName(className(), initialize, loader); } catch (final ClassNotFoundException e) { return Maho.shareClass(className(), readAll(), loader); }
         }
         

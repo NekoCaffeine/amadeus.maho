@@ -64,6 +64,11 @@ public interface CollectionHelper {
         return map;
     }
     
+    static <M extends Map<K, V>, K, V> M MINUSEQ(final M map, final @Nullable K key) {
+        map.remove(key);
+        return map;
+    }
+    
     static <T> boolean nonEmpty(final Collection<T> $this) = !$this.isEmpty();
     
     static <T> boolean GET(final Collection<T> collection, final @Nullable T value) = collection.contains(value);
