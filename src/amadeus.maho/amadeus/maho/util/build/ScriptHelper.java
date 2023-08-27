@@ -10,11 +10,13 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import amadeus.maho.core.MahoExport;
 import amadeus.maho.core.MahoImage;
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.misc.Environment;
+import amadeus.maho.util.runtime.DebugHelper;
 
 import static com.sun.jna.Platform.*;
 
@@ -108,5 +110,21 @@ public interface ScriptHelper {
     });
     
     static void addAgent(final Collection<String> args, final Path agentJar) = args += "-javaagent:%s".formatted(agentJar.toAbsolutePath() | "/");
+    
+    static void info(final String msg, final String... args) = System.out.printf("INFO: " + msg, (Object[]) args);
+    
+    static void debug(final String msg, final String... args) {
+        if (MahoExport.debug())
+            System.out.printf("DEBUG: " + msg, (Object[]) args);
+    }
+    
+    static void warning(final String msg, final String... args) = System.err.printf("WARNING: " + msg, (Object[]) args);
+    
+    static void error(final String msg, final String... args) = System.err.printf("ERROR: " + msg, (Object[]) args);
+    
+    static void fatal(final String msg, final String... args) {
+        System.err.printf("FATAL: " + msg, (Object[]) args);
+        System.exit(-1);
+    }
     
 }
