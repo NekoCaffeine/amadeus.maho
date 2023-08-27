@@ -111,19 +111,19 @@ public interface ScriptHelper {
     
     static void addAgent(final Collection<String> args, final Path agentJar) = args += "-javaagent:%s".formatted(agentJar.toAbsolutePath() | "/");
     
-    static void info(final String msg, final String... args) = System.out.printf("INFO: " + msg, (Object[]) args);
+    static void info(final String msg, final Object... args) = System.out.printf("INFO: " + msg, args);
     
-    static void debug(final String msg, final String... args) {
+    static void debug(final String msg, final Object... args) {
         if (MahoExport.debug())
-            System.out.printf("DEBUG: " + msg, (Object[]) args);
+            System.out.printf("DEBUG: " + msg, args);
     }
     
-    static void warning(final String msg, final String... args) = System.err.printf("WARNING: " + msg, (Object[]) args);
+    static void warning(final String msg, final Object... args) = System.err.printf("WARNING: " + msg, args);
     
-    static void error(final String msg, final String... args) = System.err.printf("ERROR: " + msg, (Object[]) args);
+    static void error(final String msg, final Object... args) = System.err.printf("ERROR: " + msg, args);
     
-    static void fatal(final String msg, final String... args) {
-        System.err.printf("FATAL: " + msg, (Object[]) args);
+    static void fatal(final String msg, final Object... args) {
+        System.err.printf("FATAL: " + msg, args);
         System.exit(-1);
     }
     
