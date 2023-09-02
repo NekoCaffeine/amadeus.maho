@@ -12,15 +12,12 @@ import java.util.stream.Stream;
 
 import amadeus.maho.core.MahoExport;
 import amadeus.maho.core.MahoImage;
-import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.misc.Environment;
-import amadeus.maho.util.runtime.DebugHelper;
 
 import static com.sun.jna.Platform.*;
 
-@Extension
 public interface ScriptHelper {
     
     String
@@ -111,19 +108,21 @@ public interface ScriptHelper {
     
     static void addAgent(final Collection<String> args, final Path agentJar) = args += "-javaagent:%s".formatted(agentJar.toAbsolutePath() | "/");
     
-    static void info(final String msg, final Object... args) = System.out.printf("INFO: " + msg, args);
+    static void println(final Object msg) = System.out.println(msg);
     
-    static void debug(final String msg, final Object... args) {
+    static void info(final Object msg) = System.out.println("INFO: " + msg);
+    
+    static void debug(final Object msg) {
         if (MahoExport.debug())
-            System.out.printf("DEBUG: " + msg, args);
+            System.out.println("DEBUG: " + msg);
     }
     
-    static void warning(final String msg, final Object... args) = System.err.printf("WARNING: " + msg, args);
+    static void warning(final Object msg) = System.err.println("WARNING: " + msg);
     
-    static void error(final String msg, final Object... args) = System.err.printf("ERROR: " + msg, args);
+    static void error(final Object msg) = System.err.println("ERROR: " + msg);
     
-    static void fatal(final String msg, final Object... args) {
-        System.err.printf("FATAL: " + msg, args);
+    static void fatal(final Object msg) {
+        System.err.println("FATAL: " + msg);
         System.exit(-1);
     }
     

@@ -13,13 +13,14 @@ import amadeus.maho.core.MahoProfile;
 import amadeus.maho.lang.Include;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.util.build.Scaffold;
+import amadeus.maho.util.build.ScriptHelper;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.misc.Dumper;
 import amadeus.maho.util.runtime.UnsafeHelper;
 
 @Include(Scaffold.class)
 @SneakyThrows
-public interface ShellHelper {
+public interface ShellHelper extends ScriptHelper {
     
     Unsafe unsafe = UnsafeHelper.unsafe();
     
