@@ -24,6 +24,12 @@ public class InvokeContext {
     
     @Nullable Runnable before, after;
     
+    public InvokeContext(final Lock lock, final @Nullable Runnable before, final @Nullable Runnable after) = this(before >> lock::lock, after << lock::unlock);
+    
+    public InvokeContext(final AtomicInteger counter) = this(counter::incrementAndGet, counter::decrementAndGet);
+    
+    public InvokeContext(final AtomicLong counter) = this(counter::incrementAndGet, counter::decrementAndGet);
+    
     @Extension.Operator("^")
     public void run(final Runnable runnable) {
         ~before();
@@ -60,19 +66,16 @@ public class InvokeContext {
         try { return supplier.getAsDouble(); } finally { ~after(); }
     }
     
-    public InvokeContext(final Lock lock, final @Nullable Runnable before, final @Nullable Runnable after) = this(before >> lock::lock, after << lock::unlock);
-    
-    public InvokeContext(final AtomicInteger counter) = this(counter::incrementAndGet, counter::decrementAndGet);
-    
-    public InvokeContext(final AtomicLong counter) = this(counter::incrementAndGet, counter::decrementAndGet);
-    
-    public static <T> InvokeContext overlayInvokeContext(final ThreadLocal<T> local, final @Nullable T overlay, final ThreadLocal<T> prev = { }) = { () -> {
-        prev.set(local.get());
-        local.set(overlay);
-    }, () -> {
-        local.set(prev.get());
-        prev.set(null);
-    }};
+    public static <T> InvokeContext overlayInvokeContext(final ThreadLocal<T> local, final @Nullable T overlay, final ThreadLocal<T> prev = { }) = {
+            () -> {
+                prev.set(local.get());
+                local.set(overlay);
+            },
+            () -> {
+                local.set(prev.get());
+                prev.remove();
+            }
+    };
     
     public static <T> InvokeContext fixedInvokeContext(final ThreadLocal<T> local, final @Nullable T before, final @Nullable T after) = { () -> local.set(before), () -> local.set(after) };
     

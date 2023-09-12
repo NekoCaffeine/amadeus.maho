@@ -61,7 +61,7 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
     }
     
     @SneakyThrows
-    static Process run(final Path directory = Path.of(""), final boolean openTerminal = true, final List<String> args) {
+    public Process run(final Path directory = Path.of(""), final boolean openTerminal = true, final List<String> args) {
         final ArrayList<String> commands = { };
         if (openTerminal) {
             final String command = String.join(" ", args);
