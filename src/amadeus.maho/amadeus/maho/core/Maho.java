@@ -44,6 +44,7 @@ import amadeus.maho.lang.inspection.APIStatus;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.TransformerManager;
+import amadeus.maho.util.build.HotSwap;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ClassWriter;
 import amadeus.maho.util.dynamic.CallerContext;
@@ -80,6 +81,7 @@ public final class Maho {
                         final Class<?> providerClass = Class.forName(provider, true, ClassLoader.getSystemClassLoader());
                         final Field fieldInstrumentation = providerClass.getDeclaredField("instrumentation");
                         installation(null, (Instrumentation) fieldInstrumentation.get(null));
+                        HotSwap.watch();
                         return instrumentation;
                     } catch (final Throwable throwable) {
                         System.err.println("Unable to load instrumentation from instrumentation provider: " + provider);

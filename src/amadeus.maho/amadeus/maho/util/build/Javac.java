@@ -79,7 +79,7 @@ public interface Javac {
             MODULE_INFO  = "module-info",
             PACKAGE_INFO = "package-info";
     
-    String CLASSES_DIR = "classes";
+    String CLASSES_DIR = "classes", SESSION = "javac.session";
     
     class Failure extends Exception {
         
@@ -396,6 +396,7 @@ public interface Javac {
                         fork += (classesDir / entry.getKey()).toAbsolutePath().toString();
                     }), charset, locale));
         }
+        "" >> classesDir / SESSION;
         return classesDir;
     }
     
