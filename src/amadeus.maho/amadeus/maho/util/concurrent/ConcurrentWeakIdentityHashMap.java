@@ -31,7 +31,7 @@ import amadeus.maho.util.runtime.ObjectHelper;
 public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V>, ReferenceCollector.Collectible<K> {
     
     @NoArgsConstructor
-    public static class Managed<K, V> extends ConcurrentWeakIdentityHashMap<K, V> {
+    public static class Managed<K, V> extends ConcurrentWeakIdentityHashMap<K, V> implements ReferenceCollector.Manageable<K> {
         
         @Override
         public ConcurrentHashMap<Key<K>, V> purgeKeys() = map;
@@ -121,10 +121,13 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
         public EntryIterator iterator() = { map.entrySet().iterator() };
         
         @Override
+        public void clear() = ConcurrentWeakIdentityHashMap.this.clear();
+        
+        @Override
         public int size() = ConcurrentWeakIdentityHashMap.this.size();
         
         @Override
-        public void clear() = ConcurrentWeakIdentityHashMap.this.clear();
+        public boolean isEmpty() = ConcurrentWeakIdentityHashMap.this.isEmpty();
         
         @Override
         public boolean contains(final Object object) = object instanceof Map.Entry<?, ?> entry && get(entry.getKey()) == entry.getValue();

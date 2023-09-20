@@ -9,6 +9,7 @@ import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
+import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
 
 public interface ReferenceCollector {
     
@@ -17,6 +18,15 @@ public interface ReferenceCollector {
         ReferenceQueue<T> referenceQueue();
         
         void collect(Reference<? extends T> reference);
+        
+        default boolean managed() = false;
+        
+    }
+    
+    interface Manageable<T> extends Collectible<T> {
+        
+        @Override
+        default boolean managed() = true;
         
     }
     
@@ -31,7 +41,10 @@ public interface ReferenceCollector {
         @Nullable Thread looper;
         
         @Override
-        public <T> void manage(final Collectible<T> collectible) = collectibles[collectible] = Boolean.TRUE;
+        public <C extends Manageable<T>, T> C manage(final C collectible) {
+            collectibles[collectible] = Boolean.TRUE;
+            return collectible;
+        }
         
         @Override
         public void collect() = collectibles.keySet().forEach(ReferenceCollector::collect);
@@ -49,18 +62,27 @@ public interface ReferenceCollector {
         public synchronized void start() throws IllegalStateException {
             if (looper() != null)
                 throw new IllegalStateException();
-            looper = { this, "ReferenceCollector-Looper" };
-            looper().let(it -> it.setDaemon(true)).start();
+            looper = createLooper();
+        }
+        
+        protected Thread createLooper() {
+            final Thread looper = { this, "ReferenceCollector-Looper" };
+            looper.setDaemon(true);
+            looper.start();
+            return looper;
         }
         
     }
     
-    <T> void manage(Collectible<T> collectible);
+    <C extends Manageable<T>, T> C manage(C collectible);
     
     void collect();
     
     default <K, V> ConcurrentWeakIdentityHashMap.Managed<K, V> makeManagedConcurrentWeakIdentityHashMap(final int initialCapacity = 1, final float loadFactor = 0.75F, final int concurrencyLevel = 1)
-            = new ConcurrentWeakIdentityHashMap.Managed<K, V>(initialCapacity, loadFactor, concurrencyLevel).let(this::manage);
+            = manage(new ConcurrentWeakIdentityHashMap.Managed<>(initialCapacity, loadFactor, concurrencyLevel));
+    
+    default <K> ConcurrentWeakIdentityHashSet<K> makeManagedConcurrentWeakIdentityHashSet(final int initialCapacity = 1, final float loadFactor = 0.75F, final int concurrencyLevel = 1)
+            = { makeManagedConcurrentWeakIdentityHashMap(initialCapacity, loadFactor, concurrencyLevel) };
     
     static <T> void collect(final ReferenceQueue<T> referenceQueue, final Consumer<? super Reference<? extends T>> consumer) {
         @Nullable Reference<? extends T> reference;
