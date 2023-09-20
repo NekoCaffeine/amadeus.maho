@@ -219,7 +219,7 @@ public class DynamicMethod {
                 Stream.of(genericTypes)
                         .forEach(type -> {
                             if (type.isArray()) {
-                                final int p_dimensions[] = new int[1];
+                                final int p_dimensions[] = { 0 };
                                 final Class<?> rootComponentType = TypeHelper.getRootComponentType(type, p_dimensions);
                                 while (--p_dimensions[0] > -1)
                                     signatureWriter.visitArrayType();

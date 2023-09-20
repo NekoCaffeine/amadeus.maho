@@ -272,9 +272,9 @@ public interface TypeHelper {
         }
         return clazz;
     }
-
+    
     static boolean isValueBased(final Class<?> clazz) = clazz.isAnnotationPresent(ValueBased.class);
-
+    
     ClassLocal<Class<?>> arrayTypeLocal = { type -> Array.newInstance(type, 0).getClass() };
     
     static <T> Class<T[]> arrayType(final Class<T> type) = (Class<T[]>) arrayTypeLocal[type];
@@ -312,33 +312,19 @@ public interface TypeHelper {
     };
     
     static @Nullable MethodHandle typeParameterFilter(final @Nullable Type expectedType, final BoundType boundType) = switch (expectedType) {
-        case null -> null;
-        case Class<?> expectedClass -> switch (boundType) {
+        case null                      -> null;
+        case Class<?> expectedClass    -> switch (boundType) {
             case EQUAL -> test.bindTo((Predicate<Object>) target -> target == null || target.getClass() == expectedClass);
             case LOWER -> test.bindTo((Predicate<Object>) target -> target == null || target.getClass().isAssignableFrom(expectedClass));
             case UPPER -> isInstance.bindTo(expectedType);
         };
-        case WildcardType wildcardType -> {
-            final List<MethodHandle> handles = new LinkedList<>();
-            Stream.of(wildcardType.getLowerBounds())
-                    .map(type -> typeParameterFilter(type, BoundType.LOWER))
-                    .nonnull()
-                    .forEach(handles::add);
-            Stream.of(wildcardType.getUpperBounds())
-                    .map(type -> typeParameterFilter(type, BoundType.UPPER))
-                    .nonnull()
-                    .forEach(handles::add);
-            yield mergeMethodHandle(handles, StreamHelper.MatchType.ALL);
-        }
-        case TypeVariable typeVariable -> {
-            final List<MethodHandle> handles = new LinkedList<>();
-            Stream.of(typeVariable.getBounds())
-                    .map(type -> typeParameterFilter(type, BoundType.LOWER))
-                    .nonnull()
-                    .forEach(handles::add);
-            yield mergeMethodHandle(handles, StreamHelper.MatchType.ALL);
-        }
-        default -> throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unsupported expectedType: %s(%s)".formatted(expectedType, expectedType.getClass())));
+        case WildcardType wildcardType -> mergeMethodHandle(
+                Stream.concat(
+                        Stream.of(wildcardType.getLowerBounds()).map(type -> typeParameterFilter(type, BoundType.LOWER)),
+                        Stream.of(wildcardType.getUpperBounds()).map(type -> typeParameterFilter(type, BoundType.UPPER))
+                ).nonnull().toList(), StreamHelper.MatchType.ALL);
+        case TypeVariable typeVariable -> mergeMethodHandle(Stream.of(typeVariable.getBounds()).map(type -> typeParameterFilter(type, BoundType.LOWER)).nonnull().toList(), StreamHelper.MatchType.ALL);
+        default                        -> throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unsupported expectedType: %s(%s)".formatted(expectedType, expectedType.getClass())));
     };
     
     @SneakyThrows
@@ -347,12 +333,11 @@ public interface TypeHelper {
         if (checker == null)
             return null;
         final MethodHandles.Lookup lookup = MethodHandleHelper.lookup();
-        final List<MethodHandle> handles = Stream.of(owner.getDeclaredFields())
+        return mergeMethodHandle(Stream.of(owner.getDeclaredFields())
                 .filter(ReflectionHelper.noneMatch(ReflectionHelper.STATIC))
                 .filter(field -> field.getGenericType() == typeParameter)
                 .map(field -> MethodHandles.collectArguments(checker, 0, lookup.unreflectVarHandle(field).toMethodHandle(VarHandle.AccessMode.GET).asType(MethodType.methodType(Object.class, owner))))
-                .toList();
-        return mergeMethodHandle(handles, StreamHelper.MatchType.ANY);
+                .toList(), StreamHelper.MatchType.ANY);
     }
     
     static @Nullable MethodHandle typeParametersFilter(final Class<?> owner, final Type... expectedTypes) {
