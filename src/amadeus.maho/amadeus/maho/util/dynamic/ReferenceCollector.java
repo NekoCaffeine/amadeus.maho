@@ -33,21 +33,21 @@ public interface ReferenceCollector {
     @FieldDefaults(level = AccessLevel.PROTECTED)
     class Base implements ReferenceCollector, Runnable {
         
-        ConcurrentWeakIdentityHashMap.Managed<Collectible<?>, Object> collectibles = { };
+        final ConcurrentWeakIdentityHashMap.Managed<Collectible<?>, Boolean> queue = { };
         
-        { manage(collectibles); }
+        { manage(queue); }
         
         @Getter
         @Nullable Thread looper;
         
         @Override
-        public <C extends Manageable<T>, T> C manage(final C collectible) {
-            collectibles[collectible] = Boolean.TRUE;
-            return collectible;
+        public <C extends Manageable<T>, T> C manage(final C manageable) {
+            queue[manageable] = Boolean.TRUE;
+            return manageable;
         }
         
         @Override
-        public void collect() = collectibles.keySet().forEach(ReferenceCollector::collect);
+        public void collect() = queue.keySet().forEach(ReferenceCollector::collect);
         
         @Override
         public void run() {

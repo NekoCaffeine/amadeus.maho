@@ -25,7 +25,7 @@ public class ConcurrentWeakIdentityHashSet<E> extends AbstractSet<E> implements 
     
     Set<E> set = map.keySet();
     
-    public ConcurrentWeakIdentityHashSet(final int initialCapacity = 1, final float loadFactor = 0.75F, final int concurrencyLevel = 1)
+    public ConcurrentWeakIdentityHashSet(final int initialCapacity, final float loadFactor = 0.75F, final int concurrencyLevel = 1)
             = this(new ConcurrentWeakIdentityHashMap<>(initialCapacity, loadFactor, concurrencyLevel));
     
     public void clear() = map.clear();
