@@ -311,16 +311,14 @@ public interface TypeHelper {
         });
     };
     
-    static @Nullable MethodHandle typeParameterFilter(final @Nullable Type expectedType, final BoundType boundType) {
-        if (expectedType == null)
-            return null;
-        if (expectedType instanceof Class expectedClass)
-            return switch (boundType) {
-                case EQUAL -> test.bindTo((Predicate<Object>) target -> target == null || target.getClass() == expectedClass);
-                case LOWER -> test.bindTo((Predicate<Object>) target -> target == null || target.getClass().isAssignableFrom(expectedClass));
-                case UPPER -> isInstance.bindTo(expectedType);
-            };
-        if (expectedType instanceof WildcardType wildcardType) {
+    static @Nullable MethodHandle typeParameterFilter(final @Nullable Type expectedType, final BoundType boundType) = switch (expectedType) {
+        case null -> null;
+        case Class<?> expectedClass -> switch (boundType) {
+            case EQUAL -> test.bindTo((Predicate<Object>) target -> target == null || target.getClass() == expectedClass);
+            case LOWER -> test.bindTo((Predicate<Object>) target -> target == null || target.getClass().isAssignableFrom(expectedClass));
+            case UPPER -> isInstance.bindTo(expectedType);
+        };
+        case WildcardType wildcardType -> {
             final List<MethodHandle> handles = new LinkedList<>();
             Stream.of(wildcardType.getLowerBounds())
                     .map(type -> typeParameterFilter(type, BoundType.LOWER))
@@ -330,10 +328,18 @@ public interface TypeHelper {
                     .map(type -> typeParameterFilter(type, BoundType.UPPER))
                     .nonnull()
                     .forEach(handles::add);
-            return mergeMethodHandle(handles, StreamHelper.MatchType.ALL);
+            yield mergeMethodHandle(handles, StreamHelper.MatchType.ALL);
         }
-        throw new UnsupportedOperationException("Unsupported expectedType: %s(%s)".formatted(expectedType, expectedType.getClass()));
-    }
+        case TypeVariable typeVariable -> {
+            final List<MethodHandle> handles = new LinkedList<>();
+            Stream.of(typeVariable.getBounds())
+                    .map(type -> typeParameterFilter(type, BoundType.LOWER))
+                    .nonnull()
+                    .forEach(handles::add);
+            yield mergeMethodHandle(handles, StreamHelper.MatchType.ALL);
+        }
+        default -> throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unsupported expectedType: %s(%s)".formatted(expectedType, expectedType.getClass())));
+    };
     
     @SneakyThrows
     static @Nullable MethodHandle typeParameterFilter(final Class<?> owner, final TypeVariable<? extends Class<?>> typeParameter, final @Nullable Type expectedType) {
