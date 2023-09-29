@@ -41,7 +41,7 @@ public interface Github extends HttpApi {
         public DynamicObject uploadReleaseAsset(final int release_id, final String name, final String label, final Path file) = github().uploadReleaseAsset(owner(), name(), release_id, name, label, file);
         
         @Extension.Operator("GET")
-        DynamicObject getBranch(final String branch) = github().getBranch(owner(), name(), branch);
+        public DynamicObject getBranch(final String branch) = github().getBranch(owner(), name(), branch);
         
     }
     
