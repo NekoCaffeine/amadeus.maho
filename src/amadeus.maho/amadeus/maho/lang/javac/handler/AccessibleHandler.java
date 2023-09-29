@@ -34,25 +34,22 @@ public class AccessibleHandler {
     
     public static final int ACCESS_MARKS = PUBLIC | PROTECTED | PRIVATE;
     
-    @Hook
-    private static Hook.Result isAccessible(final Resolve $this, final Env<AttrContext> env, final Symbol.TypeSymbol symbol, final boolean checkInner) = Hook.Result.TRUE;
+    @Hook(forceReturn = true)
+    private static boolean isAccessible(final Resolve $this, final Env<AttrContext> env, final Symbol.TypeSymbol symbol, final boolean checkInner) = true;
     
     @Hook
     private static Hook.Result isAccessible(final Resolve $this, final Env<AttrContext> env, final Type site, final Symbol sym, final boolean checkInner) = Hook.Result.falseToVoid(sym instanceof Symbol.ClassSymbol);
     
-    @Hook
-    private static Hook.Result addVisiblePackages(final Modules $this, final Symbol.ModuleSymbol symbol, final Map<Name, Symbol.ModuleSymbol> seenPackages, final Symbol.ModuleSymbol exportsFrom,
-            final Collection<Directive.ExportsDirective> exports) {
-        exports.stream()
-                .filter(directive -> directive.modules == null || directive.modules.contains(symbol))
-                .forEach(directive -> {
-                    seenPackages.put(directive.packge.fullname, exportsFrom);
-                    symbol.visiblePackages.put(directive.packge.fullname, directive.packge);
-                });
-        return Hook.Result.NULL;
-    }
+    @Hook(forceReturn = true)
+    private static void addVisiblePackages(final Modules $this, final Symbol.ModuleSymbol symbol, final Map<Name, Symbol.ModuleSymbol> seenPackages,
+            final Symbol.ModuleSymbol exportsFrom, final Collection<Directive.ExportsDirective> exports) = exports.stream()
+            .filter(directive -> directive.modules == null || directive.modules.contains(symbol))
+            .forEach(directive -> {
+                seenPackages[directive.packge.fullname] = exportsFrom;
+                symbol.visiblePackages[directive.packge.fullname] = directive.packge;
+            });
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN), ordinal = 1))
+    @Hook(at = @At(method = @At.MethodInsn(name = "initAddReads")), before = false)
     private static void completeModule(final Modules $this, final Symbol.ModuleSymbol moduleSymbol) {
         if (moduleSymbol.classLocation != null)
             try {

@@ -271,11 +271,11 @@ public interface ASMHelper {
         default        -> 1;
     };
     
-    static MethodNode computeMethodNode(final ClassNode node, final String name, final String desc,
-            final BiFunction<String, String, MethodNode> mapping) = lookupMethodNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.methods::add));
+    static MethodNode computeMethodNode(final ClassNode node, final String name, final String desc, final BiFunction<String, String, MethodNode> mapping)
+            = lookupMethodNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.methods::add));
     
-    static FieldNode computeField(final ClassNode node, final String name, final String desc,
-            final BiFunction<String, String, FieldNode> mapping) = lookupFieldNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.fields::add));
+    static FieldNode computeField(final ClassNode node, final String name, final String desc, final BiFunction<String, String, FieldNode> mapping)
+            = lookupFieldNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.fields::add));
     
     static Optional<MethodNode> lookupMethodNode(final ClassNode node, final String name, final String desc) = node.methods.stream()
             .filter(methodNode -> methodNode.name.equals(name) && methodNode.desc.equals(desc))
@@ -908,22 +908,16 @@ public interface ASMHelper {
     
     static String forName(final Type type) = type.getSort() == Type.ARRAY ? type.getDescriptor().replace('/', '.') : type.getClassName();
     
-    static void printBytecode(final ClassReader reader) = dumpBytecode(reader, System.out);
-    
-    static void dumpBytecode(final ClassReader reader, final OutputStream outputStream) = reader.accept(new TraceClassVisitor(new PrintWriter(outputStream)), 0);
+    static void printBytecode(final ClassReader reader, final OutputStream outputStream = System.out) = reader.accept(new TraceClassVisitor(new PrintWriter(outputStream)), 0);
     
     static String dumpBytecode(final ClassReader reader) = new StringWriter().let(writer -> reader.accept(new TraceClassVisitor(new PrintWriter(writer)), 0)).toString();
     
-    static void printBytecode(final ClassNode node) = dumpBytecode(node, System.out);
-    
-    static void dumpBytecode(final ClassNode node, final OutputStream outputStream) = node.accept(new TraceClassVisitor(new PrintWriter(outputStream)));
+    static void printBytecode(final ClassNode node, final OutputStream outputStream = System.out) = node.accept(new TraceClassVisitor(new PrintWriter(outputStream)));
     
     static String dumpBytecode(final ClassNode node) = new StringWriter().let(writer -> node.accept(new TraceClassVisitor(new PrintWriter(writer)))).toString();
     
-    static void printBytecode(final MethodNode node) = dumpBytecode(node, System.out);
-    
     @SneakyThrows
-    static void dumpBytecode(final MethodNode node, final OutputStream outputStream) {
+    static void printBytecode(final MethodNode node, final OutputStream outputStream = System.out) {
         final Textifier printer = { };
         final TraceMethodVisitor visitor = { printer };
         node.accept(visitor);
@@ -936,6 +930,13 @@ public interface ASMHelper {
                     } catch (final IOException ignored) { }
                 });
         outputStream.flush();
+    }
+    
+    static String dumpBytecode(final MethodNode node) {
+        final Textifier printer = { };
+        final TraceMethodVisitor visitor = { printer };
+        node.accept(visitor);
+        return printer.text.stream().map(Object::toString).collect(Collectors.joining());
     }
     
 }

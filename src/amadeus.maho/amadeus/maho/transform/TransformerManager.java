@@ -652,7 +652,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                     Files.write(dumpTargetPath / (stdName + ".class"), bytecode, options);
                     final ByteArrayOutputStream output = { 1024 * 16 };
                     try {
-                        ASMHelper.dumpBytecode(new ClassReader(bytecode), output);
+                        ASMHelper.printBytecode(new ClassReader(bytecode), output);
                     } catch (final Throwable throwable) { DebugHelper.breakpoint(); }
                     Files.write(dumpTargetPath / (stdName + ".bytecode"), output.toByteArray(), options);
                 } catch (final IOException e) { e.printStackTrace(); }
