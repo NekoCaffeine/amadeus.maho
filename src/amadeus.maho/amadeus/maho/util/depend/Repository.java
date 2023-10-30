@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -26,6 +26,7 @@ import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.build.Module;
 import amadeus.maho.util.concurrent.AsyncHelper;
+import amadeus.maho.util.concurrent.DeadlockDetector;
 import amadeus.maho.util.depend.maven.MavenRepository;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.link.http.HttpSetting;
@@ -67,7 +68,7 @@ public interface Repository {
         
         Collection<Repository> repositories;
         
-        ConcurrentHashMap<Project.Dependency, Collection<Project.Dependency>> recursiveResolveCache = { };
+        ConcurrentHashMap<Project.Dependency, CompletableFuture<Collection<Project.Dependency>>> recursiveResolveCache = { };
         
         public Combined(final Repository... repositories) = this(List.of(repositories));
         
@@ -97,8 +98,8 @@ public interface Repository {
         
         @Override
         @SneakyThrows
-        public Module.SingleDependency resolveModuleDependency(final Project.Dependency dependency, final boolean classes, final boolean sources, final boolean javadoc) throws IOException
-                = delegate(dependency, (repository, dep) -> repository.resolveModuleDependency(dep, classes, sources, javadoc));
+        public Module.SingleDependency resolveModuleDependency(final Project.Dependency dependency, final JarRequirements requirements) throws IOException
+                = delegate(dependency, (repository, dep) -> repository.resolveModuleDependency(dep, requirements));
         
         @Override
         public void dropResolveCache() = repositories().forEach(Repository::dropResolveCache);
@@ -113,47 +114,48 @@ public interface Repository {
     
     String debugInfo();
     
-    Map<Project.Dependency, Collection<Project.Dependency>> recursiveResolveCache();
+    Map<Project.Dependency, CompletableFuture<Collection<Project.Dependency>>> recursiveResolveCache();
     
     int versionIndex(final Project.Dependency dependency) throws IOException;
     
     Tuple2<Project.Dependency, Collection<Project.Dependency>> resolveDependency(final Project.Dependency dependency) throws IOException;
     
     @SneakyThrows
-    private void resolveDependenciesRecursive(final Project.Dependency dependency, final boolean allowMissing, final ConcurrentHashMap<Project, Collection<Project.Dependency>> context, final Set<Project.Dependency> dependencies,
-            final ConcurrentLinkedQueue<CompletableFuture<Void>> futures, final Function<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPath, final List<Project> path)
-            = context.computeIfAbsent(dependency.project(), it -> {
+    private void resolveDependenciesRecursive(final Project.Dependency dependency, final DependencyResolveContext drc, final ConcurrentHashMap<Project, CompletableFuture<?>> context, final Set<Project.Dependency> dependencies,
+            final ConcurrentLinkedQueue<CompletableFuture<?>> futures, final Function<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPath, final List<Project> path)
+            = context.computeIfAbsent(dependency.project(), _ -> async(() -> {
                 try {
                     final Tuple2<Project.Dependency, Collection<Project.Dependency>> resolved = resolveDependency(dependency);
                     dependencies += resolved.v1;
-                    return resolved.v2;
+                    return resolved.v2.stream().filter(subDependency -> !drc.exclude().test(subDependency.project())).toList();
                 } catch (final IOException e) {
-                    if (allowMissing)
-                        return List.of();
+                    if (drc.allowMissing().test(dependency.project()))
+                        return List.<Project.Dependency>of();
                     throw e;
                 }
             })
-            .stream()
-            .peek(subDependency -> dependenciesPath.apply(subDependency).add(path))
-            .filter(subDependency -> !context.containsKey(subDependency.project()))
-            .map(subDependency -> async(() -> resolveDependenciesRecursive(subDependency, allowMissing, context, dependencies, futures, dependenciesPath, new ArrayList<>(path).let(copy -> copy += dependency.project()))))
-            .forEach(futures::add);
+            .thenAcceptAsync(subDependencies -> subDependencies.stream()
+                    .peek(subDependency -> dependenciesPath.apply(subDependency).add(path))
+                    .filter(subDependency -> !context.containsKey(subDependency.project()))
+                    .forEach(subDependency -> resolveDependenciesRecursive(subDependency, drc, context, dependencies, futures, dependenciesPath, Stream.concat(path.stream(), Stream.of(dependency.project())).toList())))
+            .let(futures::add));
     
     @SneakyThrows
-    default Collection<Project.Dependency> resolveDependencies(final Collection<Project.Dependency> dependencies, final boolean allowMissing = false, final ConflictResolution resolution = ConflictResolution.LATEST) throws IOException {
+    default Collection<Project.Dependency> resolveDependencies(final Collection<Project.Dependency> dependencies, final DependencyResolveContext drc = DependencyResolveContext.DEFAULT,
+            final ConflictResolution resolution = ConflictResolution.LATEST) throws IOException = DeadlockDetector.watcher ^ (Supplier<Collection<Project.Dependency>>) () -> {
         resolveConflict(dependencies.stream(), ConflictResolution.ERROR);
         final Collection<Project> baseProjects = dependencies.stream().map(Project.Dependency::project).collect(Collectors.toSet());
         final ConcurrentHashMap<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPath = { };
-        final ConcurrentHashMap<Project, Collection<Project.Dependency>> context = { };
+        final ConcurrentHashMap<Project, CompletableFuture<?>> context = { };
         final Function<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPathGetter = key -> dependenciesPath.computeIfAbsent(key, FunctionHelper.abandon(ConcurrentLinkedQueue::new));
-        return resolveConflict(dependencies.stream().map(dependency -> async(() -> recursiveResolveCache().computeIfAbsent(dependency, it -> {
-            final ConcurrentLinkedQueue<CompletableFuture<Void>> futures = { };
-            final HashSet<Project.Dependency> subDependencies = { };
-            futures += async(() -> resolveDependenciesRecursive(it, allowMissing, context, subDependencies, futures, dependenciesPathGetter, new ArrayList<>()));
+        return resolveConflict(dependencies.stream().map(dependency -> recursiveResolveCache().computeIfAbsent(dependency, it -> async(() -> {
+            final ConcurrentLinkedQueue<CompletableFuture<?>> futures = { };
+            final Set<Project.Dependency> subDependencies = ConcurrentHashMap.newKeySet();
+            resolveDependenciesRecursive(it, drc, context, subDependencies, futures, dependenciesPathGetter, List.of());
             Stream.generate(futures::poll).takeWhile(ObjectHelper::nonNull).forEach(AsyncHelper::await);
             return subDependencies;
         }))).toList().stream().map(AsyncHelper::await).flatMap(Collection::stream), resolution, baseProjects, dependenciesPath);
-    }
+    };
     
     @SneakyThrows
     default Collection<Project.Dependency> resolveConflict(final Stream<Project.Dependency> stream, final ConflictResolution resolution = ConflictResolution.LATEST, final Collection<Project> projects = Set.of(),
@@ -179,14 +181,14 @@ public interface Repository {
     private DependencyConflictException conflict(final ConflictResolution resolution, final Project.Dependency a, final Project.Dependency b, final Map<Project.Dependency, ? extends Collection<List<Project>>> dependenciesPath)
             = { resolution, a, b, dependenciesPath[a], dependenciesPath[b] };
     
-    Module.SingleDependency resolveModuleDependency(Project.Dependency dependency, boolean classes = true, boolean sources = true, boolean javadoc = true) throws IOException;
+    Module.SingleDependency resolveModuleDependency(Project.Dependency dependency, JarRequirements requirements = JarRequirements.WITHOUT_DOC) throws IOException;
     
     @SneakyThrows
-    default Set<Module.Dependency> resolveModuleDependencies(final Collection<Project.Dependency> dependencies, final boolean allowMissing = false, final ConflictResolution resolution = ConflictResolution.LATEST,
-            final boolean classes = true, final boolean sources = true, final boolean javadoc = true) throws IOException
-            = resolveDependencies(dependencies, allowMissing, resolution)
+    default Set<Module.Dependency> resolveModuleDependencies(final Collection<Project.Dependency> dependencies, final DependencyResolveContext drc = DependencyResolveContext.DEFAULT,
+            final ConflictResolution resolution = ConflictResolution.LATEST, final JarRequirements requirements = JarRequirements.WITHOUT_DOC) throws IOException
+            = resolveDependencies(dependencies, drc, resolution)
             .stream()
-            .map(dependency -> async(() -> resolveModuleDependency(dependency, classes, sources, javadoc)))
+            .map(dependency -> async(() -> resolveModuleDependency(dependency, requirements)))
             .toList()
             .stream()
             .map(AsyncHelper::await)

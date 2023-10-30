@@ -32,6 +32,7 @@ import amadeus.maho.util.build.Module;
 import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.data.XML;
 import amadeus.maho.util.depend.CacheableHttpRepository;
+import amadeus.maho.util.depend.JarRequirements;
 import amadeus.maho.util.depend.Project;
 import amadeus.maho.util.depend.Repository;
 import amadeus.maho.util.link.http.HttpSetting;
@@ -50,55 +51,70 @@ public class MavenRepository extends CacheableHttpRepository {
     @FieldDefaults(level = AccessLevel.PROTECTED, makeFinal = true)
     public static abstract class PomVisitor extends XML.Visitor {
         
-        private static final List<String> propertiesPrefix = List.of("project", "properties");
+        private static final List<String>
+                projectPrefix    = List.of("project"),
+                parentPrefix     = List.of("project", "parent"),
+                propertiesPrefix = List.of("project", "properties");
         
-        LinkedList<String>        tags       = { };
-        LinkedList<StringBuilder> dataStack  = { };
-        HashMap<String, String>   properties = { };
+        LinkedList<String>        tags      = { };
+        LinkedList<StringBuilder> dataStack = { };
+        
+        HashMap<String, String>
+                projectProperties = { },
+                properties        = { };
         
         { dataStack << new StringBuilder(); }
         
         protected String data() {
             final String data = dataStack.getLast().toString();
             final StringBuilder builder = { }, var = { };
-            final boolean p_flag[] = { false, false, false };
+            final boolean p_flag[] = { false, false };
             data.codePoints().forEach(c -> {
                 switch (c) {
                     case '$' -> {
-                        if (p_flag[2])
-                            var.append('$');
-                        else if (p_flag[1])
+                        if (p_flag[1]) {
+                            builder.append('$').append('{').append('$');
+                            p_flag[1] = false;
+                        } else if (p_flag[0]) {
                             builder.append('$');
-                        else if (p_flag[0])
-                            p_flag[1] = true;
-                        else
+                            p_flag[0] = false;
+                        } else
                             p_flag[0] = true;
                     }
                     case '{' -> {
-                        if (p_flag[2])
-                            throw new IllegalArgumentException(data);
-                        if (p_flag[0] && !p_flag[1])
-                            p_flag[2] = true;
-                        else
+                        if (p_flag[1]) {
+                            builder.append('$').append('{').append('{');
+                            p_flag[1] = false;
+                        } else if (p_flag[0]) {
+                            p_flag[0] = false;
+                            p_flag[1] = true;
+                        } else
                             builder.append('{');
                     }
                     case '}' -> {
-                        if (p_flag[2]) {
-                            builder.append(properties.get(var.toString()));
+                        if (p_flag[1]) {
+                            final String key = var.toString();
+                            final @Nullable String value = projectProperties[key] ?? properties[key];
+                            if (value != null)
+                                builder.append(value);
+                            else
+                                builder.append('$').append('{').append(var).append('}');
                             var.setLength(0);
-                            p_flag[0] = p_flag[1] = false;
+                            p_flag[1] = false;
+                        } else if (p_flag[0]) {
+                            p_flag[0] = false;
+                            builder.append('$').append('}');
                         } else
                             builder.append('}');
                     }
                     default  -> {
-                        if (p_flag[2])
+                        if (p_flag[1])
                             var.appendCodePoint(c);
                         else {
-                            if (p_flag[0])
+                            if (p_flag[0]) {
                                 builder.append('$');
-                            if (p_flag[1])
-                                builder.append('$');
-                            p_flag[0] = p_flag[1] = false;
+                                p_flag[0] = false;
+                            }
                             builder.appendCodePoint(c);
                         }
                     }
@@ -106,8 +122,8 @@ public class MavenRepository extends CacheableHttpRepository {
             });
             if (p_flag[0])
                 builder.append('$');
-            if (p_flag[1])
-                builder.append('$');
+            else if (p_flag[1])
+                builder.append('$').append('{');
             return builder.toString();
         }
         
@@ -139,8 +155,10 @@ public class MavenRepository extends CacheableHttpRepository {
         @Override
         public void visitTagEnd(final String tag) {
             if (inProperties())
-                properties.put(tags.stream().skip(2L).collect(Collectors.joining(".")), data());
+                properties[tags.stream().skip(2L).collect(Collectors.joining("."))] = data();
             tags.removeLast();
+            if (projectPrefix.equals(tags) || parentPrefix.equals(tags) && !properties.containsKey(tag))
+                projectProperties["project." + tag] = data();
             dataStack.removeLast();
             super.visitTagEnd(tag);
         }
@@ -227,7 +245,7 @@ public class MavenRepository extends CacheableHttpRepository {
         
         final HashSet<Project.Dependency> dependencies = { };
         
-        @Nullable String group, artifact, version, scope;
+        @Nullable String group, artifact, version, scope, optional;
         
         @Override
         public void visitTagEnd(final String tag) {
@@ -238,18 +256,22 @@ public class MavenRepository extends CacheableHttpRepository {
                     case "artifactId" -> artifact = data();
                     case "version"    -> version  = data();
                     case "scope"      -> scope    = data();
+                    case "optional"   -> optional = data();
                     case "dependency" -> {
-                        boolean compile = false, runtime = false;
-                        switch (scope = scope == null ? "compile" : scope) {
-                            case "compile" -> compile = runtime = true;
-                            case "provided"-> compile = true;
-                            case "runtime" -> runtime = true;
+                        if (!Boolean.parseBoolean(optional)) {
+                            boolean compile = false, runtime = false;
+                            switch (scope = scope == null ? "compile" : scope) {
+                                case "compile" -> compile = runtime = true;
+                                case "provided"-> compile = true;
+                                case "runtime" -> runtime = true;
+                            }
+                            if (compile || runtime) {
+                                final Project project = { group, artifact, version ?? "+" };
+                                final Project.Dependency dependency = { project, compile, runtime };
+                                dependencies += dependency;
+                            }
                         }
-                        if (compile || runtime) {
-                            final Project project = { group, artifact, version ?? "+" };
-                            final Project.Dependency dependency = { project, compile, runtime };
-                            dependencies += dependency;
-                        }
+                        group = artifact = version = scope = optional = null;
                     }
                     // @formatter:on
                 }
@@ -262,7 +284,7 @@ public class MavenRepository extends CacheableHttpRepository {
     
     private static final String POM = "pom", JAR = "jar", MD5 = "md5", MD5_SUFFIX = "." + MD5, SOURCES = "sources", JAVADOC = "javadoc";
     
-    ConcurrentHashMap<Project.Dependency, Tuple2<Project.Dependency, Collection<Project.Dependency>>> resolveCache = { };
+    ConcurrentHashMap<Project.Dependency, CompletableFuture<Tuple2<Project.Dependency, Collection<Project.Dependency>>>> resolveCache = { };
     
     ConcurrentHashMap<Project, Collection<SnapshotVersion>> snapshotVersionsCache = { };
     
@@ -348,17 +370,18 @@ public class MavenRepository extends CacheableHttpRepository {
     
     @Override
     @SneakyThrows
-    public Tuple2<Project.Dependency, Collection<Project.Dependency>> resolveDependency(final Project.Dependency dependency) throws IOException = resolveCache.computeIfAbsent(dependency, it -> {
-        final Path pom = relative(resolveWildcards(dependency.project()), POM);
+    public Tuple2<Project.Dependency, Collection<Project.Dependency>> resolveDependency(final Project.Dependency dependency) throws IOException = await(resolveCache.computeIfAbsent(dependency, it -> async(() -> {
+        final Project project = resolveWildcards(dependency.project());
+        final Path pom = relative(project, POM);
         try {
-            return Tuple.tuple(new Project.Dependency(dependency.project(), dependency.compile(), dependency.runtime(), this), new PomDependenciesVisitor().let(visitor -> XML.read(cache(pom), visitor, pom | "/")).result());
+            return Tuple.tuple(new Project.Dependency(project, dependency.compile(), dependency.runtime(), this), new PomDependenciesVisitor().let(visitor -> XML.read(cache(pom), visitor, pom | "/")).result());
         } catch (final FileNotFoundException notFoundEx) {
-            final Path jar = relative(resolveWildcards(dependency.project()), JAR);
+            final Path jar = relative(project, JAR);
             if (exists(jar))
                 return Tuple.tuple(dependency, Set.of());
             throw new FileNotFoundException(jar.toString());
         }
-    });
+    })));
     
     public Project resolveWildcards(final Project project) throws IOException = switch (project.version()) {
         case "+" -> new Project(project.group(), project.artifact(), resolveVersionInfo(project.group(), project.artifact()).latest(), project.classifiers());
@@ -367,12 +390,12 @@ public class MavenRepository extends CacheableHttpRepository {
     
     @Override
     @SneakyThrows
-    public Module.SingleDependency resolveModuleDependency(final Project.Dependency dependency, final boolean classes, final boolean sources, final boolean javadoc) throws IOException {
-        final Project target = resolveWildcards(dependency.project());
+    public Module.SingleDependency resolveModuleDependency(final Project.Dependency dependency, final JarRequirements requirements) throws IOException {
+        final Project project = resolveWildcards(dependency.project());
         final CompletableFuture<Path>
-                classesTask = classes ? async(() -> cache(relative(target, JAR))) : completed(),
-                sourcesTask = sources ? async(() -> tryCache(relative(target.concatClassifier(SOURCES), JAR))) : completed(),
-                javadocTask = javadoc ? async(() -> tryCache(relative(target.concatClassifier(JAVADOC), JAR))) : completed();
+                classesTask = requirements.classes() ? async(() -> cache(relative(project, JAR))) : completed(),
+                sourcesTask = requirements.sources() ? async(() -> tryCache(relative(project.concatClassifier(SOURCES), JAR))) : completed(),
+                javadocTask = requirements.javadoc() ? async(() -> tryCache(relative(project.concatClassifier(JAVADOC), JAR))) : completed();
         return { await(classesTask), await(sourcesTask), await(javadocTask), dependency.compile(), dependency.runtime() };
     }
     

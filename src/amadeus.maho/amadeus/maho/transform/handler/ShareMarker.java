@@ -5,6 +5,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,7 +17,6 @@ import org.objectweb.asm.tree.ClassNode;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.core.MahoExport;
-import amadeus.maho.core.extension.MagicAccessor;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
@@ -27,8 +27,7 @@ import amadeus.maho.transform.handler.base.marker.BaseMarker;
 import amadeus.maho.transform.mark.Erase;
 import amadeus.maho.transform.mark.Share;
 import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.bytecode.remap.ClassNameRemapper;
-import amadeus.maho.util.resource.ResourcePath;
+import amadeus.maho.util.bytecode.remap.ClassNameRemapHandler;
 import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
 
@@ -90,7 +89,7 @@ public final class ShareMarker extends BaseMarker<Share> {
             node.access = ASMHelper.changeAccess(node.access, ACC_PUBLIC);
         if (handler.isNotDefault(Share::remap))
             node = new RemapTransformer(manager, annotation.remap(), node).transformWithoutContext(node, null);
-        final Class<?> shared = target != null ? Maho.shareClass(ClassNameRemapper.changeName(node, sourceClass.name, target)) : Maho.shareClass(node);
+        final Class<?> shared = target != null ? Maho.shareClass(ClassNameRemapHandler.of(Map.of(sourceClass.name, ASMHelper.className(target))).mapClassNode(node)) : Maho.shareClass(node);
         TransformerManager.Patcher.preLoadedClasses() += shared;
         final String name = shared.getName();
         synchronized (markerQueue) {

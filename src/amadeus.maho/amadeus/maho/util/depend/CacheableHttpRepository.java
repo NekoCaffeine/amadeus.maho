@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 import amadeus.maho.lang.AccessLevel;
@@ -40,7 +41,7 @@ public abstract class CacheableHttpRepository implements Repository {
     @Getter(on = @Delegate)
     HttpSetting setting = HttpSetting.defaultInstance();
 
-    ConcurrentHashMap<Project.Dependency, Collection<Project.Dependency>> recursiveResolveCache = { };
+    ConcurrentHashMap<Project.Dependency, CompletableFuture<Collection<Project.Dependency>>> recursiveResolveCache = { };
 
     @Override
     public String debugInfo() = getClass().getSimpleName() + ": " + rootUrl();
@@ -74,7 +75,7 @@ public abstract class CacheableHttpRepository implements Repository {
     public Path downloadDataFormRemote(final Path relative, final Path cache = cacheDir() / relative, final boolean completenessMetadata = false) throws IOException {
         int retries = maxRetries();
         final HttpRequest request = request(relative).build();
-        logger().accept(DEBUG, "Download %s => %s".formatted(request.uri(), cache));
+        logger().accept(DEBUG, "Downloading %s => %s".formatted(request.uri(), cache));
         final ArrayList<Throwable> throwables = { };
         do {
             try {

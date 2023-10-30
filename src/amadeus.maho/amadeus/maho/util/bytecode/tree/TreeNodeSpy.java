@@ -10,10 +10,10 @@ import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 
-// This is a low-level accessor, so @Proxy is not applicable.
 @Extension
 public interface TreeNodeSpy {
     
+    // don't use @Proxy or @Privilege here
     @SneakyThrows
     VarHandle
             opcodeHandle = MethodHandleHelper.lookup().findVarHandle(AbstractInsnNode.class, "opcode", int.class),

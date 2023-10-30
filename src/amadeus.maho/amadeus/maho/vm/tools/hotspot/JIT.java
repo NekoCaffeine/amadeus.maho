@@ -1,4 +1,4 @@
-package amadeus.maho.vm.tools.hotspot.jit;
+package amadeus.maho.vm.tools.hotspot;
 
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
@@ -11,10 +11,38 @@ import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.vm.tools.hotspot.WhiteBox;
 
-public enum JITCompiler {
+import static java.lang.Boolean.TRUE;
+
+public enum JIT {
     
     @Getter
     instance;
+    
+    public interface Compiler {
+        
+        WhiteBox WB = WhiteBox.instance();
+        
+        static boolean isC2OrJVMCIIncluded() = WB.isC2OrJVMCIIncluded();
+        
+        static boolean isJITEnabled() = WB.getBooleanVMFlag("UseCompiler") == TRUE;
+        
+        static boolean isJVMCIEnabled() = WB.getBooleanVMFlag("EnableJVMCI") == TRUE;
+        
+        static boolean isTieredCompilationEnabled() = WB.getBooleanVMFlag("TieredCompilation") == TRUE;
+        
+        static int tieredStopAtLevel() = Math.toIntExact(WB.getIntxVMFlag("TieredStopAtLevel"));
+        
+        static boolean isProfileInterpreterEnabled() = WB.getBooleanVMFlag("ProfileInterpreter") == TRUE;
+        
+        static boolean isGraalEnabled() = isJITEnabled() && WB.getBooleanVMFlag("UseJVMCICompiler") == TRUE && !(isTieredCompilationEnabled() && tieredStopAtLevel() <= 3);
+        
+        static boolean isJVMCINativeEnabled() = isGraalEnabled() && WB.getBooleanVMFlag("UseJVMCINativeLibrary") == TRUE;
+        
+        static boolean isC2Enabled() = isJITEnabled() && isProfileInterpreterEnabled() && (isTieredCompilationEnabled() || tieredStopAtLevel() > 3) && !isGraalEnabled();
+        
+        static boolean isC1Enabled() = isJITEnabled() && (!isProfileInterpreterEnabled() || isTieredCompilationEnabled());
+        
+    }
     
     public enum Level {
         DONT, NONE, SIMPLE, LIMITED_PROFILE, FULL_PROFILE, FULL_OPTIMIZATION
@@ -31,7 +59,7 @@ public enum JITCompiler {
         if (!isReady)
             synchronized (waitingQueue) {
                 if (!isReady) {
-                    waitingQueue.put(executable, level);
+                    waitingQueue[executable] = level;
                     return;
                 }
             }
@@ -60,5 +88,4 @@ public enum JITCompiler {
         }
         Maho.debug("JITCompiler: Ready!");
     }
-    
 }

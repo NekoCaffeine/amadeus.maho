@@ -3,7 +3,9 @@ package amadeus.maho.vm.tools.hotspot.parser;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.transform.mark.Patch;
+import amadeus.maho.transform.mark.Remap;
 import amadeus.maho.transform.mark.Share;
 import amadeus.maho.vm.tools.hotspot.WhiteBox;
 
@@ -12,11 +14,9 @@ import amadeus.maho.vm.tools.hotspot.WhiteBox;
 @FieldDefaults(level = AccessLevel.PUBLIC)
 public class DiagnosticCommand {
     
+    @NoArgsConstructor(on = @Patch.Exception)
     @Patch(target = WhiteBox.Names.DiagnosticCommand)
     private static class Patcher extends DiagnosticCommand {
-        
-        @Patch.Exception
-        public Patcher(final String name, final String desc, final DiagnosticArgumentType type, final boolean mandatory, final String defaultValue, final boolean argument) = super(name, desc, type, mandatory, defaultValue, argument);
         
         public String getName() = name;
         
@@ -32,7 +32,10 @@ public class DiagnosticCommand {
         
     }
     
-    @Share(target = WhiteBox.Names.DiagnosticArgumentType)
+    @Share(target = WhiteBox.Names.DiagnosticArgumentType, remap = @Remap(mapping = {
+            WhiteBox.Names.DiagnosticCommand_Shadow,
+            WhiteBox.Names.DiagnosticCommand
+    }))
     public enum DiagnosticArgumentType {
         JLONG, BOOLEAN, STRING, NANOTIME, STRINGARRAY, MEMORYSIZE
     }

@@ -14,6 +14,7 @@ import org.objectweb.asm.tree.MethodNode;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.ASMHelper;
 
 public interface RemapHandler {
@@ -27,20 +28,21 @@ public interface RemapHandler {
         RemapHandler remapHandler;
         
         public Type mapType(final Type type) = switch (type.getSort()) {
-            case Type.ARRAY -> Type.getType("[".repeat(type.getDimensions()) + mapType(type.getElementType()).getDescriptor());
+            case Type.ARRAY  -> Type.getType("[".repeat(type.getDimensions()) + mapType(type.getElementType()).getDescriptor());
             case Type.METHOD -> Type.getMethodType(mapMethodDesc(type.getDescriptor()));
-            default -> {
+            default          -> {
                 final String internalName = type.getSort() == Type.OBJECT ? type.getInternalName() : PRIMITIVE_TYPE_PREFIX + type.getInternalName(), result = map(internalName);
                 yield result.startsWith(PRIMITIVE_TYPE_PREFIX) ? Type.getType(result.substring(1)) : Type.getObjectType(result);
             }
         };
-    
+        
         @Override
         public String mapDesc(final String descriptor) = mapType(Type.getType(descriptor)).getDescriptor();
         
         @Override
-        public String mapType(final String internalName) = internalName == null ? null : mapType(Type.getObjectType(internalName)).getInternalName();
+        public @Nullable String mapType(final @Nullable String internalName) = internalName == null ? null : mapType(Type.getObjectType(internalName)).getInternalName();
         
+        @Override
         public String mapMethodDesc(final String methodDescriptor) {
             if ("()V".equals(methodDescriptor))
                 return methodDescriptor;
@@ -56,42 +58,40 @@ public interface RemapHandler {
         }
         
         @Override
-        public Object mapValue(final Object value) {
-            if (value instanceof Type type)
-                return mapType(type);
-            if (value instanceof Handle handle)
-                return new Handle(
-                        handle.getTag(),
-                        mapType(handle.getOwner()),
-                        mapMethodName(handle.getOwner(), handle.getName(), handle.getDesc()),
-                        handle.getTag() <= Opcodes.H_PUTSTATIC
-                                ? mapDesc(handle.getDesc())
-                                : mapMethodDesc(handle.getDesc()),
-                        handle.isInterface());
-            if (value instanceof ConstantDynamic constantDynamic) {
+        public Object mapValue(final Object value) = switch (value) {
+            case Type type                       -> mapType(type);
+            case Handle handle                   -> new Handle(
+                    handle.getTag(),
+                    mapType(handle.getOwner()),
+                    mapMethodName(handle.getOwner(), handle.getName(), handle.getDesc()),
+                    handle.getTag() <= Opcodes.H_PUTSTATIC
+                            ? mapDesc(handle.getDesc())
+                            : mapMethodDesc(handle.getDesc()),
+                    handle.isInterface());
+            case ConstantDynamic constantDynamic -> {
                 final int bootstrapMethodArgumentCount = constantDynamic.getBootstrapMethodArgumentCount();
                 final Object remappedBootstrapMethodArguments[] = new Object[bootstrapMethodArgumentCount];
                 for (int i = 0; i < bootstrapMethodArgumentCount; i++)
                     remappedBootstrapMethodArguments[i] = mapValue(constantDynamic.getBootstrapMethodArgument(i));
                 final String descriptor = constantDynamic.getDescriptor();
-                return new ConstantDynamic(
+                yield new ConstantDynamic(
                         mapInvokeDynamicMethodName(constantDynamic.getName(), descriptor),
                         mapDesc(descriptor),
                         (Handle) mapValue(constantDynamic.getBootstrapMethod()),
                         remappedBootstrapMethodArguments);
             }
-            return value;
-        }
+            default                              -> value;
+        };
         
         @Override
         public String mapInvokeDynamicMethodName(final String name, final String descriptor) = remapHandler.mapMethodName(".", name, descriptor);
-    
+        
         @Override
         public String mapMethodName(final String owner, final String name, final String descriptor) = remapHandler.mapMethodName(owner, name, descriptor);
-    
+        
         @Override
         public String mapFieldName(final String owner, final String name, final String descriptor) = remapHandler.mapFieldName(owner, name);
-    
+        
         @Override
         public String mapPackageName(final String name) {
             final String result = remapHandler.mapPackage(name);
@@ -106,13 +106,13 @@ public interface RemapHandler {
         
         @Override
         public String map(final String internalName) = remapHandler.mapInternalName(internalName);
-    
+        
     }
     
     class LocalNodeRemapper extends ClassRemapper {
         
         public LocalNodeRemapper(final ClassVisitor classVisitor, final Remapper remapper) = super(ASMHelper.asm_api_version, classVisitor, remapper);
-    
+        
         public String className() = className;
         
         public self className(final String value) {
@@ -130,9 +130,9 @@ public interface RemapHandler {
     // The result is the same.
     default String mapPackage(final String name) = name;
     
-    default String mapType(final String name) = name.contains(".") ?
-            ASMHelper.className(mapInternalName(ASMHelper.sourceName(name))) :
-            mapInternalName(name);
+    default String mapType(final String name) = name.contains(".") ? mapClassName(name) : mapInternalName(name);
+    
+    default String mapClassName(final String name) = ASMHelper.sourceName(mapInternalName(ASMHelper.className(name)));
     
     default String mapInternalName(final String name) = name;
     

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.NoSuchElementException;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -404,7 +405,12 @@ public interface Javac {
     
     static void addReadsAllUnnamed(final Collection<String> args, final Module... modules) = Stream.of(modules).forEach(module -> {
         args += "--add-reads";
-        args += module.name() + "=ALL-UNNAMED";
+        args += "%s=ALL-UNNAMED".formatted(module.name());
     });
+    
+    static void addOpensAllUnnamed(final Collection<String> args, final Map<String, Set<String>> modulesWithPackages) = modulesWithPackages.forEach((module, packages) -> packages.forEach(pkg -> {
+        args += "--add-reads";
+        args += "%s/%s=ALL-UNNAMED".formatted(module, pkg);
+    }));
     
 }

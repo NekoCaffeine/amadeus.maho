@@ -3,6 +3,7 @@ package amadeus.maho.util.depend;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import amadeus.maho.lang.AccessLevel;
@@ -52,5 +53,9 @@ public record Project(String group, String artifact, String version, String... c
             throw new IllegalArgumentException("Invalid project: '%s', At least 'group:artifact(:version)(:extend)', e.g. 'org.lwjgl:lwjgl-bgfx'".formatted(project));
         return { info[0], info[1], info.length > 2 ? info[2] : "+", ArrayHelper.sub(info, 3) };
     }
+    
+    public static Predicate<Project> groupAny(final String... groups) = project -> Stream.of(groups).anyMatch(group -> project.group().startsWith(group));
+    
+    public static Predicate<Project> artifactAny(final String... artifacts) = project -> Stream.of(artifacts).anyMatch(artifact -> project.artifact().startsWith(artifact));
     
 }

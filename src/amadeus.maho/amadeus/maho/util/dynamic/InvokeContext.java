@@ -3,10 +3,6 @@ package amadeus.maho.util.dynamic;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
-import java.util.function.IntSupplier;
-import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import amadeus.maho.lang.AccessLevel;
@@ -37,33 +33,9 @@ public class InvokeContext {
     }
     
     @Extension.Operator("^")
-    public <T> T run(final Supplier<T> supplier) {
+    public <T> T get(final Supplier<T> supplier) {
         ~before();
         try { return supplier.get(); } finally { ~after(); }
-    }
-    
-    @Extension.Operator("^")
-    public boolean run(final BooleanSupplier supplier) {
-        ~before();
-        try { return supplier.getAsBoolean(); } finally { ~after(); }
-    }
-    
-    @Extension.Operator("^")
-    public int run(final IntSupplier supplier) {
-        ~before();
-        try { return supplier.getAsInt(); } finally { ~after(); }
-    }
-    
-    @Extension.Operator("^")
-    public long run(final LongSupplier supplier) {
-        ~before();
-        try { return supplier.getAsLong(); } finally { ~after(); }
-    }
-    
-    @Extension.Operator("^")
-    public double run(final DoubleSupplier supplier) {
-        ~before();
-        try { return supplier.getAsDouble(); } finally { ~after(); }
     }
     
     public static <T> InvokeContext overlayInvokeContext(final ThreadLocal<T> local, final @Nullable T overlay, final ThreadLocal<T> prev = { }) = {

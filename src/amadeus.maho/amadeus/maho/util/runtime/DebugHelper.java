@@ -14,7 +14,6 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import amadeus.maho.core.MahoExport;
-import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Setter;
@@ -70,20 +69,17 @@ public interface DebugHelper {
     
     @SneakyThrows
     static <T extends Throwable> T breakpointBeforeThrow(final T throwable) {
-        breakpoint();
+        breakpoint(throwable);
         throw throwable;
     }
     
     @SneakyThrows
     static <T extends Throwable, R> R breakpointBeforeReturn(final T throwable) {
-        breakpoint();
+        breakpoint(throwable);
         throw throwable;
     }
     
-    static <T> T breakpointThenBreak() {
-        breakpoint();
-        throw BreakException.instance();
-    }
+    static <T> T breakpointThenBreak() { throw breakpointBeforeThrow(BreakException.instance()); }
     
     static <T> T breakpointThenError(final String message) = breakpointThenError(new AssertionError(message));
     

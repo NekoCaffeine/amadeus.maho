@@ -19,6 +19,7 @@ import jdk.internal.module.ModuleInfoExtender;
 import jdk.internal.module.ModuleResolution;
 
 import amadeus.maho.lang.EqualsAndHashCode;
+import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
@@ -36,6 +37,7 @@ public interface Jar {
     @EqualsAndHashCode
     record ClassPath(String relatively = "libs/", Collection<Module.SingleDependency> dependencies) {
         
+        @Extension.Operator(">>")
         public void copyTo(final Path path) {
             final Path dir = ~(path / relatively());
             dependencies.forEach(dependency -> dependency.classes() >> dir);
@@ -84,7 +86,7 @@ public interface Jar {
                 attributes[LAUNCHER_AGENT_CLASS] = agent.agentClass();
         }
         if (classPath != null)
-            attributes[CLASS_PATH] = classPath.dependencies().stream().map(Module.SingleDependency::classes).map(Path::getFileName).map(Path::toString).map(classPath.relatively()::concat).collect(Collectors.joining(";"));
+            attributes[CLASS_PATH] = classPath.dependencies().stream().map(Module.SingleDependency::classes).map(Path::getFileName).map(Path::toString).map(classPath.relatively()::concat).collect(Collectors.joining(" "));
         if (targetPlatform != null)
             attributes[TARGET_PLATFORM] = targetPlatform;
         return manifest;

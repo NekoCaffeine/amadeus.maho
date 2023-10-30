@@ -304,12 +304,14 @@ public final class Maho {
             .orElse(null);
 
     public static MethodNode getMethodNodeFromClassNonNull(final Class<?> target, final String name, final String desc, final boolean mustRetransform = false)
-            = Optional.ofNullable(getMethodNodeFromClass(target, name, desc, mustRetransform)).orElseThrow(() -> new UnsupportedOperationException("Unable to get MethodNode form: " + target + "#" + name + desc));
+            = Optional.ofNullable(getMethodNodeFromClass(target, name, desc, mustRetransform))
+            .orElseThrow(() -> DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unable to get MethodNode form: " + target + "#" + name + desc)));
 
     public static @Nullable ClassNode getClassNodeFromClass(final Class<?> target, final boolean mustRetransform = false) = ASMHelper.newClassNode(getBytecodeFromClass(target, mustRetransform));
 
     public static ClassNode getClassNodeFromClassNonNull(final Class<?> target, final boolean mustRetransform = false)
-            = Optional.ofNullable(getClassNodeFromClass(target, mustRetransform)).orElseThrow(() -> new UnsupportedOperationException("Unable to get ClassNode form: " + target));
+            = Optional.ofNullable(getClassNodeFromClass(target, mustRetransform))
+            .orElseThrow(() -> DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unable to get ClassNode form: " + target)));
 
     private static final Sampler<String> sampler = MahoProfile.sampler("GetBytecode");
 

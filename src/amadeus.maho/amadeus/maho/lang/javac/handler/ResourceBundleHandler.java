@@ -146,7 +146,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     protected Path location(final ResourceBundle annotation) {
         final String value = annotation.value();
-        return value.length() > 0 && value.charAt(0) == '!' ? Path.of(value.substring(1)) : Path.of(Environment.local().lookup("maho.build.project.root", "")) / value;
+        return !value.isEmpty() && value.charAt(0) == '!' ? Path.of(value.substring(1)) : Path.of(Environment.local().lookup("maho.build.project.root", "")) / value;
     }
     
 }

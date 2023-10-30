@@ -1,10 +1,9 @@
-package amadeus.maho.vm.tools.hotspot.gc;
+package amadeus.maho.vm.tools.hotspot;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
-import amadeus.maho.vm.tools.hotspot.WhiteBox;
 
 @Getter
 @RequiredArgsConstructor(AccessLevel.PRIVATE)

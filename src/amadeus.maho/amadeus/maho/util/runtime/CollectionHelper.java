@@ -69,6 +69,8 @@ public interface CollectionHelper {
         return map;
     }
     
+    static <T> boolean notContains(final Collection<T> $this, final T value) = !$this.contains(value);
+    
     static <T> boolean nonEmpty(final Collection<T> $this) = !$this.isEmpty();
     
     static <T> boolean GET(final Collection<T> collection, final @Nullable T value) = collection.contains(value);

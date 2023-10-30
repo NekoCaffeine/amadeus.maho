@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.depend.JarRequirements;
 import amadeus.maho.util.depend.Project;
 import amadeus.maho.util.depend.Repository;
 import amadeus.maho.util.depend.maven.MavenRepository;
@@ -89,7 +90,7 @@ public interface IDEA {
         static @Nullable Path tryResolveSources(final Repository repository, final Tuple2<String, String> metadata, final String suffix) {
             try {
                 final Project.Dependency dependency = { Project.of("com.jetbrains.intellij.idea:idea%s:%s%s:sources".formatted(metadata.v1, metadata.v2, suffix)) };
-                final Module.SingleDependency result = repository.resolveModuleDependency(dependency, true, false, false);
+                final Module.SingleDependency result = repository.resolveModuleDependency(dependency, JarRequirements.ONLY_CLASSES);
                 return result.classes();
             } catch (final IOException e) { return null; }
         }

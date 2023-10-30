@@ -1,10 +1,13 @@
 package amadeus.maho.vm.tools.hotspot;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.management.MemoryUsage;
+import java.lang.reflect.Array;
 import java.lang.reflect.Executable;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -12,6 +15,7 @@ import java.util.function.Function;
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.Method;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -33,10 +37,11 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
+import amadeus.maho.util.bytecode.remap.ClassNameRemapHandler;
+import amadeus.maho.util.bytecode.remap.RemapHandler;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 import amadeus.maho.vm.reflection.hotspot.HotSpot;
-import amadeus.maho.vm.tools.hotspot.jit.JITCompiler;
 import amadeus.maho.vm.tools.hotspot.parser.DiagnosticCommand;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.makeSiteByNameWithBoot;
@@ -58,36 +63,49 @@ public enum WhiteBox {
     public interface Names {
         
         String
-                WhiteBoxAPI = "WhiteBoxAPI",
-                getWhiteBox = "getWhiteBox",
-                WhiteBox = "jdk.test.whitebox.WhiteBox",
-                WhiteBox_Shadow = "amadeus.maho.vm.tools.hotspot.WhiteBox",
-                DiagnosticCommand = "jdk.test.whitebox.parser.DiagnosticCommand",
-                DiagnosticCommand_Shadow = "amadeus.maho.vm.tools.hotspot.parser.DiagnosticCommand",
-                DiagnosticArgumentType = "jdk.test.whitebox.parser.DiagnosticCommand$DiagnosticArgumentType",
+                WhiteBoxAPI                   = "WhiteBoxAPI",
+                getWhiteBox                   = "getWhiteBox",
+                WhiteBox                      = "jdk.test.whitebox.WhiteBox",
+                WhiteBox_Shadow               = "amadeus.maho.vm.tools.hotspot.WhiteBox",
+                DiagnosticCommand             = "jdk.test.whitebox.parser.DiagnosticCommand",
+                DiagnosticCommand_Shadow      = "amadeus.maho.vm.tools.hotspot.parser.DiagnosticCommand",
+                DiagnosticArgumentType        = "jdk.test.whitebox.parser.DiagnosticCommand$DiagnosticArgumentType",
                 DiagnosticArgumentType_Shadow = "amadeus.maho.vm.tools.hotspot.parser.DiagnosticCommand$DiagnosticArgumentType";
+        
+    }
+    
+    @SneakyThrows
+    private interface Bridge {
+        
+        Class<?>
+                DiagnosticCommand      = Class.forName(Names.DiagnosticCommand),
+                DiagnosticArgumentType = Class.forName(Names.DiagnosticArgumentType);
+        
+        MethodHandle constructor = MethodHandleHelper.lookup().findConstructor(DiagnosticCommand, MethodType.methodType(void.class, String.class, String.class, DiagnosticArgumentType, boolean.class, String.class, boolean.class));
+        
+        static Object map(final DiagnosticCommand command)
+                = constructor.invoke(command.name, command.desc, Enum.valueOf((Class<? extends Enum>) DiagnosticArgumentType, command.type.name()), command.mandatory, command.defaultValue, command.argument);
+        
+        static Object map(final DiagnosticCommand commands[]) {
+            final Object mappedArray = Array.newInstance(DiagnosticCommand, commands.length);
+            for (int i = 0; i < commands.length; i++)
+                Array.set(mappedArray, i, map(commands[i]));
+            return mappedArray;
+        }
         
     }
     
     @TransformProvider
     private interface Proxy {
         
-        @TransformTarget(target = Names.WhiteBox_Shadow, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
-        private static void proxyMethod(final TransformContext context, final ClassNode node) {
-            context.markModified();
-            for (final MethodNode methodNode : node.methods)
-                if (ASMHelper.anyMatch(methodNode.access, ACC_NATIVE)) {
-                    methodNode.maxLocals = methodNode.maxStack = 1 + (Type.getArgumentsAndReturnSizes(methodNode.desc) >> 2);
-                    methodNode.access &= ~ACC_NATIVE;
-                    final String desc = Type.getMethodDescriptor(Type.getReturnType(methodNode.desc), ArrayHelper.insert(Type.getArgumentTypes(methodNode.desc), Type.getObjectType(ASMHelper.className(Names.WhiteBox))));
-                    final MethodGenerator generator = MethodGenerator.fromMethodNode(methodNode);
-                    generator.push(new ConstantDynamic("INSTANCE", ASMHelper.classDesc(Names.WhiteBox), getWhiteBox));
-                    generator.loadArgs();
-                    generator.invokeDynamic(methodNode.name, desc, makeSiteByNameWithBoot, INVOKESPECIAL, Names.WhiteBox, "");
-                    generator.returnValue();
-                    generator.endMethod();
-                }
-        }
+        RemapHandler remapHandler = ClassNameRemapHandler.of(Map.of(ASMHelper.className(Names.DiagnosticCommand_Shadow), ASMHelper.className(Names.DiagnosticCommand)));
+        
+        RemapHandler.ASMRemapper asmRemapper = remapHandler.remapper();
+        
+        Type
+                WhiteBox = Type.getObjectType(ASMHelper.className(Names.WhiteBox)),
+                DiagnosticCommandShadowArray = ASMHelper.arrayType(Type.getObjectType(ASMHelper.className(Names.DiagnosticCommand_Shadow))),
+                DiagnosticCommandArray = ASMHelper.arrayType(Type.getObjectType(ASMHelper.className(Names.DiagnosticCommand)));
         
         Handle getWhiteBox = {
                 H_INVOKESTATIC,
@@ -102,19 +120,42 @@ public enum WhiteBox {
                 true
         };
         
+        @TransformTarget(target = Names.WhiteBox_Shadow, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+        private static void proxyMethod(final TransformContext context, final ClassNode node) {
+            context.markModified();
+            for (final MethodNode methodNode : node.methods)
+                if (ASMHelper.anyMatch(methodNode.access, ACC_NATIVE)) {
+                    methodNode.maxLocals = methodNode.maxStack = 1 + (Type.getArgumentsAndReturnSizes(methodNode.desc) >> 2);
+                    methodNode.access &= ~ACC_NATIVE;
+                    final String
+                            mappedDesc = asmRemapper.mapMethodDesc(methodNode.desc),
+                            desc = Type.getMethodDescriptor(Type.getReturnType(mappedDesc), ArrayHelper.insert(Type.getArgumentTypes(mappedDesc), WhiteBox));
+                    final MethodGenerator generator = MethodGenerator.fromMethodNode(methodNode);
+                    generator.push(new ConstantDynamic("INSTANCE", ASMHelper.classDesc(Names.WhiteBox), getWhiteBox));
+                    generator.loadArgs();
+                    switch (methodNode.name) {
+                        case "parseCommandLine0" -> {
+                            generator.invokeStatic(Type.getType(Bridge.class), new Method("map", ASMHelper.TYPE_OBJECT, new Type[]{ DiagnosticCommandShadowArray }));
+                            generator.checkCast(DiagnosticCommandArray);
+                        }
+                    }
+                    generator.invokeDynamic(methodNode.name, desc, makeSiteByNameWithBoot, INVOKESPECIAL, Names.WhiteBox, "");
+                    generator.returnValue();
+                    generator.endMethod();
+                }
+        }
+        
         @SneakyThrows
         private static Object getWhiteBox(final MethodHandles.Lookup lookup, final String name, final Class<?> type) = MethodHandleHelper.lookup().findStatic(type, Names.getWhiteBox, MethodType.methodType(type)).invoke();
         
     }
     
     @SneakyThrows
+    @NoArgsConstructor(on = @Patch.Exception)
     @Patch(target = Names.WhiteBox, remap = @Remap(mapping = {
             Names.WhiteBox_Shadow, Names.WhiteBox
     }))
     private static abstract class Patcher {
-        
-        @Patch.Exception
-        private Patcher() { }
         
         private static native void registerNatives();
         
@@ -122,7 +163,7 @@ public enum WhiteBox {
         public static native void openJVMFlag();
         
         public static void ready() = MahoBridge.bridgeClassLoader().loadClass(Names.WhiteBox_Shadow).getDeclaredMethod("ready").invoke(null);
-    
+        
         @Patch.Spare
         @SuppressWarnings("DataFlowIssue")
         public static Patcher getWhiteBox() = (Patcher) (Object) instance;
@@ -141,7 +182,7 @@ public enum WhiteBox {
     public static synchronized void ready() {
         try {
             Maho.debug("WhiteBox: Ready!");
-            JITCompiler.instance().ready();
+            JIT.instance().ready();
         } catch (final NoClassDefFoundError e) {
             try {
                 MahoBridge.bridgeClassLoader().loadClass("amadeus.maho.util.runtime.DebugHelper").getDeclaredMethod("breakpoint").invoke(null);
@@ -267,9 +308,9 @@ public enum WhiteBox {
     
     public native int[] g1MemoryNodeIds();
     
-    public native Object[] parseCommandLine0(String commandline, char delim, DiagnosticCommand args[]);
+    public native Object[] parseCommandLine0(String commandline, char delim, DiagnosticCommand... args);
     
-    public Object[] parseCommandLine(final String commandline, final char delim, final DiagnosticCommand args[]) = parseCommandLine0(commandline, delim, requireNonNull(args));
+    public Object[] parseCommandLine(final String commandline, final char delim, final DiagnosticCommand... args) = parseCommandLine0(commandline, delim, args);
     
     // Parallel GC
     public native long psVirtualSpaceAlignment();
@@ -363,6 +404,7 @@ public enum WhiteBox {
     
     // If usage of the DisableIntrinsic flag is not expected (or the usage can be ignored),
     // use the below method that does not require the compilation context as argument.
+    @SuppressWarnings("DataFlowIssue")
     public boolean isIntrinsicAvailable(final Executable method, final int compLevel) = isIntrinsicAvailable(method, null, compLevel);
     
     public native boolean isIntrinsicAvailable0(Executable method, Executable compilationContext, int compLevel);
@@ -467,9 +509,9 @@ public enum WhiteBox {
     public native long incMetaspaceCapacityUntilGC(long increment);
     
     public native long metaspaceCapacityUntilGC();
-
+    
     public native long metaspaceSharedRegionAlignment();
-
+    
     public native boolean metaspaceShouldConcurrentCollect();
     
     public native long metaspaceReserveAlignment();
@@ -541,7 +583,7 @@ public enum WhiteBox {
     
     // All collectors supporting concurrent GC breakpoints are expected
     // to provide at least the following breakpoints.
-    public final String AFTER_MARKING_STARTED = "AFTER MARKING STARTED";
+    public final String AFTER_MARKING_STARTED    = "AFTER MARKING STARTED";
     public final String BEFORE_MARKING_COMPLETED = "BEFORE MARKING COMPLETED";
     
     // Collectors supporting concurrent GC breakpoints that do reference
@@ -709,11 +751,11 @@ public enum WhiteBox {
     public native boolean isSharedClass(Class<?> c);
     
     public native boolean areSharedStringsIgnored();
-
+    
     public native boolean isSharedInternedString(String s);
-
+    
     public native boolean isCDSIncluded();
-
+    
     public native boolean isJFRIncluded();
     
     public native boolean isDTraceIncluded();
@@ -735,7 +777,7 @@ public enum WhiteBox {
     public native int handshakeWalkStack(Thread t, boolean all_threads);
     
     public native void asyncHandshakeWalkStack(Thread t);
-
+    
     public native void lockAndBlock(boolean suspender);
     
     // Returns true on linux if library has the noexecstack flag set.
@@ -767,7 +809,7 @@ public enum WhiteBox {
     
     // libc name
     public native String getLibcName();
-
+    
     // Walk stack frames of current thread
     public native void verifyFrames(boolean log, boolean updateRegisterMap);
     
