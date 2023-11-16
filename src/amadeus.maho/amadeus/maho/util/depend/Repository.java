@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -64,7 +65,7 @@ public interface Repository {
     class Combined implements Repository {
         
         @NoArgsConstructor
-        static class Failed extends IOException { }
+        public static class Failed extends IOException { }
         
         Collection<Repository> repositories;
         
@@ -104,7 +105,9 @@ public interface Repository {
         @Override
         public void dropResolveCache() = repositories().forEach(Repository::dropResolveCache);
         
-        protected Failed failed(final Project.Dependency dependency, final Collection<Throwable> throwables) {
+        protected Throwable failed(final Project.Dependency dependency, final Collection<Throwable> throwables) {
+            if (throwables.stream().map(AsyncHelper::resolveExecutionException).allMatch(RepositoryFileNotFoundException.class::isInstance))
+                return new RepositoryFileNotFoundException(dependency.toString(), this);
             final Failed failed = { "Resolving failed: %s".formatted(dependency) };
             throwables.forEach(failed::addSuppressed);
             return failed;
@@ -128,10 +131,11 @@ public interface Repository {
                     final Tuple2<Project.Dependency, Collection<Project.Dependency>> resolved = resolveDependency(dependency);
                     dependencies += resolved.v1;
                     return resolved.v2.stream().filter(subDependency -> !drc.exclude().test(subDependency.project())).toList();
-                } catch (final IOException e) {
-                    if (drc.allowMissing().test(dependency.project()))
-                        return List.<Project.Dependency>of();
-                    throw e;
+                } catch (final Throwable throwable) {
+                    if (resolveExecutionException(throwable) instanceof RepositoryFileNotFoundException)
+                        if (drc.allowMissing().test(dependency.project()))
+                            return List.<Project.Dependency>of();
+                    throw throwable;
                 }
             })
             .thenAcceptAsync(subDependencies -> subDependencies.stream()

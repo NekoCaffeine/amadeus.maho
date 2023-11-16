@@ -43,7 +43,6 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
-import amadeus.maho.util.dynamic.InvokeContext;
 import amadeus.maho.util.runtime.ArrayHelper;
 
 import static amadeus.maho.core.extension.DynamicLookup.*;
@@ -131,9 +130,6 @@ public class PrivilegeHandler extends JavacContext {
     
     @Getter
     private static final AtomicInteger counter = { };
-    
-    @Getter
-    private static final InvokeContext invokeContext = { counter() };
     
     Name
             Privilege          = name("amadeus.maho.lang.Privilege"),

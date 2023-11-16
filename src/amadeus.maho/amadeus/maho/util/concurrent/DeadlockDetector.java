@@ -47,7 +47,7 @@ public interface DeadlockDetector {
     
     WatcherThread watcherThread = { };
     
-    InvokeContext watcher = { watcherThread.counter()::getAndIncrement, watcherThread.counter()::getAndDecrement };
+    InvokeContext watcher = { watcherThread.counter() };
     
     static List<ThreadInfo> detect(final int maxDepth = Integer.MAX_VALUE) {
         final @Nullable long threadIds[] = bean.isThreadContentionMonitoringSupported() ? bean.findDeadlockedThreads() : bean.findMonitorDeadlockedThreads();

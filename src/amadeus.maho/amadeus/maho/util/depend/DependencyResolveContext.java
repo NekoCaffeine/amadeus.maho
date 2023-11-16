@@ -9,6 +9,8 @@ import amadeus.maho.lang.ToString;
 @EqualsAndHashCode
 public record DependencyResolveContext(Predicate<Project> exclude = _ -> false, Predicate<Project> allowMissing = _ -> false) {
     
-    public static final DependencyResolveContext DEFAULT = { };
+    public static final DependencyResolveContext
+            DEFAULT       = { },
+            ALLOW_MISSING = { _ -> false, _ -> true };
     
 }

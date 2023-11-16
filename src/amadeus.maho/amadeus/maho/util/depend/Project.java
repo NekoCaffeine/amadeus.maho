@@ -47,6 +47,8 @@ public record Project(String group, String artifact, String version, String... c
     
     public Project concatClassifier(final String... classifiers) = { group(), artifact(), version(), ArrayHelper.addAll(classifiers(), classifiers) };
     
+    public boolean snapshot() = version().endsWith("-SNAPSHOT");
+    
     public static Project of(final String project) {
         final String info[] = project.split(":");
         if (info.length < 2)

@@ -10,6 +10,7 @@ import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 
 import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
@@ -27,7 +28,8 @@ public abstract class RedirectMethodHandler<A extends Annotation> extends BaseHa
     @Handler(value = ToString.class, priority = PRIORITY)
     public static class ToStringHandler extends RedirectMethodHandler<ToString> {
         
-        protected static final Method from = LookupHelper.method1(Object::toString), to = LookupHelper.method1(ToStringHelper::toString);
+        @SneakyThrows
+        protected static final Method from = LookupHelper.method1(Object::toString), to = ToStringHelper.class.getDeclaredMethod("toString", Object.class);
         
         @Override
         protected Method from() = from;

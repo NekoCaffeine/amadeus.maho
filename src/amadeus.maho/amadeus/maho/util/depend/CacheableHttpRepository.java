@@ -1,6 +1,5 @@
 package amadeus.maho.util.depend;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -12,6 +11,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
@@ -25,6 +27,7 @@ import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.link.http.HttpSetting;
 import amadeus.maho.util.throwable.RetryException;
 
+import static amadeus.maho.util.concurrent.AsyncHelper.resolveExecutionException;
 import static amadeus.maho.util.link.http.HttpHelper.StatesCode.*;
 import static amadeus.maho.util.logging.LogLevel.*;
 
@@ -66,7 +69,17 @@ public abstract class CacheableHttpRepository implements Repository {
         return downloadDataFormRemote(relative, cache);
     }
 
-    public @Nullable Path tryCache(final Path relative, final Path cache = cacheDir() / relative) { try { return cache(relative, cache); } catch (final IOException e) { return null; } }
+    @SneakyThrows
+    public @Nullable Path tryCache(final Supplier<Path> relative, final UnaryOperator<Path> cache = cacheDir()::resolve) {
+        try {
+            final Path path = relative.get();
+            return cache(path, cache.apply(path));
+        } catch (final Throwable throwable) {
+            if (resolveExecutionException(throwable) instanceof RepositoryFileNotFoundException)
+                return null;
+            throw throwable;
+        }
+    }
 
     public HttpRequest.Builder request(final Path relative) = HttpRequest.newBuilder().GET().let(builder -> setting().headers().forEach(builder::header))
             .uri(URI.create(rootUrl() + relative.toString().replace(relative.getFileSystem().getSeparator(), "/")));
@@ -82,23 +95,23 @@ public abstract class CacheableHttpRepository implements Repository {
                 ~-cache;
                 return Interrupt.getUninterruptible(() -> client().sendMayThrow(request, info -> switch (info.statusCode()) {
                     case OK        -> HttpResponse.BodyHandlers.ofFile(cache--).apply(info);
-                    case NOT_FOUND -> throw new FileNotFoundException(request.uri().toString());
+                    case NOT_FOUND -> throw new RepositoryFileNotFoundException(request.uri().toString(), this);
                     default        -> throw new IOException("Response status code: %d (%s)".formatted(info.statusCode(), request.uri()));
                 }).body()).let(it -> onDownloadCompleted(relative, it, completenessMetadata));
             } catch (final IOException e) {
-                if (e instanceof FileNotFoundException notFoundEx)
+                if (e instanceof RepositoryFileNotFoundException notFoundEx)
                     throw notFoundEx;
                 else
                     throwables += e;
             }
         } while (--retries > 0);
-        throw new FileNotFoundException().let(it -> it.addSuppressed(new RetryException(throwables)));
+        throw new RepositoryFileNotFoundException(request.uri().toString(), this).let(it -> it.addSuppressed(new RetryException(throwables)));
     }
 
     @SneakyThrows
     public boolean exists(final Path relative) throws IOException {
         int retries = maxRetries();
-        final HttpRequest request = request(relative).timeout(Duration.ofSeconds(5)).build();
+        final HttpRequest request = request(relative).HEAD().timeout(Duration.ofSeconds(5)).build();
         final ArrayList<Throwable> throwables = { };
         do {
             try {

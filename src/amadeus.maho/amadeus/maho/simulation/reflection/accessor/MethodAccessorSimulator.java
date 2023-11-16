@@ -31,7 +31,7 @@ public class MethodAccessorSimulator implements MethodAccessor {
     
     @Override
     @SneakyThrows
-    public @Nullable Object invoke(final @Nullable Object reference, final Object[] objects) throws IllegalArgumentException {
+    public @Nullable Object invoke(final @Nullable Object reference, final Object[] objects, final @Nullable Class<?> caller = null) throws IllegalArgumentException {
         if (reference == null)
             throw new IllegalArgumentException(new NullPointerException("reference == null"));
         return bindTo(handle, reference).invokeWithArguments(objects);

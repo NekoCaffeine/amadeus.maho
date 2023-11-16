@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
 
+import jdk.internal.reflect.FieldAccessorImpl;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.reflect.UnsafeFieldAccessorImpl;
 
@@ -33,7 +34,7 @@ public class ReflectBreaker {
                 = Hook.Result.falseToVoid(accessFlag() || breakModules.contains(caller.getModule()));
         
         @Hook(forceReturn = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
-        private static void throwFinalFieldIllegalAccessException(final UnsafeFieldAccessorImpl $this, final String attemptedType, final String attemptedValue) { }
+        private static void throwFinalFieldIllegalAccessException(final FieldAccessorImpl $this, final String attemptedType, final String attemptedValue) { }
         
     }
     

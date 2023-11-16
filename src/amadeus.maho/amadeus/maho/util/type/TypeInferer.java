@@ -27,12 +27,12 @@ public interface TypeInferer {
     @SneakyThrows
     private static Map<TypeVariable<?>, Type> computeType(final Type context, final boolean root = true, final Map<TypeVariable<?>, Type> typeVariableMap = new HashMap<>()) {
         if ((Type) switch (context) {
-            case ParameterizedType parameterizedType && parameterizedType.getRawType() instanceof Class<?> clazz -> {
+            case ParameterizedType parameterizedType when parameterizedType.getRawType() instanceof Class<?> clazz -> {
                 computeParameterizedType(parameterizedType, typeVariableMap);
                 yield clazz;
             }
-            case Class<?> clazz && clazz != Object.class                                                         -> clazz;
-            default                                                                                              -> null;
+            case Class<?> clazz when clazz != Object.class                                                         -> clazz;
+            default                                                                                                -> null;
         } instanceof Class<?> raw) {
             if (root) {
                 final @Nullable Type superclass = raw.getGenericSuperclass(); // interface => null

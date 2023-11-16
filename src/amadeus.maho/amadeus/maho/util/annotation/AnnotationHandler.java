@@ -236,7 +236,7 @@ public class AnnotationHandler<T> {
                         lazy(() -> ArrayHelper.toPrimitive(list.stream()
                                 .map(element -> getter(element, method).get())
                                 .toArray(lookupArrayMapper(method))));
-                case String[] args && args.length == 2 && Enum.class.isAssignableFrom(method.getReturnType()) -> lazy(() -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]));
+                case String[] args when args.length == 2 && Enum.class.isAssignableFrom(method.getReturnType()) -> lazy(() -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]));
                 case null, default                                                                            -> () -> value;
             };
     

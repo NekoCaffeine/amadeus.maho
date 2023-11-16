@@ -1,6 +1,5 @@
 package amadeus.maho.util.depend.maven;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +10,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
@@ -32,10 +33,12 @@ import amadeus.maho.util.build.Module;
 import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.data.XML;
 import amadeus.maho.util.depend.CacheableHttpRepository;
+import amadeus.maho.util.depend.RepositoryFileNotFoundException;
 import amadeus.maho.util.depend.JarRequirements;
 import amadeus.maho.util.depend.Project;
 import amadeus.maho.util.depend.Repository;
 import amadeus.maho.util.link.http.HttpSetting;
+import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.tuple.Tuple;
@@ -284,6 +287,9 @@ public class MavenRepository extends CacheableHttpRepository {
     
     private static final String POM = "pom", JAR = "jar", MD5 = "md5", MD5_SUFFIX = "." + MD5, SOURCES = "sources", JAVADOC = "javadoc";
     
+    @Getter
+    boolean hasReleases, hasSnapshots;
+    
     ConcurrentHashMap<Project.Dependency, CompletableFuture<Tuple2<Project.Dependency, Collection<Project.Dependency>>>> resolveCache = { };
     
     ConcurrentHashMap<Project, Collection<SnapshotVersion>> snapshotVersionsCache = { };
@@ -298,6 +304,8 @@ public class MavenRepository extends CacheableHttpRepository {
     @SneakyThrows
     public String projectVersion(final Project project, final String extension) {
         if (project.version().endsWith("-SNAPSHOT")) {
+            if (!hasSnapshots())
+                throw new RepositoryFileNotFoundException(project + "." + extension, this);
             final Path relative = Path.of("%s/%s/%s/maven-metadata.xml".formatted(project.group().replace('.', '/'), project.artifact(), project.version()));
             final String classifier = String.join("-", project.classifiers());
             return snapshotVersionsCache.computeIfAbsent(project.dropClassifier(), _ -> {
@@ -306,7 +314,7 @@ public class MavenRepository extends CacheableHttpRepository {
                             final SnapshotVersion.Visitor visitor = { };
                             XML.read(path, visitor, relative | "/");
                             return visitor.result();
-                        } catch (final FileNotFoundException e) { return List.of(); }
+                        } catch (final RepositoryFileNotFoundException e) { return List.of(); }
                     })
                     .stream()
                     .filter(version -> classifier.equals(version.classifier()) && extension.equals(version.extension))
@@ -314,6 +322,8 @@ public class MavenRepository extends CacheableHttpRepository {
                     .map(SnapshotVersion::value)
                     .orElseGet(project::version);
         }
+        if (!hasReleases())
+            throw new RepositoryFileNotFoundException(project + "." + extension, this);
         return project.version();
     }
     
@@ -372,14 +382,14 @@ public class MavenRepository extends CacheableHttpRepository {
     @SneakyThrows
     public Tuple2<Project.Dependency, Collection<Project.Dependency>> resolveDependency(final Project.Dependency dependency) throws IOException = await(resolveCache.computeIfAbsent(dependency, it -> async(() -> {
         final Project project = resolveWildcards(dependency.project());
-        final Path pom = relative(project, POM);
         try {
+            final Path pom = relative(project, POM);
             return Tuple.tuple(new Project.Dependency(project, dependency.compile(), dependency.runtime(), this), new PomDependenciesVisitor().let(visitor -> XML.read(cache(pom), visitor, pom | "/")).result());
-        } catch (final FileNotFoundException notFoundEx) {
+        } catch (final RepositoryFileNotFoundException notFoundEx) {
             final Path jar = relative(project, JAR);
             if (exists(jar))
                 return Tuple.tuple(dependency, Set.of());
-            throw new FileNotFoundException(jar.toString());
+            throw new RepositoryFileNotFoundException(jar.toString(), this);
         }
     })));
     
@@ -394,8 +404,8 @@ public class MavenRepository extends CacheableHttpRepository {
         final Project project = resolveWildcards(dependency.project());
         final CompletableFuture<Path>
                 classesTask = requirements.classes() ? async(() -> cache(relative(project, JAR))) : completed(),
-                sourcesTask = requirements.sources() ? async(() -> tryCache(relative(project.concatClassifier(SOURCES), JAR))) : completed(),
-                javadocTask = requirements.javadoc() ? async(() -> tryCache(relative(project.concatClassifier(JAVADOC), JAR))) : completed();
+                sourcesTask = requirements.sources() ? async(() -> tryCache(() -> relative(project.concatClassifier(SOURCES), JAR))) : completed(),
+                javadocTask = requirements.javadoc() ? async(() -> tryCache(() -> relative(project.concatClassifier(JAVADOC), JAR))) : completed();
         return { await(classesTask), await(sourcesTask), await(javadocTask), dependency.compile(), dependency.runtime() };
     }
     
@@ -410,10 +420,18 @@ public class MavenRepository extends CacheableHttpRepository {
     @Getter
     private static final List<Function<HttpSetting, MavenRepository>> defaultRepositories = new CopyOnWriteArrayList<>(List.of(MavenRepository::releases, MavenRepository::snapshots));
     
+    @Getter
+    private static final Map<String, Function<HttpSetting, MavenRepository>> mirrors = new ConcurrentHashMap<>(Map.of("tencent", MavenRepository::tencent));
+    
+    static { defaultRepositories().addAll(0, Stream.of(Environment.local().lookup("MAHO_MAVEN_MIRRORS", "").split(";")).map(mirror -> mirror.toLowerCase(Locale.ENGLISH)).map(mirrors()::get).nonnull().toList()); }
+    
     public static MavenRepository snapshots(final HttpSetting setting = HttpSetting.defaultInstance(), final Path cacheDir = Repository.defaultCachePath() / "snapshots")
-            = { cacheDir, "https://oss.sonatype.org/content/repositories/snapshots/", setting };
+            = { cacheDir, "https://oss.sonatype.org/content/repositories/snapshots/", setting, false, true };
     
     public static MavenRepository releases(final HttpSetting setting = HttpSetting.defaultInstance(), final Path cacheDir = Repository.defaultCachePath() / "releases")
-            = { cacheDir, "https://repo1.maven.org/maven2/", setting };
+            = { cacheDir, "https://repo1.maven.org/maven2/", setting, true, false };
+    
+    public static MavenRepository tencent(final HttpSetting setting = HttpSetting.defaultInstance(), final Path cacheDir = Repository.defaultCachePath() / "tencent")
+            = { cacheDir, "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/", setting, true, true };
     
 }

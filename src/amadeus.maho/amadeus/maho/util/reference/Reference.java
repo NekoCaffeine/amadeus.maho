@@ -1,5 +1,6 @@
 package amadeus.maho.util.reference;
 
+import java.lang.foreign.Arena;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -8,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
+
+import jdk.internal.foreign.MemorySessionImpl;
 
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
@@ -64,6 +67,8 @@ public interface Reference {
         
         @Getter
         java.lang.ref.Cleaner instance = java.lang.ref.Cleaner.create();
+        
+        static Arena arena() = MemorySessionImpl.createImplicit(instance()).asArena();
         
         static <T> T cleaning(final T target, final Runnable action) = target.let(it -> instance().register(it, action));
         

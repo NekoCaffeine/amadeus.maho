@@ -243,7 +243,7 @@ public interface JNI extends Library {
     }
     
     @HiddenDanger(HiddenDanger.GC)
-    default <T> @Nullable T resolvePointer(final @Nullable Pointer pointer) = pointer == null ? null : UnsafeHelper.fromAddress(pointer.getLong(0L));
+    default <T> @Nullable T resolvePointer(final @Nullable Pointer pointer) = pointer == null ? null : UnsafeHelper.fromAddress(Pointer.nativeValue(pointer));
     
     @HiddenDanger(HiddenDanger.GC)
     default <T> @Nullable T resolveReference(final PointerByReference reference) = resolvePointer(reference.getValue());

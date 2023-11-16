@@ -2,9 +2,7 @@ package amadeus.maho.util.serialization;
 
 import java.io.EOFException;
 import java.io.IOException;
-
-import jdk.incubator.foreign.MemorySegment;
-import jdk.incubator.foreign.ResourceScope;
+import java.lang.foreign.MemorySegment;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
@@ -13,10 +11,8 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.reference.Reference;
 
 @Getter
-@FieldDefaults(level = AccessLevel.PRIVATE,makeFinal = true)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class BinaryData implements BinaryMapper {
-    
-    @Nullable ResourceScope scope;
     
     @Nullable MemorySegment segment;
     
@@ -25,11 +21,10 @@ public class BinaryData implements BinaryMapper {
     public BinaryData(final long size, final int bufferSize = 1 << 14) {
         assert size > -1;
         if (size < 1) {
-            scope = null;
             segment = null;
             this.bufferSize = 0;
         } else {
-            segment = MemorySegment.allocateNative(size, scope = ResourceScope.newSharedScope(Reference.Cleaner.instance()));
+            segment = Reference.Cleaner.arena().allocate(size);
             this.bufferSize = size < bufferSize ? (int) size : bufferSize;
         }
     }

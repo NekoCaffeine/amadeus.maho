@@ -55,7 +55,7 @@ public interface StreamHelper {
     
     static <T> @Nullable T TILDE(final Stream<T> $this) = $this.findFirst().orElse(null);
     
-    static <T> @Nullable T NOT(final Stream<T> $this) = $this.findFirst().orElseThrow();
+    static <T> T NOT(final Stream<T> $this) = $this.findFirst().orElseThrow();
     
     static String collectCodepoints(final IntStream $this) = $this.collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
     

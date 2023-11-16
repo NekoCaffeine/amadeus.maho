@@ -23,7 +23,7 @@ public class InterfaceHandler {
     }
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
-    private static void classOrInterfaceOrRecordBodyDeclaration(final List<JCTree> capture, final JavacParser $this, final Name className, final boolean isInterface, final boolean isRecord) {
+    private static void classOrInterfaceOrRecordBodyDeclaration(final List<JCTree> capture, final JavacParser $this, final JCTree.JCModifiers mods, final Name className, final boolean isInterface, final boolean isRecord) {
         if (isInterface)
             capture.stream().cast(JCTree.JCBlock.class).forEach(block -> block.flags |= STATIC);
     }

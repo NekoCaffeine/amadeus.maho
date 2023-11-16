@@ -8,6 +8,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Lint;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -17,7 +18,9 @@ import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.Flow;
+import com.sun.tools.javac.comp.TypeEnter;
 import com.sun.tools.javac.parser.JavacParser;
+import com.sun.tools.javac.parser.Tokens;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeCopier;
 import com.sun.tools.javac.tree.TreeInfo;
@@ -31,6 +34,8 @@ import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
 import amadeus.maho.lang.javac.handler.base.Syntax;
 import amadeus.maho.transform.mark.Hook;
@@ -119,8 +124,45 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
         }
     }
     
-    @Proxy(PUTFIELD)
-    private static native void lint(AttrContext $this, Lint value);
+    public static void eraseInitialization(final JCTree.JCVariableDecl decl) {
+        decl.init = null;
+        final @Nullable Symbol.VarSymbol sym = decl.sym;
+        if (sym != null) {
+            sym.setData(null);
+            sym.flags_field &= ~HASINIT;
+        }
+    }
+    
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    private static JCTree.JCMethodDecl finalAdjustment(final JCTree.JCMethodDecl capture, final TypeEnter.RecordConstructorHelper $this, final JCTree.JCMethodDecl constructor) {
+        final List<JCTree.JCVariableDecl> recordFieldDecls = (Privilege) $this.recordFieldDecls;
+        capture.params.forEach(parameter -> {
+            final @Nullable JCTree.JCVariableDecl component = ~recordFieldDecls.stream().filter(decl -> decl.name == parameter.name);
+            if (component != null && component.init != null && parameter.init == null) {
+                parameter.init = component.init;
+                eraseInitialization(component);
+            }
+        });
+        return capture;
+    }
+    
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    private static JCTree.JCClassDecl recordDeclaration(final JCTree.JCClassDecl capture, final JavacParser $this, final JCTree.JCModifiers modifiers, final Tokens.Comment comment) {
+        final Map<Name, JCTree.JCVariableDecl> mapping = capture.defs.stream()
+                .cast(JCTree.JCVariableDecl.class)
+                .collect(Collectors.toMap(decl -> decl.name, Function.identity()));
+        capture.defs.stream()
+                .cast(JCTree.JCMethodDecl.class)
+                .filter(decl -> anyMatch(decl.mods.flags, Flags.COMPACT_RECORD_CONSTRUCTOR))
+                .forEach(decl -> decl.params.forEach(parameter -> {
+                    final @Nullable JCTree.JCVariableDecl component = mapping[parameter.name];
+                    if (component != null && component.init != null && parameter.init == null) {
+                        parameter.init = component.init;
+                        eraseInitialization(component);
+                    }
+                }));
+        return capture;
+    }
     
     private static final long removeFlags = ~(ABSTRACT | NATIVE | SYNCHRONIZED | RECORD | COMPACT_RECORD_CONSTRUCTOR);
     
@@ -128,13 +170,6 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
     public void process(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final boolean advance) {
         if (!advance) {
             if (tree instanceof JCTree.JCMethodDecl methodDecl && owner instanceof JCTree.JCClassDecl) { // Expand methods with default parameters.
-                final boolean isRecord = anyMatch(methodDecl.mods.flags, COMPACT_RECORD_CONSTRUCTOR);
-                if (isRecord)
-                    TreeInfo.recordFields((JCTree.JCClassDecl) owner).stream()
-                            .filter(field -> field.init != null)
-                            .forEach(field -> methodDecl.params.stream()
-                                    .filter(param -> param.name.equals(field.name))
-                                    .forEach(param -> param.init = field.init));
                 final LinkedList<JCTree.JCVariableDecl> defaultValues = { };
                 methodDecl.params.stream()
                         .filter(decl -> decl.init != null)
@@ -153,7 +188,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                         try {
                             final List<JCTree.JCVariableDecl> params = methodDecl.params;
                             final Env<AttrContext> methodEnv = methodEnv(memberEnter, methodDecl, env);
-                            lint(methodEnv.info, lint);
+                            (Privilege) (methodEnv.info.lint = lint);
                             final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping = params.stream()
                                     .filter(decl -> decl.init != null)
                                     .peek(decl -> decl.type = attr.attribType(decl.vartype, methodEnv))
@@ -165,7 +200,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                                                 AssignHandler.lower(decl, newArray, decl.type);
                                     })
                                     .collect(Collectors.toMap(Function.identity(), decl -> decl.init));
-                            methodDecl.params.forEach(param -> param.init = null); // Processing is complete, remove the parameters with assignment statements in the method.
+                            params.forEach(DefaultValueHandler::eraseInitialization);
                             final boolean def = noneMatch(methodDecl.mods.flags, PRIVATE | STATIC) && anyMatch(modifiers(owner).flags, INTERFACE);
                             if (def)
                                 modifiers(owner).flags |= DEFAULT;
@@ -178,12 +213,6 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                             maker.pos = pos;
                             maker.toplevel = toplevel;
                         }
-                        if (isRecord)
-                            TreeInfo.recordFields((JCTree.JCClassDecl) owner).stream()
-                                    .peek(field -> field.mods.flags |= UNINITIALIZED_FIELD)
-                                    .peek(field -> field.sym.flags_field |= UNINITIALIZED_FIELD)
-                                    .peek(field -> field.sym.setData(null))
-                                    .forEach(field -> field.init = null);
                     }
                 }
             }

@@ -37,7 +37,7 @@ public interface IDEA {
                 RELEASES            = INTELLIJ_REPOSITORY + "releases/";
         
         static Repository.Combined repository(final Path cacheDir = Repository.defaultCachePath() / "intellij", final HttpSetting setting = HttpSetting.defaultInstance())
-                = { Stream.of(SNAPSHOTS, RELEASES).map(url -> new MavenRepository(cacheDir, url, setting)).toArray(Repository[]::new) };
+                = { new Repository[] { new MavenRepository(cacheDir, SNAPSHOTS, setting, true, true), new MavenRepository(cacheDir, RELEASES, setting, true, false) } };
         
         @SneakyThrows
         static LinkedHashSet<Module.Dependency> attachLocalInstance(final Path instanceHome, final Set<String> plugins = Set.of(), final Predicate<Path> shouldInCompile = path -> true,

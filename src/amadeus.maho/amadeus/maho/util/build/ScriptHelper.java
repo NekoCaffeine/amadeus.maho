@@ -1,9 +1,15 @@
 package amadeus.maho.util.build;
 
+import java.lang.ref.Reference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.stream.Stream;
+
+import com.sun.jna.Memory;
+import com.sun.jna.Pointer;
+import com.sun.jna.platform.win32.User32;
+import com.sun.jna.platform.win32.WinDef;
 
 import amadeus.maho.core.MahoExport;
 import amadeus.maho.core.MahoImage;
@@ -11,6 +17,7 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.misc.Environment;
 
 import static com.sun.jna.Platform.*;
+import static com.sun.jna.platform.win32.WinUser.*;
 
 public interface ScriptHelper {
     
@@ -70,5 +77,16 @@ public interface ScriptHelper {
         System.err.println("FATAL: " + msg);
         System.exit(-1);
     }
+    
+    static void refreshEnv() = switch (getOSType()) {
+        case WINDOWS -> {
+            final String environment = "Environment";
+            final Pointer pointer = new Memory(environment.length() + 1);
+            pointer.setString(0, environment);
+            User32.INSTANCE.SendMessageTimeout(HWND_BROADCAST, 0x001A, new WinDef.WPARAM(0), new WinDef.LPARAM(Pointer.nativeValue(pointer)), SMTO_ABORTIFHUNG, 500, null);
+            Reference.reachabilityFence(pointer);
+        }
+        default      -> { }
+    };
     
 }

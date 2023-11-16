@@ -179,7 +179,7 @@ public class AssignHandler {
                     final JCTree.JCSwitch jcSwitch = (Privilege) new JCTree.JCSwitch(switchExpression.selector, switchExpression.cases);
                     jcSwitch.pos = switchExpression.pos;
                     jcSwitch.endpos = switchExpression.endpos;
-                    jcSwitch.hasTotalPattern = switchExpression.hasTotalPattern;
+                    jcSwitch.hasUnconditionalPattern = switchExpression.hasUnconditionalPattern;
                     jcSwitch.patternSwitch = switchExpression.patternSwitch;
                     jcSwitch.cases.forEach(it -> {
                         if (it.body instanceof JCTree.JCExpression expr) {

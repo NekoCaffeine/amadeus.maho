@@ -110,10 +110,10 @@ public class BranchHandler extends BaseSyntaxHandler {
     
     public static class TopMarkType extends Type implements NullType {
         
-        public TopMarkType() = super(null, TypeMetadata.EMPTY);
+        public TopMarkType() = super(null, List.nil());
         
-        @Override
-        public BottomType cloneWithMetadata(final TypeMetadata md) { throw new AssertionError("Cannot add metadata to a bottom type"); }
+        // @Override
+        // public BottomType cloneWithMetadata(final List<TypeMetadata> md) { throw new AssertionError("Cannot add metadata to a bottom type"); }
         
         @Override
         public TypeTag getTag() = BOT;
@@ -122,8 +122,8 @@ public class BranchHandler extends BaseSyntaxHandler {
         @DefinedBy(DefinedBy.Api.LANGUAGE_MODEL)
         public TypeKind getKind() = TypeKind.NULL;
         
-        @Override
-        public boolean isCompound() = false;
+        // @Override
+        // public boolean isCompound() = false;
         
         @Override
         @DefinedBy(DefinedBy.Api.LANGUAGE_MODEL)

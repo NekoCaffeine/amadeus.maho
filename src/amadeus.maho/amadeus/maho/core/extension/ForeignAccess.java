@@ -6,7 +6,7 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 @TransformProvider
 public class ForeignAccess {
     
-    @Hook(forceReturn = true)
-    private static boolean implIsEnableNativeAccess(final Module $this) = true;
+    @Hook(value = Module.EnableNativeAccess.class, isStatic = true, forceReturn = true)
+    private static boolean isNativeAccessEnabled(final Module $this) = true;
     
 }

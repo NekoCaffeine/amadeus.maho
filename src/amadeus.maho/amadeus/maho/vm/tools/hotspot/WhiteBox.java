@@ -6,9 +6,9 @@ import java.lang.invoke.MethodType;
 import java.lang.management.MemoryUsage;
 import java.lang.reflect.Array;
 import java.lang.reflect.Executable;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -25,6 +25,7 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Erase;
 import amadeus.maho.transform.mark.Init;
@@ -103,9 +104,9 @@ public enum WhiteBox {
         RemapHandler.ASMRemapper asmRemapper = remapHandler.remapper();
         
         Type
-                WhiteBox = Type.getObjectType(ASMHelper.className(Names.WhiteBox)),
+                WhiteBox                     = Type.getObjectType(ASMHelper.className(Names.WhiteBox)),
                 DiagnosticCommandShadowArray = ASMHelper.arrayType(Type.getObjectType(ASMHelper.className(Names.DiagnosticCommand_Shadow))),
-                DiagnosticCommandArray = ASMHelper.arrayType(Type.getObjectType(ASMHelper.className(Names.DiagnosticCommand)));
+                DiagnosticCommandArray       = ASMHelper.arrayType(Type.getObjectType(ASMHelper.className(Names.DiagnosticCommand)));
         
         Handle getWhiteBox = {
                 H_INVOKESTATIC,
@@ -198,7 +199,7 @@ public enum WhiteBox {
     public native void printHeapSizes();
     
     // Memory
-    public native long getObjectAddress0(Object o);
+    private native long getObjectAddress0(Object o);
     
     public long getObjectAddress(final Object o) = getObjectAddress0(requireNonNull(o));
     
@@ -214,11 +215,11 @@ public enum WhiteBox {
     
     public native long getHeapAlignment();
     
-    public native boolean isObjectInOldGen0(Object o);
+    private native boolean isObjectInOldGen0(Object o);
     
     public boolean isObjectInOldGen(final Object o) = isObjectInOldGen0(requireNonNull(o));
     
-    public native long getObjectSize0(Object o);
+    private native long getObjectSize0(Object o);
     
     public long getObjectSize(final Object o) = getObjectSize0(requireNonNull(o));
     
@@ -228,71 +229,136 @@ public enum WhiteBox {
     
     private native int countAliveClasses0(String name);
     
-    public boolean isClassAlive(final String name) = isClassAlive0(name.replace('.', '/'));
-    
-    public native boolean isClassAlive0(String name);
+    public boolean isClassAlive(final String name) = countAliveClasses(name) != 0;
     
     public native int getSymbolRefcount(String name);
     
     public native boolean deflateIdleMonitors();
     
-    public native boolean isMonitorInflated0(Object obj);
+    private native boolean isMonitorInflated0(Object obj);
     
     public boolean isMonitorInflated(final Object obj) = isMonitorInflated0(requireNonNull(obj));
     
     public native void forceSafepoint();
     
-    public native long getConstantPool0(Class<?> aClass);
+    public native void forceClassLoaderStatsSafepoint();
+    
+    private native long getConstantPool0(Class<?> aClass);
     
     public long getConstantPool(final Class<?> aClass) = getConstantPool0(requireNonNull(aClass));
     
-    public native int getConstantPoolCacheIndexTag0();
+    private native int getConstantPoolCacheIndexTag0();
     
     public int getConstantPoolCacheIndexTag() = getConstantPoolCacheIndexTag0();
     
-    public native int getConstantPoolCacheLength0(Class<?> aClass);
+    private native int getConstantPoolCacheLength0(Class<?> aClass);
     
     public int getConstantPoolCacheLength(final Class<?> aClass) = getConstantPoolCacheLength0(requireNonNull(aClass));
     
-    public native int remapInstructionOperandFromCPCache0(final Class<?> aClass, int index);
+    private native Object[] getResolvedReferences0(Class<?> aClass);
+    
+    public Object[] getResolvedReferences(final Class<?> aClass) = getResolvedReferences0(requireNonNull(aClass));
+    
+    private native int remapInstructionOperandFromCPCache0(Class<?> aClass, int index);
     
     public int remapInstructionOperandFromCPCache(final Class<?> aClass, final int index) = remapInstructionOperandFromCPCache0(requireNonNull(aClass), index);
     
-    public native int encodeConstantPoolIndyIndex0(int index);
+    private native int encodeConstantPoolIndyIndex0(int index);
     
     public int encodeConstantPoolIndyIndex(final int index) = encodeConstantPoolIndyIndex0(index);
     
+    private native int getFieldEntriesLength0(Class<?> aClass);
+    
+    public int getFieldEntriesLength(final Class<?> aClass) = getFieldEntriesLength0(requireNonNull(aClass));
+    
+    private native int getFieldCPIndex0(Class<?> aClass, int index);
+    
+    public int getFieldCPIndex(final Class<?> aClass, final int index) = getFieldCPIndex0(requireNonNull(aClass), index);
+    
+    private native int getIndyInfoLength0(Class<?> aClass);
+    
+    public int getIndyInfoLength(final Class<?> aClass) = getIndyInfoLength0(requireNonNull(aClass));
+    
+    private native int getIndyCPIndex0(Class<?> aClass, int index);
+    
+    public int getIndyCPIndex(final Class<?> aClass, final int index) = getIndyCPIndex0(requireNonNull(aClass), index);
+    
+    private native String printClasses0(String classNamePattern, int flags);
+    
+    public String printClasses(final String classNamePattern, final int flags) = printClasses0(requireNonNull(classNamePattern), flags);
+    
+    private native String printMethods0(String classNamePattern, String methodPattern, int flags);
+    
+    public String printMethods(final String classNamePattern, final String methodPattern, final int flags) = printMethods0(requireNonNull(classNamePattern), requireNonNull(methodPattern), flags);
+    
     // JVMTI
-    public native void addToBootstrapClassLoaderSearch0(String segment);
+    private native void addToBootstrapClassLoaderSearch0(String segment);
     
     public void addToBootstrapClassLoaderSearch(final String segment) = addToBootstrapClassLoaderSearch0(requireNonNull(segment));
     
-    public native void addToSystemClassLoaderSearch0(String segment);
+    private native void addToSystemClassLoaderSearch0(String segment);
     
     public void addToSystemClassLoaderSearch(final String segment) = addToSystemClassLoaderSearch0(requireNonNull(segment));
     
     // G1
+    
     public native boolean g1InConcurrentMark();
+    
+    public native int g1CompletedConcurrentMarkCycles();
+    
+    // Perform a complete concurrent GC cycle, using concurrent GC breakpoints.
+    // Completes any in-progress cycle before performing the requested cycle.
+    // Returns true if the cycle completed successfully.  If the cycle was not
+    // successful (e.g. it was aborted), then throws RuntimeException if
+    // errorIfFail is true, returning false otherwise.
+    public boolean g1RunConcurrentGC(final boolean errorIfFail) {
+        try {
+            // Take control, waiting until any in-progress cycle completes.
+            concurrentGCAcquireControl();
+            final int count = g1CompletedConcurrentMarkCycles();
+            concurrentGCRunTo(AFTER_MARKING_STARTED, false);
+            concurrentGCRunToIdle();
+            if (count < g1CompletedConcurrentMarkCycles()) return true;
+            else if (errorIfFail) throw new RuntimeException("Concurrent GC aborted");
+            else return false;
+        } finally {
+            concurrentGCReleaseControl();
+        }
+    }
+    
+    public void g1RunConcurrentGC() = g1RunConcurrentGC(true);
+    
+    // Start a concurrent GC cycle, using concurrent GC breakpoints.
+    // The concurrent GC will continue in parallel with the caller.
+    // Completes any in-progress cycle before starting the requested cycle.
+    public void g1StartConcurrentGC() {
+        try {
+            // Take control, waiting until any in-progress cycle completes.
+            concurrentGCAcquireControl();
+            concurrentGCRunTo(AFTER_MARKING_STARTED, false);
+        } finally {
+            // Release control, permitting the cycle to complete.
+            concurrentGCReleaseControl();
+        }
+    }
     
     public native boolean g1HasRegionsToUncommit();
     
-    public native boolean g1IsHumongous0(Object o);
+    private native boolean g1IsHumongous0(Object o);
     
     public boolean g1IsHumongous(final Object o) = g1IsHumongous0(requireNonNull(o));
     
-    public native boolean g1BelongsToHumongousRegion0(long adr);
+    private native boolean g1BelongsToHumongousRegion0(long adr);
     
     public boolean g1BelongsToHumongousRegion(final long adr) {
-        if (adr == 0)
-            throw new IllegalArgumentException("adr argument should not be null");
+        if (adr == 0) throw new IllegalArgumentException("adr argument should not be null");
         return g1BelongsToHumongousRegion0(adr);
     }
     
-    public native boolean g1BelongsToFreeRegion0(long adr);
+    private native boolean g1BelongsToFreeRegion0(long adr);
     
     public boolean g1BelongsToFreeRegion(final long adr) {
-        if (adr == 0)
-            throw new IllegalArgumentException("adr argument should not be null");
+        if (adr == 0) throw new IllegalArgumentException("adr argument should not be null");
         return g1BelongsToFreeRegion0(adr);
     }
     
@@ -304,13 +370,13 @@ public enum WhiteBox {
     
     public native MemoryUsage g1AuxiliaryMemoryUsage();
     
+    private native Object[] parseCommandLine0(String commandline, char delim, DiagnosticCommand[] args);
+    
+    public Object[] parseCommandLine(final String commandline, final char delim, final DiagnosticCommand[] args) = parseCommandLine0(commandline, delim, requireNonNull(args));
+    
     public native int g1ActiveMemoryNodeCount();
     
     public native int[] g1MemoryNodeIds();
-    
-    public native Object[] parseCommandLine0(String commandline, char delim, DiagnosticCommand... args);
-    
-    public Object[] parseCommandLine(final String commandline, final char delim, final DiagnosticCommand... args) = parseCommandLine0(commandline, delim, args);
     
     // Parallel GC
     public native long psVirtualSpaceAlignment();
@@ -322,7 +388,8 @@ public enum WhiteBox {
      * @param liveness percent of region's liveness (live_objects / total_region_size * 100).
      * @return long[3] array where long[0] - total count of old regions
      * long[1] - total memory of old regions
-     * long[2] - lowest estimation of total memory of old regions to be freed (non-full regions are not included)
+     * long[2] - lowest estimation of total memory of old regions to be freed (non-full
+     * regions are not included)
      */
     public native long[] g1GetMixedGCInfo(int liveness);
     
@@ -345,8 +412,6 @@ public enum WhiteBox {
     
     public native long NMTMallocWithPseudoStackAndType(long size, int index, int type);
     
-    public native boolean NMTChangeTrackingLevel();
-    
     public native int NMTGetHashSize();
     
     public native long NMTNewArena(long initSize);
@@ -356,6 +421,10 @@ public enum WhiteBox {
     public native void NMTArenaMalloc(long arena, long size);
     
     // Compiler
+    
+    // Determines if the libgraal shared library file is present.
+    public native boolean hasLibgraal();
+    
     public native boolean isC2OrJVMCIIncluded();
     
     public native boolean isJVMCISupportedByGC();
@@ -374,19 +443,19 @@ public enum WhiteBox {
     
     public boolean isMethodCompiled(final Executable method) = isMethodCompiled(method, false /*not osr*/);
     
-    public native boolean isMethodCompiled0(Executable method, boolean isOsr);
+    private native boolean isMethodCompiled0(Executable method, boolean isOsr);
     
     public boolean isMethodCompiled(final Executable method, final boolean isOsr) = isMethodCompiled0(requireNonNull(method), isOsr);
     
-    public boolean isMethodCompilable(final Executable method) = isMethodCompilable(method, -2 /*any*/);
+    public boolean isMethodCompilable(final Executable method) = isMethodCompilable(method, -1 /*any*/);
     
     public boolean isMethodCompilable(final Executable method, final int compLevel) = isMethodCompilable(method, compLevel, false /*not osr*/);
     
-    public native boolean isMethodCompilable0(Executable method, int compLevel, boolean isOsr);
+    private native boolean isMethodCompilable0(Executable method, int compLevel, boolean isOsr);
     
     public boolean isMethodCompilable(final Executable method, final int compLevel, final boolean isOsr) = isMethodCompilable0(requireNonNull(method), compLevel, isOsr);
     
-    public native boolean isMethodQueuedForCompilation0(Executable method);
+    private native boolean isMethodQueuedForCompilation0(Executable method);
     
     public boolean isMethodQueuedForCompilation(final Executable method) = isMethodQueuedForCompilation0(requireNonNull(method));
     
@@ -400,58 +469,82 @@ public enum WhiteBox {
     // The compilation context is related to using the DisableIntrinsic flag on a
     // per-method level, see hotspot/src/share/vm/compiler/abstractCompiler.hpp
     // for more details.
-    public boolean isIntrinsicAvailable(final Executable method, final Executable compilationContext, final int compLevel) = isIntrinsicAvailable0(requireNonNull(method), compilationContext, compLevel);
+    public boolean isIntrinsicAvailable(final Executable method, @Nullable final Executable compilationContext, final int compLevel) = isIntrinsicAvailable0(requireNonNull(method), compilationContext, compLevel);
     
     // If usage of the DisableIntrinsic flag is not expected (or the usage can be ignored),
     // use the below method that does not require the compilation context as argument.
-    @SuppressWarnings("DataFlowIssue")
     public boolean isIntrinsicAvailable(final Executable method, final int compLevel) = isIntrinsicAvailable(method, null, compLevel);
     
-    public native boolean isIntrinsicAvailable0(Executable method, Executable compilationContext, int compLevel);
+    private native boolean isIntrinsicAvailable0(Executable method, Executable compilationContext, int compLevel);
     
     public int deoptimizeMethod(final Executable method) = deoptimizeMethod(method, false /*not osr*/);
     
-    public native int deoptimizeMethod0(Executable method, boolean isOsr);
+    private native int deoptimizeMethod0(Executable method, boolean isOsr);
     
     public int deoptimizeMethod(final Executable method, final boolean isOsr) = deoptimizeMethod0(requireNonNull(method), isOsr);
     
-    public void makeMethodNotCompilable(final Executable method) = makeMethodNotCompilable(method, -2 /*any*/);
+    public void makeMethodNotCompilable(final Executable method) = makeMethodNotCompilable(method, -1 /*any*/);
     
     public void makeMethodNotCompilable(final Executable method, final int compLevel) = makeMethodNotCompilable(method, compLevel, false /*not osr*/);
     
-    public native void makeMethodNotCompilable0(Executable method, int compLevel, boolean isOsr);
+    private native void makeMethodNotCompilable0(Executable method, int compLevel, boolean isOsr);
     
     public void makeMethodNotCompilable(final Executable method, final int compLevel, final boolean isOsr) = makeMethodNotCompilable0(requireNonNull(method), compLevel, isOsr);
     
-    public int getMethodCompilationLevel(final Executable method) = getMethodCompilationLevel(method, false /*not ost*/);
+    public int getMethodCompilationLevel(final Executable method) = getMethodCompilationLevel(method, false /*not osr*/);
     
-    public native int getMethodCompilationLevel0(Executable method, boolean isOsr);
+    private native int getMethodCompilationLevel0(Executable method, boolean isOsr);
     
     public int getMethodCompilationLevel(final Executable method, final boolean isOsr) = getMethodCompilationLevel0(requireNonNull(method), isOsr);
     
-    public native boolean testSetDontInlineMethod0(Executable method, boolean value);
+    public int getMethodDecompileCount(final Executable method) = getMethodDecompileCount0(requireNonNull(method));
+    
+    private native int getMethodDecompileCount0(Executable method);
+    
+    // Get the total trap count of a method. If the trap count for a specific reason
+    // did overflow, this includes the overflow trap count of the method.
+    public int getMethodTrapCount(final Executable method) = getMethodTrapCount0(requireNonNull(method), null);
+    
+    // Get the trap count of a method for a specific reason. If the trap count for
+    // that reason did overflow, this includes the overflow trap count of the method.
+    public int getMethodTrapCount(final Executable method, final String reason) = getMethodTrapCount0(requireNonNull(method), reason);
+    
+    private native int getMethodTrapCount0(Executable method, @Nullable String reason);
+    
+    // Get the total deopt count.
+    public int getDeoptCount() = getDeoptCount0(null, null);
+    
+    // Get the deopt count for a specific reason and a specific action. If either
+    // one of 'reason' or 'action' is null, the method returns the sum of all
+    // deoptimizations with the specific 'action' or 'reason' respectively.
+    // If both arguments are null, the method returns the total deopt count.
+    public int getDeoptCount(final String reason, final String action) = getDeoptCount0(reason, action);
+    
+    private native int getDeoptCount0(@Nullable String reason, @Nullable String action);
+    
+    private native boolean testSetDontInlineMethod0(Executable method, boolean value);
     
     public boolean testSetDontInlineMethod(final Executable method, final boolean value) = testSetDontInlineMethod0(requireNonNull(method), value);
     
-    public int getCompileQueuesSize() = getCompileQueueSize(-2 /*any*/);
+    public int getCompileQueuesSize() = getCompileQueueSize(-1 /*any*/);
     
     public native int getCompileQueueSize(int compLevel);
     
-    public native boolean testSetForceInlineMethod0(Executable method, boolean value);
+    private native boolean testSetForceInlineMethod0(Executable method, boolean value);
     
     public boolean testSetForceInlineMethod(final Executable method, final boolean value) = testSetForceInlineMethod0(requireNonNull(method), value);
     
     public boolean enqueueMethodForCompilation(final Executable method, final int compLevel) = enqueueMethodForCompilation(method, compLevel, -1 /*InvocationEntryBci*/);
     
-    public native boolean enqueueMethodForCompilation0(Executable method, int compLevel, int entry_bci);
+    private native boolean enqueueMethodForCompilation0(Executable method, int compLevel, int entry_bci);
     
     public boolean enqueueMethodForCompilation(final Executable method, final int compLevel, final int entry_bci) = enqueueMethodForCompilation0(requireNonNull(method), compLevel, entry_bci);
     
-    public native boolean enqueueInitializerForCompilation0(Class<?> aClass, int compLevel);
+    private native boolean enqueueInitializerForCompilation0(Class<?> aClass, int compLevel);
     
     public boolean enqueueInitializerForCompilation(final Class<?> aClass, final int compLevel) = enqueueInitializerForCompilation0(requireNonNull(aClass), compLevel);
     
-    public native void clearMethodState0(Executable method);
+    private native void clearMethodState0(Executable method);
     
     public native void markMethodProfiled(Executable method);
     
@@ -461,11 +554,11 @@ public enum WhiteBox {
     
     public native void unlockCompilation();
     
-    public native int getMethodEntryBci0(Executable method);
+    private native int getMethodEntryBci0(Executable method);
     
     public int getMethodEntryBci(final Executable method) = getMethodEntryBci0(requireNonNull(method));
     
-    public native Object[] getNMethod0(Executable method, boolean isOsr);
+    private native Object[] getNMethod0(Executable method, boolean isOsr);
     
     public Object[] getNMethod(final Executable method, final boolean isOsr) = getNMethod0(requireNonNull(method), isOsr);
     
@@ -473,26 +566,24 @@ public enum WhiteBox {
     
     public long allocateCodeBlob(final long size, final int type) {
         final int intSize = (int) size;
-        if ((long) intSize != size || size < 0)
-            throw new IllegalArgumentException("size argument has illegal value " + size);
+        if ((long) intSize != size || size < 0) throw new IllegalArgumentException(
+                "size argument has illegal value " + size);
         return allocateCodeBlob(intSize, type);
     }
     
     public native void freeCodeBlob(long addr);
     
-    public native void forceNMethodSweep();
-    
     public native Object[] getCodeHeapEntries(int type);
     
     public native int getCompilationActivityMode();
     
-    public native long getMethodData0(Executable method);
+    private native long getMethodData0(Executable method);
     
     public long getMethodData(final Executable method) = getMethodData0(requireNonNull(method));
     
     public native Object[] getCodeBlob(long addr);
     
-    public native void clearInlineCaches0(boolean preserve_static_stubs);
+    private native void clearInlineCaches0(boolean preserve_static_stubs);
     
     public void clearInlineCaches() = clearInlineCaches0(false);
     
@@ -511,10 +602,6 @@ public enum WhiteBox {
     public native long metaspaceCapacityUntilGC();
     
     public native long metaspaceSharedRegionAlignment();
-    
-    public native boolean metaspaceShouldConcurrentCollect();
-    
-    public native long metaspaceReserveAlignment();
     
     // Metaspace Arena Tests
     public native long createMetaspaceTestContext(long commit_limit, long reserve_limit);
@@ -540,7 +627,7 @@ public enum WhiteBox {
     public native long maxMetaspaceAllocationSize();
     
     // Don't use these methods directly
-    // Use GC class instead.
+    // Use jdk.test.whitebox.gc.GC class instead.
     public native boolean isGCSupported(int name);
     
     public native boolean isGCSupportedByJVMCICompiler(int name);
@@ -574,12 +661,9 @@ public enum WhiteBox {
     private static boolean concurrentGCIsControlled = false;
     
     private void checkConcurrentGCIsControlled() {
-        if (!concurrentGCIsControlled) {
+        if (!concurrentGCIsControlled)
             throw new IllegalStateException("Not controlling concurrent GC");
-        }
     }
-    
-    // TODO breakpoints
     
     // All collectors supporting concurrent GC breakpoints are expected
     // to provide at least the following breakpoints.
@@ -591,10 +675,15 @@ public enum WhiteBox {
     public final String AFTER_CONCURRENT_REFERENCE_PROCESSING_STARTED =
             "AFTER CONCURRENT REFERENCE PROCESSING STARTED";
     
+    // G1 specific GC breakpoints.
+    public final String G1_AFTER_REBUILD_STARTED    = "AFTER REBUILD STARTED";
+    public final String G1_BEFORE_REBUILD_COMPLETED = "BEFORE REBUILD COMPLETED";
+    public final String G1_AFTER_CLEANUP_STARTED    = "AFTER CLEANUP STARTED";
+    public final String G1_BEFORE_CLEANUP_COMPLETED = "BEFORE CLEANUP COMPLETED";
+    
     public void concurrentGCAcquireControl() {
         checkConcurrentGCBreakpointsSupported();
-        if (concurrentGCIsControlled)
-            throw new IllegalStateException("Already controlling concurrent GC");
+        if (concurrentGCIsControlled) throw new IllegalStateException("Already controlling concurrent GC");
         concurrentGCAcquireControl0();
         concurrentGCIsControlled = true;
     }
@@ -633,14 +722,8 @@ public enum WhiteBox {
             return false;
     }
     
-    // Method tries to start concurrent mark cycle.
-    // It returns false if CM Thread is always in concurrent cycle.
-    public native boolean g1StartConcMarkCycle();
-    
     // Tests on ReservedSpace/VirtualSpace classes
     public native int stressVirtualSpaceResize(long reservedSpaceSize, long magnitude, long iterations);
-    
-    public native void runMemoryUnitTests();
     
     public native void readFromNoaccessArea();
     
@@ -653,6 +736,8 @@ public enum WhiteBox {
     
     // VM flags
     public native boolean isConstantVMFlag(String name);
+    
+    public native boolean isDefaultVMFlag(String name);
     
     public native boolean isLockedVMFlag(String name);
     
@@ -692,14 +777,14 @@ public enum WhiteBox {
     
     public native Double getDoubleVMFlag(String name);
     
-    public final List<Function<String, Object>> flagsGetters = List.of(
-            this::getBooleanVMFlag, this::getIntVMFlag, this::getUintVMFlag, this::getIntxVMFlag, this::getUintxVMFlag, this::getUint64VMFlag, this::getSizeTVMFlag, this::getStringVMFlag, this::getDoubleVMFlag);
+    private final List<Function<String, Object>> flagsGetters = Arrays.asList(
+            this::getBooleanVMFlag, this::getIntVMFlag, this::getUintVMFlag,
+            this::getIntxVMFlag, this::getUintxVMFlag, this::getUint64VMFlag,
+            this::getSizeTVMFlag, this::getStringVMFlag, this::getDoubleVMFlag);
     
-    public Object getVMFlag(final String name) = flagsGetters.stream()
+    public Object getVMFlag(final String name) = ~flagsGetters.stream()
             .map(f -> f.apply(name))
-            .filter(Objects::nonNull)
-            .findAny()
-            .orElse(null);
+            .nonnull();
     
     // Jigsaw
     public native void DefineModule(Object module, boolean is_open, String version, String location, Object[] packages);
@@ -712,13 +797,22 @@ public enum WhiteBox {
     
     public native void AddModuleExportsToAll(Object module, String pkg);
     
-    public native int getOffsetForName0(String name);
+    public native int getCDSOffsetForName0(String name);
     
-    public int getOffsetForName(final String name) throws Exception {
-        final int offset = getOffsetForName0(name);
+    public int getCDSOffsetForName(final String name) throws Exception {
+        final int offset = getCDSOffsetForName0(name);
         if (offset == -1)
             throw new RuntimeException(name + " not found");
         return offset;
+    }
+    
+    public native int getCDSConstantForName0(String name);
+    
+    public int getCDSConstantForName(final String name) throws Exception {
+        final int constant = getCDSConstantForName0(name);
+        if (constant == -1)
+            throw new RuntimeException(name + " not found");
+        return constant;
     }
     
     public native Boolean getMethodBooleanOption(Executable method, String name);
@@ -733,24 +827,24 @@ public enum WhiteBox {
     
     public final List<BiFunction<Executable, String, Object>> methodOptionGetters = List.of(this::getMethodBooleanOption, this::getMethodIntxOption, this::getMethodUintxOption, this::getMethodDoubleOption, this::getMethodStringOption);
     
-    public Object getMethodOption(final Executable method, final String name) = methodOptionGetters.stream()
+    public Object getMethodOption(final Executable method, final String name) = ~methodOptionGetters.stream()
             .map(f -> f.apply(method, name))
-            .filter(Objects::nonNull)
-            .findAny()
-            .orElse(null);
+            .nonnull();
     
     // Sharing & archiving
+    public native int getCDSGenericHeaderMinVersion();
+    
+    public native int getCurrentCDSVersion();
+    
     public native String getDefaultArchivePath();
     
     public native boolean cdsMemoryMappingFailed();
     
     public native boolean isSharingEnabled();
     
-    public native boolean isShared(Object o);
-    
     public native boolean isSharedClass(Class<?> c);
     
-    public native boolean areSharedStringsIgnored();
+    public native boolean areSharedStringsMapped();
     
     public native boolean isSharedInternedString(String s);
     
@@ -760,9 +854,7 @@ public enum WhiteBox {
     
     public native boolean isDTraceIncluded();
     
-    public native boolean isJavaHeapArchiveSupported();
-    
-    public native Object getResolvedReferences(Class<?> c);
+    public native boolean canWriteJavaHeapArchive();
     
     public native void linkClass(Class<?> c);
     
@@ -775,6 +867,8 @@ public enum WhiteBox {
     
     // Handshakes
     public native int handshakeWalkStack(Thread t, boolean all_threads);
+    
+    public native boolean handshakeReadMonitors(Thread t);
     
     public native void asyncHandshakeWalkStack(Thread t);
     
@@ -790,6 +884,10 @@ public enum WhiteBox {
     
     public native void printOsInfo();
     
+    public native long hostPhysicalMemory();
+    
+    public native long hostPhysicalSwap();
+    
     // Decoder
     public native void disableElfSectionCache();
     
@@ -798,9 +896,6 @@ public enum WhiteBox {
     
     // Protection Domain Table
     public native int protectionDomainRemovedCount();
-    
-    // Number of loaded AOT libraries
-    public native int aotLibrariesCount();
     
     public native int getKlassMetadataSize(Class<?> c);
     
@@ -820,5 +915,9 @@ public enum WhiteBox {
     public native void lockCritical();
     
     public native void unlockCritical();
+    
+    public native boolean setVirtualThreadsNotifyJvmtiMode(boolean enabled);
+    
+    public native void preTouchMemory(long addr, long size);
     
 }

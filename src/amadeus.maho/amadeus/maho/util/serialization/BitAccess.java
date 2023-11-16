@@ -4,11 +4,9 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.foreign.MemorySegment;
 import java.util.function.LongConsumer;
 import java.util.stream.LongStream;
-
-import jdk.incubator.foreign.MemoryAccess;
-import jdk.incubator.foreign.MemorySegment;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Extension;
@@ -16,6 +14,8 @@ import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+
+import static java.lang.foreign.ValueLayout.JAVA_BYTE;
 
 @Extension
 public class BitAccess {
@@ -140,12 +140,12 @@ public class BitAccess {
             throw new IllegalArgumentException("length: " + length);
         final int begin = index > 0 ? Byte.SIZE - index : 0, middle = length - begin >>> 3, end = length - begin & 0b111;
         if (begin > 0)
-            MemoryAccess.setByteAtOffset(segment, offset, mergeByte(MemoryAccess.getByteAtOffset(segment, offset), (byte) (bits >>> length - begin & MASKS[begin]), index));
+            segment.set(JAVA_BYTE, offset, mergeByte(segment.get(JAVA_BYTE, offset), (byte) (bits >>> length - begin & MASKS[begin]), index));
         int i = begin > 0 ? 1 : 0;
         for (final int max = begin > 0 ? middle + 1 : middle; i < max; i++)
-            MemoryAccess.setByteAtOffset(segment, offset + i, (byte) (bits >>> 8 * (middle - i) + end));
+            segment.set(JAVA_BYTE, offset + i, (byte) (bits >>> 8 * (middle - i) + end));
         if (end > 0)
-            MemoryAccess.setByteAtOffset(segment, offset + i, mergeByte((byte) (bits & MASKS[end]), MemoryAccess.getByteAtOffset(segment, offset + i), end));
+            segment.set(JAVA_BYTE, offset + i, mergeByte((byte) (bits & MASKS[end]), segment.get(JAVA_BYTE, offset + i), end));
     }
     
     public static long readNBits(final MemorySegment segment, final long offset, final int index, final int length) {
@@ -156,12 +156,12 @@ public class BitAccess {
         long result = 0L;
         final int begin = index > 0 ? Byte.SIZE - index : 0, middle = length - begin >>> 3, end = length - begin & 0b111;
         if (begin > 0)
-            result = (MemoryAccess.getByteAtOffset(segment, offset) & MASKS[begin]) << length - begin;
+            result = (segment.get(JAVA_BYTE, offset) & MASKS[begin]) << length - begin;
         int i = begin > 0 ? 1 : 0;
         for (final int max = begin > 0 ? middle + 1 : middle; i < max; i++)
-            result |= ((long) MemoryAccess.getByteAtOffset(segment, offset + i) & 0xFF) << 8 * (middle - i) + end;
+            result |= ((long) segment.get(JAVA_BYTE, offset + i) & 0xFF) << 8 * (middle - i) + end;
         if (end > 0)
-            result |= MemoryAccess.getByteAtOffset(segment, offset + i) >>> Byte.SIZE - end;
+            result |= segment.get(JAVA_BYTE, offset + i) >>> Byte.SIZE - end;
         return result;
     }
     

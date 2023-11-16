@@ -104,6 +104,10 @@ public class MahoJavac {
     @Hook(metadata = @TransformMetadata(disable = "disable.force.preview"))
     private static Hook.Result usesPreview(final Preview $this, final JavaFileObject file) = Hook.Result.TRUE;
     
+    // Fix NPE (JDK21)
+    @Hook(exactMatch = false, forceReturn = true)
+    private static boolean participatesInPreview(final Preview $this) = true;
+    
     // Disable preview warn
     @Hook(metadata = @TransformMetadata(disable = "disable.dont.warn.preview"))
     private static Hook.Result isSuppressed(final Lint $this, final Lint.LintCategory category) = Hook.Result.falseToVoid(category == Lint.LintCategory.PREVIEW);

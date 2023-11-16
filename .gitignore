@@ -6,3 +6,5 @@ hs_err*
 *.iml
 /build/compiled-script/
 /build/GithubConfig.default.cfg
+/build/upgrade/
+/build/upgrade-modules/

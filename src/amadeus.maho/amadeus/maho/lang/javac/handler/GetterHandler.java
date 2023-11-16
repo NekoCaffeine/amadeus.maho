@@ -83,13 +83,13 @@ public class GetterHandler extends BaseHandler<Getter> {
                     maker.Return(maker.Conditional(maker.Binary(JCTree.Tag.EQ, maker.Ident(mark.name), maker.Literal(2)),
                             maker.Ident(tree.name),
                             maker.SwitchExpression(unsafeFieldBaseAccess(maker, tree, env, mark.sym, "compareAndExchangeInt", maker.Literal(0), maker.Literal(1)), List.of(
-                                    maker.Case(CaseTree.CaseKind.RULE, List.of(maker.Literal(0)), List.of(
+                                    maker.Case(CaseTree.CaseKind.RULE, List.of(maker.ConstantCaseLabel(maker.Literal(0))), null, List.of(
                                             maker.VarDef(maker.Modifiers(FINAL), $value, unpackedType, tree.init),
                                             maker.Exec(unsafeFieldBaseAccess(maker, tree, env, tree.sym, "put%sOpaque".formatted(type), maker.Ident($value))),
                                             maker.Exec(unsafeFieldBaseAccess(maker, tree, env, mark.sym, "putIntRelease", maker.Literal(2))),
                                             maker.Yield(maker.Ident($value))
                                     ), null),
-                                    maker.Case(CaseTree.CaseKind.RULE, List.of(maker.Literal(1)), List.of(
+                                    maker.Case(CaseTree.CaseKind.RULE, List.of(maker.ConstantCaseLabel(maker.Literal(1))), null, List.of(
                                             maker.WhileLoop(
                                                     maker.Binary(JCTree.Tag.NE, unsafeFieldBaseAccess(maker, tree, env, mark.sym, "getIntOpaque".formatted()), maker.Literal(2)),
                                                     maker.Exec(maker.Apply(List.nil(), maker.Select(IdentQualifiedName(Thread.class), name("onSpinWait")), List.nil()))
@@ -97,7 +97,7 @@ public class GetterHandler extends BaseHandler<Getter> {
                                             maker.Exec(unsafe(tree, env).invocation(maker, "loadLoadFence")),
                                             maker.Yield(maker.TypeCast(unpackedType, unsafeFieldBaseAccess(maker, tree, env, tree.sym, "get%sOpaque".formatted(type))))
                                     ), null),
-                                    maker.Case(CaseTree.CaseKind.RULE, List.of(maker.DefaultCaseLabel()), List.of(
+                                    maker.Case(CaseTree.CaseKind.RULE, List.of(maker.DefaultCaseLabel()), null, List.of(
                                             maker.Yield(maker.TypeCast(unpackedType, unsafeFieldBaseAccess(maker, tree, env, tree.sym, "get%sOpaque".formatted(type))))
                                     ), null)
                             ))))

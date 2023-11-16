@@ -62,18 +62,18 @@ public interface Build {
     
     static void sync() {
         IDEA.deleteLibraries(workspace);
-        IDEA.generateAll(workspace, "17", true, List.of(Module.build(), module));
+        IDEA.generateAll(workspace, "21", true, List.of(Module.build(), module));
     }
     
-    static Path build(final boolean aot = false) {
+    static Path build(final boolean aot = false, final boolean shouldUpgrade = false) {
         workspace.clean(module).flushMetadata();
-        Javac.compile(workspace, module, path -> true, args -> {
+        Javac.compile(workspace, module, path -> true, shouldUpgrade ? args -> {
             final Path upgrade = workspace.root() / Module.build().path() / "upgrade";
             if (Files.isDirectory(upgrade)) {
                 args += "--upgrade-module-path";
                 args += upgrade.toAbsolutePath().toString();
             }
-        });
+        } : _ -> { });
         final Map<String, Jar.Result> pack = Jar.pack(workspace, module, Jar.manifest(Main.class.getCanonicalName(), new Jar.Agent(Maho.class.getCanonicalName())));
         final Path modulesDir = workspace.output(Jar.MODULES_DIR, module), targetDir = aot ? ~workspace.output("aot-" + Jar.MODULES_DIR, module) : modulesDir;
         if (aot)
@@ -99,29 +99,37 @@ public interface Build {
         final Path path = Maho.jar(), home = Files.isRegularFile(path) ? -+-path :
                 Optional.ofNullable(System.getenv("MAHO_HOME")).map(Path::of).orElseThrow(() -> new IllegalStateException("Environment variable 'MAHO_HOME' is missing"));
         Shell.Context.standardJavaFileManager().close();
-        final Consumer<Path> consumer = root -> root >> home;
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> closeModuleReaderAndPush(build, home, consumer), "Maho Build Task - Push to `MAHO_HOME`"));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            ((Privilege) ((BuiltinClassLoader) Maho.class.getClassLoader()).moduleToReader).values().forEach(ModuleReader::close); // Unlock 'modules'
+            FileHelper.retryWhenIOE(() -> {
+                if (Files.isRegularFile(path) && !Files.isDirectory(home / "modules"))
+                    build | root -> root / "modules" >> --+-path;
+                else
+                    build | root -> {
+                        Files.list(root)
+                                .filter(Files::isDirectory)
+                                .forEach(dir -> --(home / dir.getFileName().toString()));
+                        root >> home;
+                    };
+            });
+        }, "Maho Build Task - Push to `MAHO_HOME`"));
         System.exit(0);
+    }
+    
+    static void upgrade(final boolean aot = true) {
+        final Path distributive = build(aot, true);
+        distributive >> ~--workspace.output("upgrade", module);
+        distributive | root -> root / "modules" >> ~--(workspace.buildDir() / "upgrade-modules");
     }
     
     static void aotPush() = push(aotBuild());
     
-    static Path link(final Path output = workspace.output("maho-image")) {
+    static Path link(final Path output = workspace.output("maho-image", module)) {
         final Path result = Jlink.createMahoImage(workspace, linkModule, --output);
         final @Nullable String image = Environment.local().lookup(MahoImage.VARIABLE);
         if (image != null)
             result >> ~--Path.of(image);
         return result;
-    }
-    
-    @SneakyThrows
-    private static void closeModuleReaderAndPush(final Path build, final Path home, final Consumer<Path> copy) throws InterruptedException {
-        ((Privilege) ((BuiltinClassLoader) Maho.class.getClassLoader()).moduleToReader).values().forEach(ModuleReader::close); // Unlock 'modules'
-        FileHelper.retryWhenIOE(() -> {
-            --(home / "modules");
-            --(home / "sources");
-        });
-        build | copy;
     }
     
     static void mark(final String type = "stable") {

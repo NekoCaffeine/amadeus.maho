@@ -2,6 +2,7 @@ package amadeus.maho.util.concurrent;
 
 import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
@@ -42,6 +43,8 @@ public interface AsyncHelper {
     static Executor contextExecutor() = contextExecutor(Thread.currentThread());
     
     static void contextExecutor(final @Nullable Executor executor) = contextExecutor(Thread.currentThread(), executor);
+    
+    static Throwable resolveExecutionException(final Throwable throwable) = throwable instanceof ExecutionException exception ? exception.getCause() : throwable;
     
     @SneakyThrows
     static CompletableFuture<Void> async(final Runnable task, final @Nullable Executor executor = contextExecutor(), final int retry, final long timeout, final TimeUnit unit) = CompletableFuture.runAsync(() -> {

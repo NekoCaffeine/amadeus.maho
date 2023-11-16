@@ -175,8 +175,8 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                         pre = flag ? getter -> maker.Binary(tree.getTag() == PREINC ? PLUS : MINUS, getter, maker.Literal(1)) : UnaryOperator.identity(),
                         post = flag ? UnaryOperator.identity() : getter -> maker.Binary(tree.getTag() == POSTINC ? PLUS : MINUS, getter, maker.Literal(1));
                 switch (tree.arg) {
-                    case JCTree.JCMethodInvocation invocation && invocation.args.isEmpty()                                                    -> lowerExpr = handler.lowerSetter(invocation, pre, post);
-                    case OperatorOverloadingHandler.OperatorInvocation invocation && invocation.source instanceof JCTree.JCArrayAccess access -> lowerExpr = handler.lowerPutter(access, pre, post);
+                    case JCTree.JCMethodInvocation invocation when invocation.args.isEmpty()                                                    -> lowerExpr = handler.lowerSetter(invocation, pre, post);
+                    case OperatorOverloadingHandler.OperatorInvocation invocation when invocation.source instanceof JCTree.JCArrayAccess access -> lowerExpr = handler.lowerPutter(access, pre, post);
                     default                                                                                                                   -> { }
                 }
             }
