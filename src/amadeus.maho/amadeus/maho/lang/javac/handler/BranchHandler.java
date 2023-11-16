@@ -11,7 +11,6 @@ import com.sun.source.tree.MethodInvocationTree;
 import com.sun.tools.javac.code.Kinds;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.code.TypeMetadata;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.comp.AttrContext;
@@ -54,7 +53,6 @@ import static com.sun.tools.javac.jvm.ByteCodes.*;
 import static com.sun.tools.javac.jvm.CRTFlags.*;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
 
-
 @TransformProvider
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PUBLIC)
@@ -96,15 +94,7 @@ public class BranchHandler extends BaseSyntaxHandler {
     @FieldDefaults(level = AccessLevel.PUBLIC)
     public static class NullOrBinary extends JCTree.JCBinary {
         
-        // JCPolyExpression.PolyKind polyKind;
-        
         public NullOrBinary(final JCBinary binary) = this(binary.getTag(), binary.lhs, binary.rhs, binary.operator);
-        
-        // @Override
-        // public boolean isPoly() = polyKind == POLY;
-        //
-        // @Override
-        // public boolean isStandalone() = polyKind == STANDALONE;
         
     }
     
@@ -112,18 +102,12 @@ public class BranchHandler extends BaseSyntaxHandler {
         
         public TopMarkType() = super(null, List.nil());
         
-        // @Override
-        // public BottomType cloneWithMetadata(final List<TypeMetadata> md) { throw new AssertionError("Cannot add metadata to a bottom type"); }
-        
         @Override
         public TypeTag getTag() = BOT;
         
         @Override
         @DefinedBy(DefinedBy.Api.LANGUAGE_MODEL)
         public TypeKind getKind() = TypeKind.NULL;
-        
-        // @Override
-        // public boolean isCompound() = false;
         
         @Override
         @DefinedBy(DefinedBy.Api.LANGUAGE_MODEL)
@@ -176,15 +160,7 @@ public class BranchHandler extends BaseSyntaxHandler {
     
     @Privilege
     private static void attrNullOrExpr(final Attr attr, final JCTree.JCBinary binary) {
-        // tree.polyKind = !attr.allowPoly || attr.pt().hasTag(NONE) && attr.pt() != Type.recoveryType && attr.pt() != Infer.anyPoly || attr.isBooleanOrNumeric(attr.env, tree) ? STANDALONE : POLY;
-        // if (tree.polyKind == POLY && attr.resultInfo.pt.hasTag(VOID)) {
-        //     attr.resultInfo.checkContext.report(tree, attr.diags.fragment(CompilerProperties.Fragments.ConditionalTargetCantBeVoid));
-        //     attr.result = tree.type = attr.types.createErrorType(attr.resultInfo.pt);
-        //     return;
-        // }
         final Type left = attr.chk.checkNonVoid(binary.lhs.pos(), attr.attribExpr(binary.lhs, attr.env));
-        // tree.rhs instanceof JCTree.JCPolyExpression poly && poly.isPoly() ?
-        // attr.attribTree(tree.rhs, attr.env, attr.new ResultInfo(Kinds.KindSelector.VAL, left)) :
         final Type right = attr.chk.checkNonVoid(binary.rhs.pos(), attr.attribExpr(binary.rhs, attr.env, binary.rhs instanceof JCTree.JCLambda || binary.rhs instanceof JCTree.JCMemberReference ? left : Type.noType));
         final List<Type> types = List.of(left, right);
         final Type owner = attr.condType(List.of(binary.lhs.pos(), binary.rhs.pos()), types);
