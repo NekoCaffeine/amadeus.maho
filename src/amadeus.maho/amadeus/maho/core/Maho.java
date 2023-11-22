@@ -67,7 +67,7 @@ public final class Maho {
     // use instrumentation()
     @Setter
     private static volatile @Nullable Instrumentation instrumentation;
-
+    
     public static boolean initialized() = instrumentation != null;
 
     public static Instrumentation instrumentation() = instrumentation == null ? injectAgent() : instrumentation;
@@ -81,10 +81,9 @@ public final class Maho {
                         final Class<?> providerClass = Class.forName(provider, true, ClassLoader.getSystemClassLoader());
                         final Field fieldInstrumentation = providerClass.getDeclaredField("instrumentation");
                         installation(null, (Instrumentation) fieldInstrumentation.get(null));
-                        HotSwap.watch();
                         return instrumentation;
                     } catch (final Throwable throwable) {
-                        System.err.println("Unable to load instrumentation from instrumentation provider: " + provider);
+                        System.err.println(STR."Unable to load instrumentation from instrumentation provider: \{provider}");
                         throwable.printStackTrace();
                         DebugHelper.breakpoint();
                     }
@@ -103,7 +102,7 @@ public final class Maho {
 
     public static void log(final LogLevel level, final String message) = logger()?.log("Maho", level, message);
 
-    public static void stage(final String message) = debug("Stage -> " + message);
+    public static void stage(final String message) = debug(STR."Stage -> \{message}");
 
     public static void info(final String message) = log(LogLevel.INFO, message);
 
@@ -163,7 +162,7 @@ public final class Maho {
         jailbreak(instrumentation, ModuleLayer.boot().modules().stream(), extraReads);
         final Module maho = Maho.class.getModule();
         if (maho.getClassLoader() != null && maho.isNamed()) { // Gives module attribution and privileges to the classes shared to the BootClassLoader
-            final ModuleDescriptor.Builder builder = ModuleDescriptor.newModule(maho.getName() + ".boot", Set.of(ModuleDescriptor.Modifier.OPEN, ModuleDescriptor.Modifier.SYNTHETIC));
+            final ModuleDescriptor.Builder builder = ModuleDescriptor.newModule(STR."\{maho.getName()}.boot", Set.of(ModuleDescriptor.Modifier.OPEN, ModuleDescriptor.Modifier.SYNTHETIC));
             maho.getDescriptor().rawVersion().ifPresent(builder::version);
             final Module boot = Modules.defineModule(null, builder.packages(maho.getPackages()).packages(Set.of(SHARE_PACKAGE)).build(), null);
             jailbreak(instrumentation, Stream.concat(Stream.of(maho), ModuleLayer.boot().modules().stream()), Set.of(boot));
@@ -214,7 +213,7 @@ public final class Maho {
 
     public static final String
             MAHO_PACKAGE_NAME = Maho.class.getPackage().getName().replaceFirst("(?<upperPackageName>.*\\.).*", "$1"),
-            MAHO_SHADOW_PACKAGE_NAME = MAHO_PACKAGE_NAME + "shadow.";
+            MAHO_SHADOW_PACKAGE_NAME = STR."\{MAHO_PACKAGE_NAME}shadow.";
 
     @SneakyThrows
     private static void setupTransformer() {
@@ -228,17 +227,17 @@ public final class Maho {
 
     @SneakyThrows
     public static void dump(final List<String> list, final String subHead) {
-        list += "PID: " + ProcessHandle.current().pid();
-        list += "VersionInfo: " + VERSION;
-        list += "MahoImage: " + MahoImage.isImage();
-        list += "Experimental: " + experimental();
-        list += "Debug: " + MahoExport.debug();
-        list += "JVM: " + System.getProperty("java.vm.name");
-        list += "RuntimeVersion: " + Runtime.version();
-        list += "JavaHome: " + Path.of(System.getProperty("java.home")).toRealPath();
-        list += "Location: " + Path.of("").toRealPath();
-        list += "ClassLoader: " + Maho.class.getClassLoader();
-        list += "Instrumentation: " + instrumentation();
+        list += STR."PID: \{ProcessHandle.current().pid()}";
+        list += STR."VersionInfo: \{VERSION}";
+        list += STR."MahoImage: \{MahoImage.isImage()}";
+        list += STR."Experimental: \{experimental()}";
+        list += STR."Debug: \{MahoExport.debug()}";
+        list += STR."JVM: \{System.getProperty("java.vm.name")}";
+        list += STR."RuntimeVersion: \{Runtime.version()}";
+        list += STR."JavaHome: \{Path.of(System.getProperty("java.home")).toRealPath()}";
+        list += STR."Location: \{Path.of("").toRealPath()}";
+        list += STR."ClassLoader: \{Maho.class.getClassLoader()}";
+        list += STR."Instrumentation: \{instrumentation()}";
     }
 
     @SneakyThrows
@@ -248,6 +247,8 @@ public final class Maho {
         loadJavaSupport(instrumentation);
         loadClassLoaderBridge();
         setupTransformer();
+        if (MahoExport.hotswap())
+            HotSwap.watch();
     }
 
     public static void setupFromClass(final Class<?> clazz = CallerContext.caller(), final Predicate<ResourcePath.ClassInfo> filter = info -> true) {
@@ -256,7 +257,7 @@ public final class Maho {
             final Module module = clazz.getModule();
             if (module != Maho.class.getModule())
                 accessRequires(module);
-            TransformerManager.runtime().setup(clazz.getClassLoader(), path, AOTTransformer.Level.RUNTIME, module.isNamed() ? module.getDescriptor().toNameAndVersion() + "#" + clazz.getSimpleName() : clazz.getSimpleName(), filter);
+            TransformerManager.runtime().setup(clazz.getClassLoader(), path, AOTTransformer.Level.RUNTIME, module.isNamed() ? STR."\{module.getDescriptor().toNameAndVersion()}#\{clazz.getSimpleName()}" : clazz.getSimpleName(), filter);
         }
     }
 
@@ -305,20 +306,20 @@ public final class Maho {
 
     public static MethodNode getMethodNodeFromClassNonNull(final Class<?> target, final String name, final String desc, final boolean mustRetransform = false)
             = Optional.ofNullable(getMethodNodeFromClass(target, name, desc, mustRetransform))
-            .orElseThrow(() -> DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unable to get MethodNode form: " + target + "#" + name + desc)));
+            .orElseThrow(() -> DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException(STR."Unable to get MethodNode form: \{target}#\{name}\{desc}")));
 
     public static @Nullable ClassNode getClassNodeFromClass(final Class<?> target, final boolean mustRetransform = false) = ASMHelper.newClassNode(getBytecodeFromClass(target, mustRetransform));
 
     public static ClassNode getClassNodeFromClassNonNull(final Class<?> target, final boolean mustRetransform = false)
             = Optional.ofNullable(getClassNodeFromClass(target, mustRetransform))
-            .orElseThrow(() -> DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unable to get ClassNode form: " + target)));
+            .orElseThrow(() -> DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException(STR."Unable to get ClassNode form: \{target}")));
 
     private static final Sampler<String> sampler = MahoProfile.sampler("GetBytecode");
 
     @SneakyThrows
     public static @Nullable byte[] getBytecodeFromClass(final Class<?> target, final boolean mustRetransform = false) {
         if (!mustRetransform) {
-            final @Nullable InputStream stream = (target.getClassLoader() ?? ClassLoader.getPlatformClassLoader()).getResourceAsStream(target.getName().replace('.', '/') + ".class");
+            final @Nullable InputStream stream = (target.getClassLoader() ?? ClassLoader.getPlatformClassLoader()).getResourceAsStream(STR."\{target.getName().replace('.', '/')}.class");
             if (stream != null)
                 return stream.readAllBytes();
         }

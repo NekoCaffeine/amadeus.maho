@@ -72,6 +72,7 @@ public final class MahoExport {
             MAHO_LOGS_FORCED_INTERRUPTION = "maho.logs.forced.interruption", // boolean
             MAHO_LOGS_OUTPUT_FILE         = "maho.logs.output.file", // boolean
             MAHO_DEBUG_MODE               = "maho.debug", // boolean
+            MAHO_DEBUG_HOTSWAP            = "maho.debug.hotswap", // boolean
             MAHO_DEBUG_DUMP_BYTECODE      = "maho.debug.dump.bytecode"; // boolean
     
     private static final Environment env = Environment.local();
@@ -80,7 +81,8 @@ public final class MahoExport {
     @Getter
     private static boolean
             experimental = env.lookup(MAHO_EXPERIMENTAL, true),
-            debug        = env.lookup(MAHO_DEBUG_MODE, JDWP.isJDWPEnable());
+            debug        = env.lookup(MAHO_DEBUG_MODE, JDWP.isJDWPEnable()),
+            hotswap      = env.lookup(MAHO_DEBUG_HOTSWAP, debug());
     
     @SneakyThrows
     public static Path workDirectory() = Path.of(env.lookup(MAHO_WORK_DIRECTORY, Path.of("").toRealPath().toString()));

@@ -1,15 +1,28 @@
 package amadeus.maho.vm.tools.hotspot;
 
+import java.lang.instrument.ClassFileTransformer;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
+import java.security.ProtectionDomain;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import amadeus.maho.core.Maho;
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.RequiredArgsConstructor;
+import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
+import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.misc.Environment;
-import amadeus.maho.vm.tools.hotspot.WhiteBox;
+import amadeus.maho.util.runtime.ClassHelper;
 
 import static java.lang.Boolean.TRUE;
 
@@ -48,6 +61,60 @@ public enum JIT {
         DONT, NONE, SIMPLE, LIMITED_PROFILE, FULL_PROFILE, FULL_OPTIMIZATION
     }
     
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+    public static final class Spy implements ClassFileTransformer {
+        
+        Consumer<Supplier<Class<?>>> consumer;
+        
+        @Override
+        public @Nullable byte[] transform(final @Nullable ClassLoader loader, final @Nullable String className, final @Nullable Class<?> classBeingRedefined, final @Nullable ProtectionDomain domain, final @Nullable byte bytecode[]) {
+            if (classBeingRedefined != null)
+                consumer.accept(() -> classBeingRedefined);
+            else if (className != null)
+                consumer.accept(() -> ClassHelper.tryLoad(className.replace('/', '.'), false, loader));
+            return null;
+        }
+        
+    }
+    
+    @Getter
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+    public static final class Scheduler extends Thread {
+        
+        LinkedBlockingQueue<Supplier<Class<?>>> pending = { };
+        
+        Spy spy = { pending()::offer };
+        
+        CopyOnWriteArrayList<Function<? super Class, Level>> functions = { };
+        
+        { Maho.instrumentation().addTransformer(spy(), true); }
+        
+        { setName("JITScheduler"); }
+        
+        { setDaemon(true); }
+        
+        { start(); }
+        
+        @Override
+        @SneakyThrows
+        public void run() = Interrupt.doInterruptible(() -> Stream.generate(pending::take)
+                .map(supplier -> !functions().isEmpty() ? supplier.get() : null)
+                .nonnull()
+                .forEach(target -> functions.stream().anyMatch(function -> {
+                    final @Nullable Level level = function.apply(target);
+                    if (level != null) {
+                        instance().compile(target, level);
+                        return true;
+                    }
+                    return false;
+                })));
+        
+    }
+    
+    Scheduler scheduler = { };
+    
     @Getter
     private static final Level defautLevel = Level.valueOf(Environment.local().lookup("maho.jit.level.default", Level.FULL_OPTIMIZATION.name()));
     
@@ -64,21 +131,32 @@ public enum JIT {
                 }
             }
         if (level == Level.DONT)
-            WhiteBox.instance().makeMethodNotCompilable(executable, 4);
-        else if (WhiteBox.instance().getMethodCompilationLevel(executable) < level.ordinal() - 1 && WhiteBox.instance().isMethodCompilable(executable, level.ordinal()))
-            WhiteBox.instance().enqueueMethodForCompilation(executable, level.ordinal() - 1);
+            Compiler.WB.makeMethodNotCompilable(executable, 4);
+        else if (Compiler.WB.getMethodCompilationLevel(executable) < level.ordinal() - 1 && Compiler.WB.isMethodCompilable(executable, level.ordinal()))
+            Compiler.WB.enqueueMethodForCompilation(executable, level.ordinal() - 1);
     }
     
     public void compile(final Class<?> clazz, final Level level = defautLevel()) {
-        for (final Method method : clazz.getDeclaredMethods())
-            compile(method, level);
+        try {
+            for (final Method method : clazz.getDeclaredMethods())
+                compile(method, level);
+        } catch (final LinkageError ignored) { }
     }
     
     public void compileLoaded(final Predicate<? super Class> predicate, final Level level = defautLevel()) = Stream.of(Maho.instrumentation().getAllLoadedClasses()).filter(predicate).forEach(clazz -> compile(clazz, level));
     
     public void compileLoaded(final String prefix) = compileLoaded(clazz -> clazz.getName().startsWith(prefix));
     
-    public void compileLoaded(final Package pkg) = compileLoaded(pkg.getName() + ".");
+    public void compileLoaded(final Package pkg) = compileLoaded(STR."\{pkg.getName()}.");
+    
+    public void compileAll(final Predicate<? super Class> predicate, final Level level = defautLevel()) {
+        scheduler.functions() += target -> predicate.test(target) ? level : null;
+        compileLoaded(predicate);
+    }
+    
+    public void compileAll(final String prefix) = compileAll(clazz -> clazz.getName().startsWith(prefix));
+    
+    public void compileAll(final Package pkg) = compileAll(STR."\{pkg.getName()}.");
     
     public synchronized void ready() {
         synchronized (waitingQueue) {

@@ -138,6 +138,6 @@ public interface LambdaHelper {
         return instance;
     }
     
-    static boolean isLambdaClass(final Class<?> clazz) = clazz.isSynthetic() && clazz.getCanonicalName() == null && clazz.getSuperclass() == Object.class && clazz.getName().contains("$$Lambda/");
+    static boolean isLambdaClass(final Class<?> clazz) = clazz.getCanonicalName() == null && clazz.getName().contains("$Lambda$") && clazz.getName().indexOf('/') != -1;
     
 }

@@ -109,21 +109,17 @@ public interface AsyncHelper {
     @SneakyThrows
     static <T> @Nullable T await(final Future<T> future) = future.get();
     
-    static <T> @Nullable T await(final long timeout, final Future<T> future) = await(timeout, TimeUnit.MILLISECONDS, future);
-    
     @SneakyThrows
-    static <T> @Nullable T await(final long timeout, final TimeUnit unit, final Future<T> future) = future.get(timeout, unit);
+    static <T> @Nullable T await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final Future<T> future) = future.get(timeout, unit);
     
     @SneakyThrows
     static void await(final CompletableFuture<?>... futures) = CompletableFuture.allOf(futures).get();
     
-    static void await(final long timeout, final CompletableFuture<?>... futures) = await(timeout, TimeUnit.MILLISECONDS, futures);
-    
     @SneakyThrows
-    static void await(final long timeout, final TimeUnit unit, final CompletableFuture<?>... futures) = CompletableFuture.allOf(futures).get(timeout, unit);
+    static void await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final CompletableFuture<?>... futures) = CompletableFuture.allOf(futures).get(timeout, unit);
     
     static void await(final Stream<CompletableFuture<?>> futures) = await(futures.toArray(CompletableFuture[]::new));
     
-    static void await(final long timeout, final TimeUnit unit, final Stream<CompletableFuture<?>> futures) = await(timeout, unit, futures.toArray(CompletableFuture[]::new));
+    static void await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final Stream<CompletableFuture<?>> futures) = await(timeout, unit, futures.toArray(CompletableFuture[]::new));
     
 }
