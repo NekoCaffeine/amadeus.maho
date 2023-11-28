@@ -136,25 +136,6 @@ public class DynamicLinkingContext {
     public static DynamicLinkingContext withLinkMethodHandleConstant(final Class<?> caller, final String name, final Object type, final int refKind, final Class<?> defc)
             = { LinkingType.LINK_METHOD_HANDLE_CONSTANT, caller, name, type, null, null, refKind, defc };
     
-    // runtime version <= 17
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
-    public static void linkCallSite_$Enter(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
-            = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
-    
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
-    public static void linkCallSite_$Exit(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
-            = contextStack().pop();
-    
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
-    public static void linkDynamicConstant_$Enter(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
-            = contextStack().push(withLinkDynamicConstant((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
-    
-    @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
-    public static void linkDynamicConstant_$Exit(final Object callerObj, final int indexInCP, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
-            = contextStack().pop();
-    // end
-    
-    
     // runtime version > 17
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkCallSite_$Enter(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])

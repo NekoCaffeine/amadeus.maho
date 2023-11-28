@@ -107,10 +107,10 @@ public interface AsyncHelper {
     static <T> CompletableFuture<T> failed(final Throwable throwable) = CompletableFuture.failedFuture(throwable);
     
     @SneakyThrows
-    static <T> @Nullable T await(final Future<T> future) = future.get();
+    static <T> T await(final Future<T> future) = future.get();
     
     @SneakyThrows
-    static <T> @Nullable T await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final Future<T> future) = future.get(timeout, unit);
+    static <T> T await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final Future<T> future) = future.get(timeout, unit);
     
     @SneakyThrows
     static void await(final CompletableFuture<?>... futures) = CompletableFuture.allOf(futures).get();
