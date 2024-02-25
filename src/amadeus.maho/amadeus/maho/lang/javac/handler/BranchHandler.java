@@ -34,15 +34,15 @@ import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.lang.javac.handler.base.Syntax;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.ClassLocal;
+import amadeus.maho.util.dynamic.Cloner;
 import amadeus.maho.util.dynamic.Wrapper;
-import amadeus.maho.vm.JVM;
 
 import static amadeus.maho.lang.javac.handler.BranchHandler.PRIORITY;
 import static amadeus.maho.util.bytecode.Bytecodes.INVOKEVIRTUAL;
@@ -70,7 +70,7 @@ public class BranchHandler extends BaseSyntaxHandler {
         return wrapper.defineHiddenWrapperClass(MethodHandles.Lookup.ClassOption.NESTMATE, MethodHandles.Lookup.ClassOption.STRONG);
     }
     
-    public static Type voidMark(final Type type) = type == null || type instanceof Type.JCVoidType || type instanceof VoidMark ? type : (Type) JVM.local().copyObjectWithoutHead(voidMarkLocal[type.getClass()], type);
+    public static Type voidMark(final Type type) = type == null || type instanceof Type.JCVoidType || type instanceof VoidMark ? type : (Type) Cloner.copyFields(voidMarkLocal[type.getClass()], type);
     
     public interface SafeExpression { }
     
@@ -208,15 +208,15 @@ public class BranchHandler extends BaseSyntaxHandler {
                 switch (result.typecode) {
                     case VOIDcode      -> thenExit = code.branch(goto_);
                     case INTcode,
-                            FLOATcode,
-                            BYTEcode,
-                            SHORTcode,
-                            CHARcode   -> {
+                         FLOATcode,
+                         BYTEcode,
+                         SHORTcode,
+                         CHARcode   -> {
                         code.emitop0(pop);
                         thenExit = code.branch(goto_);
                     }
                     case LONGcode,
-                            DOUBLEcode -> {
+                         DOUBLEcode -> {
                         code.emitop0(pop2);
                         thenExit = code.branch(goto_);
                     }
@@ -296,20 +296,22 @@ public class BranchHandler extends BaseSyntaxHandler {
      */
     @Hook(at = @At(method = @At.MethodInsn(name = "isEmpty"), offset = -1, ordinal = 0), jump = @At(method = @At.MethodInsn(name = "illegal"), offset = 2, ordinal = 0))
     private static Hook.Result term3Rest(final JavacParser $this, @Hook.Reference JCTree.JCExpression t, @Hook.Reference List<JCTree.JCExpression> typeArgs) {
-        final Tokens.Token token = token($this);
+        final Tokens.Token token = $this.token();
         if (token.kind == AdditionalOperators.KIND_SAFE_ACCESS) {
             final int pos = token.pos;
             $this.nextToken();
-            typeArgs = typeArgumentsOpt($this, EXPR());
-            final var F = F($this);
-            t = toP($this, F.at(pos).Select(t, ident($this, true)));
-            t = argumentsOpt($this, typeArgs, typeArgumentsOpt($this, t));
+            typeArgs = (Privilege) $this.typeArgumentsOpt((Privilege) JavacParser.EXPR);
+            final var F = F($this).at(pos);
+            final Name ident = (Privilege) $this.ident(true);
+            t = toP($this, F.Select(t, ident));
+            final JCTree.JCExpression typeArgumentsOpt = (Privilege) $this.typeArgumentsOpt(t);
+            t = (Privilege) $this.argumentsOpt(typeArgs, typeArgumentsOpt);
             if (t instanceof JCTree.JCMethodInvocation invocation)
                 (t = new SafeMethodInvocation(invocation)).pos = invocation.pos;
             else if (t instanceof JCTree.JCFieldAccess access)
                 (t = new SafeFieldAccess(access)).pos = access.pos;
             else
-                throw new AssertionError(t.getClass() + ": " + t);
+                throw new AssertionError(STR."\{t.getClass()}: \{t}");
             typeArgs = null;
             return new Hook.Result().jump();
         }
@@ -332,12 +334,12 @@ public class BranchHandler extends BaseSyntaxHandler {
                 expression.type = voidMark(expression.type);
         }
         if (expression.type instanceof VoidMark) {
-            final LinkedList<JCTree> context = HandlerMarker.attrContext();
+            final LinkedList<JCTree> context = HandlerSupport.attrContext();
             final @Nullable JCTree prev = context[-2];
             if (prev != null)
                 if (!(prev.getTag() == AdditionalOperators.TAG_NULL_OR ||
-                        prev instanceof JCTree.JCFieldAccess access && access.selected == expression ||
-                        prev instanceof JCTree.JCMethodInvocation invocation && invocation.meth == expression))
+                      prev instanceof JCTree.JCFieldAccess access && access.selected == expression ||
+                      prev instanceof JCTree.JCMethodInvocation invocation && invocation.meth == expression))
                     expression.type = attr.syms.voidType;
         }
     }
@@ -369,7 +371,7 @@ public class BranchHandler extends BaseSyntaxHandler {
     @Privilege
     private static <T extends JCTree.JCExpression> void dropResult(final Gen gen, final T expression) {
         if (gen.result.typecode != VOIDcode && expression.type instanceof VoidMark) {
-            final JCTree prev = HandlerMarker.genContext()[-2];
+            final JCTree prev = HandlerSupport.genContext()[-2];
             if (prev != null)
                 if (!(prev.getTag() == AdditionalOperators.TAG_NULL_OR || prev instanceof JCTree.JCFieldAccess || prev instanceof JCTree.JCMethodInvocation invocation && invocation.meth == expression)) {
                     gen.result.drop();

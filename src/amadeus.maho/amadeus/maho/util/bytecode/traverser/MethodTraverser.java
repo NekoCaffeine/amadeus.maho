@@ -247,7 +247,7 @@ public interface MethodTraverser {
     default void compute(final MethodNode methodNode, final ClassWriter writer, final @Nullable Consumer<Frame> peek = null, final ComputeType... computeTypes) = compute(methodNode, writer, peek, Set.of(computeTypes));
     
     default void compute(final MethodNode methodNode, final ClassWriter writer, final @Nullable Consumer<Frame> peek = null, final Set<ComputeType> computeTypes) {
-        try (final var handle = sampler().handle("%s#%s%s -> %s".formatted(writer.name(), methodNode.name, methodNode.desc, computeTypes.stream().sorted(Enum::compareTo).map(Enum::name).collect(Collectors.joining(" | "))))) {
+        try (final var _ = sampler()[STR."\{writer.name()}#\{methodNode.name}\{methodNode.desc} -> \{computeTypes.stream().sorted(Enum::compareTo).map(Enum::name).collect(Collectors.joining(" | "))}"]) {
             methodNode.maxLocals = methodNode.maxStack = 0;
             final InsnList instructions = methodNode.instructions;
             final Frame initFrame = { };

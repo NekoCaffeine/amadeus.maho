@@ -29,15 +29,29 @@ import amadeus.maho.util.bytecode.Bytecodes;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Hook {
     
-    @Share(erase = @Erase, init = @Init(initialized = true), required = "amadeus.maho.transform.mark.Hook")
+    @Share(erase = @Erase, required = "amadeus.maho.transform.mark.Hook")
     class Result {
         
         private static final Object VOID_MARK;
         
         static {
-            if (Result.class.getClassLoader() != null)
-                VOID_MARK = { };
-            else if (MahoBridge.bridgeClassLoader() == null)
+            if (Result.class.getClassLoader() != null) {
+                @Nullable Class<?> bootTarget = null;
+                try {
+                    bootTarget = Class.forName(Result.class.getName(), false, null);
+                } catch (final ClassNotFoundException _) { }
+                if (bootTarget == null)
+                    VOID_MARK = { };
+                else
+                    try {
+                        final Field field = bootTarget.getDeclaredField("VOID_MARK");
+                        field.setAccessible(true);
+                        VOID_MARK = field.get(null);
+                    } catch (final Throwable throwable) {
+                        throwable.printStackTrace();
+                        throw new RuntimeException(throwable);
+                    }
+            } else if (MahoBridge.bridgeClassLoader() == null)
                 VOID_MARK = { };
             else
                 try {
@@ -126,18 +140,16 @@ public @interface Hook {
     
     @Share(required = "amadeus.maho.transform.mark.Hook")
     @Target(ElementType.PARAMETER)
-    @Retention(RetentionPolicy.RUNTIME)
-    @interface Reference { }
+    @Retention(RetentionPolicy.RUNTIME) @interface Reference { }
     
     @Share(required = "amadeus.maho.transform.mark.Hook")
     @Target(ElementType.PARAMETER)
-    @Retention(RetentionPolicy.RUNTIME)
-    @interface LocalVar {
-    
+    @Retention(RetentionPolicy.RUNTIME) @interface LocalVar {
+        
         int opcode() default Bytecodes.ALOAD;
         
         int index();
-    
+        
     }
     
     boolean isStatic() default false;
@@ -163,7 +175,7 @@ public @interface Hook {
     At at() default @At;
     
     At[] jump() default { };
-
+    
     At[] lambdaRedirect() default { };
     
     @Remap.Class

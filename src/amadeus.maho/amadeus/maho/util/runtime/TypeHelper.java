@@ -6,15 +6,19 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import jdk.internal.ValueBased;
@@ -235,6 +239,12 @@ public interface TypeHelper {
     
     enum BoundType {EQUAL, LOWER, UPPER}
     
+    List<Class<?>> primitiveTypes = List.of(boolean.class, byte.class, short.class, char.class, int.class, long.class, float.class, double.class);
+    
+    Map<Class<?>, String> primitiveTypeNames = primitiveTypes.stream().collect(Collectors.toMap(Function.identity(), clazz -> clazz.getName().upper(0)));
+    
+    static boolean isBoxedMethod(final Method method) = method.getName().equals("valueOf") && method.getParameterCount() == 1 && Wrapper.findWrapperType(method.getDeclaringClass()) != null;
+    
     static Class<?> boxClass(final Class<?> clazz) {
         final @Nullable Wrapper wrapper = Wrapper.findPrimitiveType(clazz);
         return wrapper == null ? clazz : wrapper.wrapperType;
@@ -303,7 +313,7 @@ public interface TypeHelper {
     @SneakyThrows
     private static @Nullable MethodHandle mergeMethodHandle(final List<MethodHandle> handles, final StreamHelper.MatchType matchType) = switch (handles.size()) {
         case 0  -> null;
-        case 1  -> handles.get(0);
+        case 1  -> handles.getFirst();
         default -> test.bindTo(switch (matchType) {
             case ANY  -> (Predicate<?>) target -> handles.stream().anyMatch(handle -> (boolean) handle.invoke(target));
             case ALL  -> (Predicate<?>) target -> handles.stream().allMatch(handle -> (boolean) handle.invoke(target));
@@ -324,7 +334,7 @@ public interface TypeHelper {
                         Stream.of(wildcardType.getUpperBounds()).map(type -> typeParameterFilter(type, BoundType.UPPER))
                 ).nonnull().toList(), StreamHelper.MatchType.ALL);
         case TypeVariable typeVariable -> mergeMethodHandle(Stream.of(typeVariable.getBounds()).map(type -> typeParameterFilter(type, BoundType.LOWER)).nonnull().toList(), StreamHelper.MatchType.ALL);
-        default                        -> throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("Unsupported expectedType: %s(%s)".formatted(expectedType, expectedType.getClass())));
+        default                        -> throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException(STR."Unsupported expectedType: \{expectedType}(\{expectedType.getClass()})"));
     };
     
     @SneakyThrows

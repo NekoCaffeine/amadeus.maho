@@ -10,6 +10,7 @@ import org.objectweb.asm.tree.ClassNode;
 
 import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformMetadata;
@@ -29,7 +30,9 @@ public interface VerifyErrorInfoTransformer {
     String EXPECTED_STACKMAP = "Expected stackmap frame at this location.", EXPECTED_STACKMAP_OR_DEAD_CODE = "Expected stackmap frame at this location, or this location is unreachable.";
     
     @Hook(at = @At(var = @At.VarInsn(opcode = ALOAD, var = 1)), before = false, capture = true, avoidRecursion = true, metadata = @TransformMetadata(enable = MahoExport.MAHO_DEBUG_DUMP_BYTECODE, aotLevel = AOTTransformer.Level.RUNTIME))
-    private static String _init_(final String capture, final VerifyError $this, final String message) {
+    private static @Nullable String _init_(final String capture, final VerifyError $this, final @Nullable String message) {
+        if (message == null)
+            return null;
         final String transformed[] = { message };
         try {
             {
@@ -50,7 +53,7 @@ public interface VerifyErrorInfoTransformer {
                             final ClassNode resultNode = ASMHelper.newClassNode(Files.readAllBytes(resultPath)), sourceNode = ASMHelper.newClassNode(Files.readAllBytes(sourcePath));
                             ASMHelper.lookupMethodNode(resultNode, name, descriptor)
                                     .ifPresent(resultMethod -> ASMHelper.lookupMethodNode(sourceNode, name, descriptor)
-                                            .ifPresent(sourceMethod -> transformed[0] += "  Result Dump:\n%s  Source Dump:\n%s".formatted(ASMHelper.dumpBytecode(resultMethod), ASMHelper.dumpBytecode(sourceMethod))));
+                                            .ifPresent(sourceMethod -> transformed[0] += STR."  Result Dump:\n\{ASMHelper.dumpBytecode(resultMethod)}  Source Dump:\n\{ASMHelper.dumpBytecode(sourceMethod)}"));
                         }
                     } catch (final IOException ignored) { }
                 }

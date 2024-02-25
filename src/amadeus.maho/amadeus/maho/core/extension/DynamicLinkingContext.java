@@ -19,14 +19,14 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 
-@AllArgsConstructor
-@FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = true)
+@TransformProvider
 @Share(erase = @Erase, init = @Init(initialized = true), required = {
         "amadeus.maho.core.extension.DynamicLinkingContext$CallSiteContextThreadLocal",
         "amadeus.maho.core.extension.DynamicLinkingContext$LinkingType"
 })
-@TransformProvider
-public class DynamicLinkingContext {
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = true)
+public final class DynamicLinkingContext {
     
     @Share
     private static final class CallSiteContextThreadLocal extends ThreadLocal<LinkedList<DynamicLinkingContext>> {
@@ -48,10 +48,10 @@ public class DynamicLinkingContext {
     
     private static final String MethodHandleNatives = "java.lang.invoke.MethodHandleNatives";
     
-    // Unable to use ThreadLocal.withInitial(Stack::new) here
+    // Unable to use ThreadLocal.withInitial(LinkedList::new) here
     // DynamicLinkingContext#<clinit> =>
     // ThreadLocal#withInitial =>
-    // Stack::new =>
+    // LinkedList::new =>
     // MethodHandleNatives#link? =>
     // DynamicLinkingContext#link? =>
     // contextStack.get() =>
@@ -94,17 +94,17 @@ public class DynamicLinkingContext {
     
     @Override
     public boolean equals(final @Nullable Object obj)
-            = obj != null && obj.getClass() == DynamicLinkingContext.class
-            && linkingType == ((DynamicLinkingContext) obj).linkingType
-            && caller == ((DynamicLinkingContext) obj).caller
-            && name.equals(((DynamicLinkingContext) obj).name)
-            && type == ((DynamicLinkingContext) obj).type
-            && bootstrapMethod == ((DynamicLinkingContext) obj).bootstrapMethod
-            && (staticArguments instanceof Object[] ?
-            Arrays.deepEquals((Object[]) staticArguments, (Object[]) ((DynamicLinkingContext) obj).staticArguments) :
-            Objects.equals(staticArguments, ((DynamicLinkingContext) obj).staticArguments))
-            && refKind == ((DynamicLinkingContext) obj).refKind
-            && defc == ((DynamicLinkingContext) obj).defc;
+            = obj instanceof DynamicLinkingContext context &&
+              linkingType == context.linkingType &&
+              caller == context.caller &&
+              name.equals(context.name) &&
+              type == context.type &&
+              bootstrapMethod == context.bootstrapMethod &&
+              (staticArguments instanceof Object[] ?
+                      Arrays.deepEquals((Object[]) staticArguments, (Object[]) context.staticArguments) :
+                      Objects.equals(staticArguments, context.staticArguments)) &&
+              refKind == context.refKind &&
+              defc == context.defc;
     
     @Override
     public String toString() {
@@ -114,15 +114,15 @@ public class DynamicLinkingContext {
                 .append("name").append(" = ").append(name).append(", ")
                 .append("target").append(" = ").append(type).append(", ");
         switch (linkingType) {
-            case LINK_CALL_SITE                           -> builder.append("bootstrapMethod").append(" = ").append(bootstrapMethod).append(", ")
+            case LINK_CALL_SITE              -> builder.append("bootstrapMethod").append(" = ").append(bootstrapMethod).append(", ")
                     .append("staticArguments").append(" = ").append(staticArguments instanceof Object[] ?
                             Arrays.toString((Object[]) staticArguments) : staticArguments);
-            case LINK_METHOD, LINK_METHOD_HANDLE_CONSTANT -> builder.append("refKind").append(" = ").append(refKind).append(", ")
+            case LINK_METHOD,
+                 LINK_METHOD_HANDLE_CONSTANT -> builder.append("refKind").append(" = ").append(refKind).append(", ")
                     .append("defc").append(" = ").append(defc).append('/').append(defc != null ? defc.getClassLoader() : null);
         }
         return builder.append(']').toString();
     }
-    
     
     public static DynamicLinkingContext withLinkCallSite(final Class<?> caller, final String name, final Object type, final MethodHandle bootstrapMethod, final Object staticArguments)
             = { LinkingType.LINK_CALL_SITE, caller, name, type, bootstrapMethod, staticArguments, 0, null };
@@ -136,10 +136,9 @@ public class DynamicLinkingContext {
     public static DynamicLinkingContext withLinkMethodHandleConstant(final Class<?> caller, final String name, final Object type, final int refKind, final Class<?> defc)
             = { LinkingType.LINK_METHOD_HANDLE_CONSTANT, caller, name, type, null, null, refKind, defc };
     
-    // runtime version > 17
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkCallSite_$Enter(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
-    = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
+            = contextStack().push(withLinkCallSite((Class<?>) callerObj, nameObj.toString(), typeObj, (MethodHandle) bootstrapMethodObj, staticArguments));
     
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkCallSite_$Exit(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments, final Object appendixResult[])
@@ -152,7 +151,6 @@ public class DynamicLinkingContext {
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME), at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     public static void linkDynamicConstant_$Exit(final Object callerObj, final Object bootstrapMethodObj, final Object nameObj, final Object typeObj, final Object staticArguments)
             = contextStack().pop();
-    // end
     
     @Hook(target = MethodHandleNatives, isStatic = true, direct = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     public static void linkMethod_$Enter(final Class<?> callerClass, final int refKind, final Class<?> defc, final String name, final Object type, final Object appendixResult[])

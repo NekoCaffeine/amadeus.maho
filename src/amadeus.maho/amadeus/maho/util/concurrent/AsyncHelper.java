@@ -1,12 +1,15 @@
 package amadeus.maho.util.concurrent;
 
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -14,6 +17,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.inspection.TestOnly;
+import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.throwable.RetryException;
 
 public interface AsyncHelper {
@@ -118,8 +122,16 @@ public interface AsyncHelper {
     @SneakyThrows
     static void await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final CompletableFuture<?>... futures) = CompletableFuture.allOf(futures).get(timeout, unit);
     
-    static void await(final Stream<CompletableFuture<?>> futures) = await(futures.toArray(CompletableFuture[]::new));
+    static void await(final Stream<? extends CompletableFuture<?>> futures) = await(futures.toArray(CompletableFuture[]::new));
+    
+    static void await(final Collection<? extends CompletableFuture<?>> futures) = await(futures.toArray(CompletableFuture[]::new));
     
     static void await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final Stream<CompletableFuture<?>> futures) = await(timeout, unit, futures.toArray(CompletableFuture[]::new));
+    
+    static void awaitRecursion(final Consumer<ConcurrentLinkedQueue<CompletableFuture<Void>>> consumer) {
+        final ConcurrentLinkedQueue<CompletableFuture<Void>> futures = { };
+        consumer[futures];
+        await(Stream.generate(futures::poll).takeWhile(ObjectHelper::nonNull));
+    }
     
 }

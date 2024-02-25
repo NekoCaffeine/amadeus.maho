@@ -1,76 +1,63 @@
 package amadeus.maho.util.build;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLConnection;
-import java.net.URLStreamHandler;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
-import java.security.ProtectionDomain;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
-import java.util.NoSuchElementException;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
 import javax.tools.DiagnosticListener;
-import javax.tools.FileObject;
-import javax.tools.ForwardingJavaFileManager;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardJavaFileManager;
-import javax.tools.StandardLocation;
 
 import jdk.internal.misc.VM;
 
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
-import com.sun.tools.javac.api.JavacTool;
+import com.sun.tools.javac.api.MultiTaskListener;
+import com.sun.tools.javac.file.BaseFileManager;
+import com.sun.tools.javac.file.CacheFSInfo;
 import com.sun.tools.javac.file.JavacFileManager;
+import com.sun.tools.javac.jvm.Target;
+import com.sun.tools.javac.main.Arguments;
+import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.resources.LauncherProperties;
-import com.sun.tools.javac.resources.LauncherProperties.Errors;
+import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
+import com.sun.tools.javac.util.Log;
 
 import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.Delegate;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchCompiler;
+import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchContext;
 import amadeus.maho.util.function.FunctionHelper;
+import amadeus.maho.util.runtime.DebugHelper;
 
 public interface Javac {
     
@@ -88,175 +75,90 @@ public interface Javac {
         
         public Failure(final JCDiagnostic.Error error) = super(message(error));
         
+        public Failure(final JCDiagnostic.Error error, final Throwable throwable) = super(message(error), throwable);
+        
         private static String message(final JCDiagnostic.Error error) {
             try {
                 return resourceBundle.getString("launcher.error") + MessageFormat.format(resourceBundle.getString(error.key()), error.getArgs());
-            } catch (final MissingResourceException e) { return "Cannot access resource; " + error.key() + Arrays.toString(error.getArgs()); }
+            } catch (final MissingResourceException e) { return STR."Cannot access resource; \{error.key()}\{Arrays.toString(error.getArgs())}"; }
         }
         
     }
     
-    @Getter
-    @RequiredArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-    class InMemoryContext {
+    record Request(Collection<Path> paths, List<String> options, Locale locale = Locale.getDefault(), Charset charset = StandardCharsets.UTF_8,
+                   @Nullable DiagnosticListener<? super JavaFileObject> listener = null, PrintWriter writer = { new OutputStreamWriter(System.out), true }) {
         
-        HashMap<String, byte[]> inMemoryClasses = { };
+        public <C extends Context> C generateCompileContext(final C context, final boolean cacheFSInfo = true) {
+            context.put(Locale.class, locale);
+            if (listener != null)
+                context.put(DiagnosticListener.class, listener);
+            context.put(Log.errKey, writer);
+            if (cacheFSInfo)
+                CacheFSInfo.preRegister(context);
+            final JavacFileManager fileManager = { context, true, charset };
+            fileManager.autoClose = true;
+            context.put(JavaFileManager.class, fileManager);
+            final Arguments args = Arguments.instance(context);
+            args.init("javac", options, List.of(), fileManager.getJavaFileObjectsFromPaths(paths));
+            if (fileManager.isSupportedOption(Option.MULTIRELEASE.primaryName) == 1)
+                fileManager.handleOption(Option.MULTIRELEASE.primaryName, List.of(Target.instance(context).multiReleaseValue()).iterator());
+            return context;
+        }
         
-        public MemoryFileManager manager(final StandardJavaFileManager delegate) = { delegate, inMemoryClasses };
+        public CompileTask.Parallel parallelCompileTask(final boolean cacheFSInfo = true) = { this, generateCompileContext(new DispatchContext()) };
         
-        public MemoryClassLoader loader(final ClassLoader parent) = { parent, inMemoryClasses };
+        public CompileTask.Serial serialCompileTask(final boolean cacheFSInfo = true) = { this, generateCompileContext(new Context()) };
+        
+        public CompileTask compileTask(final boolean parallel = true, final boolean cacheFSInfo = true) = parallel ? parallelCompileTask(cacheFSInfo) : serialCompileTask(cacheFSInfo);
+        
+        @SneakyThrows
+        public void compile(final boolean parallel = true, final boolean cacheFSInfo = true) throws Javac.Failure {
+            try (final CompileTask<?> compileTask = compileTask(parallel, cacheFSInfo)) { DebugHelper.logTimeConsuming(parallel ? "parallel-compile" : "serial-compile", compileTask::compile); }
+        }
         
     }
     
-    @RequiredArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-    class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager> {
+    sealed interface CompileTask<C extends JavaCompiler> extends AutoCloseable {
         
-        Map<String, byte[]> map;
-        
-        @Override
-        public JavaFileObject getJavaFileForOutput(final JavaFileManager.Location location, final String className, final JavaFileObject.Kind kind, final FileObject sibling) throws IOException
-                = location == StandardLocation.CLASS_OUTPUT && kind == JavaFileObject.Kind.CLASS ? createInMemoryClassFile(className) : super.getJavaFileForOutput(location, className, kind, sibling);
-        
-        private JavaFileObject createInMemoryClassFile(final String className) = new SimpleJavaFileObject(URI.create("memory:///" + className.replace('.', '/') + ".class"), JavaFileObject.Kind.CLASS) {
+        record Parallel(Request request, DispatchContext context) implements CompileTask<DispatchCompiler> {
             
             @Override
-            public OutputStream openOutputStream() = new ByteArrayOutputStream() {
-                
-                @Override
-                public void close() throws IOException {
-                    super.close();
-                    map.put(className, toByteArray());
-                }
-                
-            };
+            public DispatchCompiler compiler() = DispatchCompiler.instance(context());
             
-        };
+        }
         
-    }
-    
-    @Getter
-    @RequiredArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-    class MemoryClassLoader extends ClassLoader {
-        
-        @RequiredArgsConstructor
-        @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-        private static class MemoryURLStreamHandler extends URLStreamHandler {
-            
-            @RequiredArgsConstructor
-            @FieldDefaults(level = AccessLevel.PRIVATE)
-            private static class Connection extends URLConnection {
-                
-                final byte[] bytes;
-                
-                @Nullable InputStream input;
-                
-                @Override
-                public void connect() throws IOException {
-                    if (!connected) {
-                        if (bytes == null)
-                            throw new FileNotFoundException(getURL().getPath());
-                        input = new ByteArrayInputStream(bytes);
-                        connected = true;
-                    }
-                }
-                
-                @Override
-                public InputStream getInputStream() throws IOException {
-                    connect();
-                    return input;
-                }
-                
-                @Override
-                public long getContentLengthLong() = bytes.length;
-                
-                @Override
-                public String getContentType() = "application/octet-stream";
-                
-            }
-            
-            MemoryClassLoader loader;
+        record Serial(Request request, Context context) implements CompileTask<JavaCompiler> {
             
             @Override
-            public MemoryURLStreamHandler.Connection openConnection(final URL url) {
-                if (!url.getProtocol().equalsIgnoreCase("memory"))
-                    throw new IllegalArgumentException(url.toString());
-                return { url, loader.sourceFileClasses.get(binaryName(url.getPath())) };
-            }
+            public JavaCompiler compiler() = JavaCompiler.instance(context());
             
         }
         
-        MemoryURLStreamHandler handler = { this };
+        private static com.sun.tools.javac.util.List<JavaFileObject> sources(final Context context, final Request request)
+                = ((JavacFileManager) context.get(JavaFileManager.class)).getJavaFileObjectsFromPaths(request.paths).fromIterable().collect(com.sun.tools.javac.util.List.collector());
         
-        Map<String, byte[]> sourceFileClasses;
+        Request request();
         
-        @Override
-        protected Class<?> loadClass(final String name, final boolean resolve) throws ClassNotFoundException {
-            synchronized (getClassLoadingLock(name)) {
-                Class<?> loadedClass = findLoadedClass(name);
-                if (loadedClass == null) {
-                    loadedClass = sourceFileClasses.containsKey(name) ? findClass(name) : getParent().loadClass(name);
-                    if (resolve)
-                        resolveClass(loadedClass);
-                }
-                return loadedClass;
-            }
+        Context context();
+        
+        C compiler();
+        
+        default void compile() throws Javac.Failure {
+            final Context context = context();
+            try {
+                compiler().compile(sources(context, request()));
+                if (compiler().errorCount() > 0)
+                    throw new Javac.Failure(LauncherProperties.Errors.CompilationFailed);
+            } catch (final Throwable throwable) { throw new Javac.Failure(LauncherProperties.Errors.CompilationFailed, throwable); }
         }
         
         @Override
-        public URL getResource(final String name) = sourceFileClasses.containsKey(binaryName(name)) ? findResource(name) : getParent().getResource(name);
-        
-        @Override
-        public Enumeration<URL> getResources(final String name) throws IOException {
-            final URL url = findResource(name);
-            final Enumeration<URL> enumeration = getParent().getResources(name);
-            if (url == null)
-                return enumeration;
-            else {
-                final List<URL> list = new ArrayList<>();
-                list += url;
-                while (enumeration.hasMoreElements())
-                    list += enumeration.nextElement();
-                return Collections.enumeration(list);
-            }
+        default void close() throws Exception {
+            final Context context = context();
+            JavaCompiler.instance(context)?.close();
+            if (context.get(JavaFileManager.class) instanceof BaseFileManager baseFileManager && baseFileManager.autoClose)
+                baseFileManager.close();
         }
-        
-        @Override
-        protected Class<?> findClass(final String name) throws ClassNotFoundException {
-            final byte bytes[] = sourceFileClasses.get(name);
-            if (bytes == null)
-                throw new ClassNotFoundException(name);
-            return defineClass(name, bytes, 0, bytes.length, new ProtectionDomain(null, null, this, null));
-        }
-        
-        @Override
-        public @Nullable URL findResource(final String name) {
-            final @Nullable String binaryName = binaryName(name);
-            if (binaryName == null || sourceFileClasses[binaryName] == null)
-                return null;
-            try { return { "memory", null, -1, name, handler }; } catch (final MalformedURLException e) { return null; }
-        }
-        
-        @Override
-        public Enumeration<URL> findResources(final String name) = new Enumeration<>() {
-            
-            private @Nullable URL next = findResource(name);
-            
-            @Override
-            public boolean hasMoreElements() = next != null;
-            
-            @Override
-            public URL nextElement() {
-                if (next == null)
-                    throw new NoSuchElementException();
-                try { return next; } finally { next = null; }
-            }
-            
-        };
-        
-        private static @Nullable String binaryName(final String name) = !name.endsWith(".class") ? null : name.substring(0, name.length() - 6).replace('/', '.');
         
     }
     
@@ -264,23 +166,30 @@ public interface Javac {
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     class ClassesNameListener implements TaskListener {
         
-        ConcurrentLinkedQueue<String> collection = { };
+        ConcurrentLinkedQueue<String> names = { };
         
         public ClassesNameListener(final JavacTask task) = task.addTaskListener(this);
+        
+        public ClassesNameListener(final Context context) = MultiTaskListener.instance(context).add(this);
         
         @Override
         public void started(final TaskEvent event) {
             if (event.getKind() == TaskEvent.Kind.ANALYZE) {
                 final TypeElement element = event.getTypeElement();
                 if (element.getNestingKind() == NestingKind.TOP_LEVEL)
-                    collection += element.getQualifiedName().toString();
+                    names += element.getQualifiedName().toString();
             }
         }
         
     }
     
-    @Getter(on = @Delegate)
-    JavacTool instance = JavacTool.create();
+    AtomicReference<Boolean> parallelStrategy = { };
+    
+    {
+        final @Nullable String strategy = System.getProperty("amadeus.maho.compile.parallel");
+        if (strategy != null)
+            parallelStrategy.set(Boolean.parseBoolean(strategy));
+    }
     
     @Getter
     PathMatcher javaFileMatcher = FileSystems.getDefault().getPathMatcher("glob:**.java");
@@ -302,10 +211,10 @@ public interface Javac {
             }
             switch (opt) { // the following options all expect a value, either in the following position, or after '=', for options beginning "--"
                 case "--add-exports",
-                        "--add-modules",
-                        "--limit-modules",
-                        "--patch-module",
-                        "--upgrade-module-path" -> {
+                     "--add-modules",
+                     "--limit-modules",
+                     "--patch-module",
+                     "--upgrade-module-path" -> {
                     if (value == null) {
                         if (i == runtimeArgs.length - 1) // should not happen when invoked from launcher
                             throw new Failure(LauncherProperties.Errors.NoValueForOption(opt));
@@ -340,11 +249,10 @@ public interface Javac {
     }
     
     @SneakyThrows
-    static void compile(final Collection<Path> paths, final List<String> options, final Charset charset = StandardCharsets.UTF_8, final Locale locale = Locale.getDefault(), final Consumer<JavacTask> worker = FunctionHelper.abandon(),
-            final Function<JavacFileManager, JavaFileManager> mapper = self -> self, final DiagnosticListener<? super JavaFileObject> listener = null, final PrintWriter writer = { new OutputStreamWriter(System.out), true }) throws Failure {
-        final JavacFileManager manager = getStandardFileManager(listener, locale, charset);
-        if (!getTask(writer, mapper.apply(manager), listener, options, null, manager.getJavaFileObjectsFromPaths(paths)).let(worker).call())
-            throw new Failure(Errors.CompilationFailed);
+    static void compile(final Collection<Path> paths, final List<String> options, final Charset charset = StandardCharsets.UTF_8, final Locale locale = Locale.getDefault(),
+            final DiagnosticListener<? super JavaFileObject> listener = null, final PrintWriter writer = { new OutputStreamWriter(System.out), true }) throws Failure {
+        final Request request = { paths, options, locale, charset, listener, writer };
+        request.compile(parallelStrategy.get()?.booleanValue() ?? (paths.size() > 8));
     }
     
     Predicate<Path> hasModuleInfo = path -> path ^ root -> Files.exists(root / (MODULE_INFO + CLASS_SUFFIX));
@@ -377,7 +285,7 @@ public interface Javac {
             args += "--module-source-path";
             args += moduleSourcePath.toAbsolutePath().toString();
             args += "-d";
-            args += classesDir.toAbsolutePath().toString();
+            args += (~classesDir.toAbsolutePath()).toString();
             argsTransformer.accept(args);
             compile(module.subModules().entrySet().stream()
                     .filter(entry -> shouldCompile.test(entry.getKey()))
@@ -405,12 +313,12 @@ public interface Javac {
     
     static void addReadsAllUnnamed(final Collection<String> args, final Module... modules) = Stream.of(modules).forEach(module -> {
         args += "--add-reads";
-        args += "%s=ALL-UNNAMED".formatted(module.name());
+        args += STR."\{module.name()}=ALL-UNNAMED";
     });
     
     static void addOpensAllUnnamed(final Collection<String> args, final Map<String, Set<String>> modulesWithPackages) = modulesWithPackages.forEach((module, packages) -> packages.forEach(pkg -> {
         args += "--add-reads";
-        args += "%s/%s=ALL-UNNAMED".formatted(module, pkg);
+        args += STR."\{module}/\{pkg}=ALL-UNNAMED";
     }));
     
 }

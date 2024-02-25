@@ -15,6 +15,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.ASMHelper;
+import amadeus.maho.util.bytecode.tree.LabelNodeHelper;
 
 @EqualsAndHashCode
 @RequiredArgsConstructor
@@ -94,7 +95,7 @@ public class TypeOwner {
             switch (now.getOpcode()) {
                 case -1 -> {
                     if (now instanceof LabelNode labelNode)
-                        return labelNode.label();
+                        return LabelNodeHelper.label(labelNode);
                 }
                 default -> { break loop; }
             }

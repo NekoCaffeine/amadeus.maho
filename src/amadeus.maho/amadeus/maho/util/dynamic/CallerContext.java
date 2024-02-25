@@ -32,16 +32,16 @@ public interface CallerContext {
     
     static <T> Class<T> caller(final int depth) = (Class<T>) callerFrame(1 + depth).getDeclaringClass();
     
-    static Executable selfExecutable() = executable(callerFrame(1));
+    static @Nullable Executable selfExecutable() = executable(callerFrame(1));
     
-    static Executable callerExecutable() = executable(callerFrame(2));
+    static @Nullable Executable callerExecutable() = executable(callerFrame(2));
     
-    static Executable callerExecutable(final int depth) = executable(callerFrame(1 + depth));
+    static @Nullable Executable callerExecutable(final int depth) = executable(callerFrame(1 + depth));
     
     @SneakyThrows
     static @Nullable Executable executable(final StackWalker.StackFrame frame)
             = frame.getMethodName().equals(_CLINIT_) ? null : frame.getMethodName().equals(_INIT_) ?
-            frame.getDeclaringClass().getConstructor(frame.getMethodType().parameterArray()) :
+            frame.getDeclaringClass().getDeclaredConstructor(frame.getMethodType().parameterArray()) :
             frame.getDeclaringClass().getDeclaredMethod(frame.getMethodName(), frame.getMethodType().parameterArray());
     
 }

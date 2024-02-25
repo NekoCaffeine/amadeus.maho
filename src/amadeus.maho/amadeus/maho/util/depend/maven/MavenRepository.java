@@ -150,8 +150,8 @@ public class MavenRepository extends CacheableHttpRepository {
         
         @Override
         public void visitTagBegin(final String tag, final Map<String, String> attr) {
-            tags.addLast(tag);
-            dataStack.addLast(new StringBuilder());
+            tags << tag;
+            dataStack << new StringBuilder();
             super.visitTagBegin(tag, attr);
         }
         
@@ -159,10 +159,10 @@ public class MavenRepository extends CacheableHttpRepository {
         public void visitTagEnd(final String tag) {
             if (inProperties())
                 properties[tags.stream().skip(2L).collect(Collectors.joining("."))] = data();
-            tags.removeLast();
+            tags--;
             if (projectPrefix.equals(tags) || parentPrefix.equals(tags) && !properties.containsKey(tag))
-                projectProperties["project." + tag] = data();
-            dataStack.removeLast();
+                projectProperties[STR."project.\{tag}"] = data();
+            dataStack--;
             super.visitTagEnd(tag);
         }
         
@@ -285,7 +285,7 @@ public class MavenRepository extends CacheableHttpRepository {
         
     }
     
-    private static final String POM = "pom", JAR = "jar", MD5 = "md5", MD5_SUFFIX = "." + MD5, SOURCES = "sources", JAVADOC = "javadoc";
+    private static final String POM = "pom", JAR = "jar", MD5 = "md5", MD5_SUFFIX = STR.".\{MD5}", SOURCES = "sources", JAVADOC = "javadoc";
     
     @Getter
     boolean hasReleases, hasSnapshots;
@@ -296,17 +296,17 @@ public class MavenRepository extends CacheableHttpRepository {
     
     MapTable<String, String, VersionInfo> versionInfoCache = MapTable.newConcurrentHashMapTable();
     
-    public String projectDir(final Project project) = "%s/%s/%s/".formatted(project.group().replace('.', '/'), project.artifact(), project.version());
+    public String projectDir(final Project project) = STR."\{project.group().replace('.', '/')}/\{project.artifact()}/\{project.version()}/";
     
     public String projectFileName(final Project project, final String extension)
-            = project.classifiers().length > 0 ? "%s-%s-%s".formatted(project.artifact(), projectVersion(project, extension), String.join("-", project.classifiers())) : "%s-%s".formatted(project.artifact(), projectVersion(project, extension));
+            = project.classifiers().length > 0 ? STR."\{project.artifact()}-\{projectVersion(project, extension)}-\{String.join("-", project.classifiers())}" : STR."\{project.artifact()}-\{projectVersion(project, extension)}";
     
     @SneakyThrows
     public String projectVersion(final Project project, final String extension) {
         if (project.version().endsWith("-SNAPSHOT")) {
             if (!hasSnapshots())
-                throw new RepositoryFileNotFoundException(project + "." + extension, this);
-            final Path relative = Path.of("%s/%s/%s/maven-metadata.xml".formatted(project.group().replace('.', '/'), project.artifact(), project.version()));
+                throw new RepositoryFileNotFoundException(STR."\{project}.\{extension}", this);
+            final Path relative = Path.of(STR."\{project.group().replace('.', '/')}/\{project.artifact()}/\{project.version()}/maven-metadata.xml");
             final String classifier = String.join("-", project.classifiers());
             return snapshotVersionsCache.computeIfAbsent(project.dropClassifier(), _ -> {
                         try {
@@ -323,7 +323,7 @@ public class MavenRepository extends CacheableHttpRepository {
                     .orElseGet(project::version);
         }
         if (!hasReleases())
-            throw new RepositoryFileNotFoundException(project + "." + extension, this);
+            throw new RepositoryFileNotFoundException(STR."\{project}.\{extension}", this);
         return project.version();
     }
     
@@ -350,13 +350,13 @@ public class MavenRepository extends CacheableHttpRepository {
         if (!completenessMetadata) {
             final String relativeChecksum = cache.checksum(MD5), actualChecksum = readMD5(downloadDataFormRemote(relative << MD5_SUFFIX, cache << MD5_SUFFIX, true));
             if (!relativeChecksum.equalsIgnoreCase(actualChecksum))
-                throw new IllegalStateException("relative=%s, checksum=%s, actual=%s".formatted(cache, relativeChecksum, actualChecksum));
+                throw new IllegalStateException(STR."relative=\{cache}, checksum=\{relativeChecksum}, actual=\{actualChecksum}");
         }
     }
     
     @SneakyThrows
     public VersionInfo resolveVersionInfo(final String group, final String artifact) throws IOException = versionInfoCache.row(group).computeIfAbsent(artifact, it -> {
-        final Path relative = Path.of("%s/%s/maven-metadata.xml".formatted(group.replace('.', '/'), it));
+        final Path relative = Path.of(STR."\{group.replace('.', '/')}/\{it}/maven-metadata.xml");
         return new VersionInfo.Visitor().let(visitor -> XML.read(tryUpdateCache(relative), visitor, relative | "/")).result();
     });
     
@@ -367,7 +367,7 @@ public class MavenRepository extends CacheableHttpRepository {
     public boolean latest(final Project project) throws IOException = latest(project.group(), project.artifact(), project.version());
     
     @SneakyThrows
-    public boolean valid(final String group, final String artifact, final String version) throws IOException = exists(Path.of("%s/%s/%s/maven-metadata.xml".formatted(group.replace('.', '/'), artifact, version)));
+    public boolean valid(final String group, final String artifact, final String version) throws IOException = exists(Path.of(STR."\{group.replace('.', '/')}/\{artifact}/\{version}/maven-metadata.xml"));
     
     @SneakyThrows
     public boolean valid(final Project project) throws IOException = valid(project.group(), project.artifact(), project.version());

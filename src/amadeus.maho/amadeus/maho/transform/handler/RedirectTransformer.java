@@ -49,26 +49,22 @@ public final class RedirectTransformer extends MethodTransformer<Redirect> imple
     @Override
     public ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
         final String selector = annotation.selector().isEmpty() ? sourceMethod.name : annotation.selector();
-        Predicate<MethodNode> methodChecker = At.Lookup.WILDCARD.equals(selector) ?
-                method -> true :
-                method -> method.name.equals(selector);
-        methodChecker = methodChecker.and(At.Lookup.WILDCARD.equals(annotation.descriptor()) ?
-                method -> true :
-                method -> method.desc.equals(annotation.descriptor()));
+        Predicate<MethodNode> methodChecker = At.Lookup.WILDCARD.equals(selector) ? _ -> true : method -> method.name.equals(selector);
+        methodChecker = methodChecker.and(At.Lookup.WILDCARD.equals(annotation.descriptor()) ? _ -> true : method -> method.desc.equals(annotation.descriptor()));
         final Slice slice = annotation.slice();
         final AnnotationHandler<Slice> sliceHandler = AnnotationHandler.asOneOfUs(slice);
         final At start = slice.value();
         final @Nullable At end = sliceHandler.lookupSourceValue(Slice::end);
         for (final MethodNode methodNode : node.methods)
             if (methodChecker.test(methodNode)) {
-                TransformerManager.transform("redirect", "%s#%s%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), methodNode.name, methodNode.desc, annotation.target(), sourceMethod.name, sourceMethod.desc));
+                TransformerManager.transform("redirect", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{annotation.target()}#\{sourceMethod.name}\{sourceMethod.desc}");
                 context.markModified();
                 final List<AbstractInsnNode> targets = At.Lookup.findTargets(start, manager.remapper(), methodNode.instructions);
                 if (end != null) {
                     final List<AbstractInsnNode> endTarget = At.Lookup.findTargets(end, manager.remapper(), methodNode.instructions);
                     if (targets.size() != 1 || endTarget.size() != 1)
                         throw new IllegalArgumentException("The result of slice matching is not unique, which is dangerous!!!");
-                    final AbstractInsnNode startTargetNode = targets.get(0), endTargetNode = endTarget.get(0);
+                    final AbstractInsnNode startTargetNode = targets.getFirst(), endTargetNode = endTarget.getFirst();
                     boolean flag = false;
                     for (final ListIterator<AbstractInsnNode> iterator = methodNode.instructions.iterator(); iterator.hasNext(); ) {
                         final AbstractInsnNode insn = iterator.next();

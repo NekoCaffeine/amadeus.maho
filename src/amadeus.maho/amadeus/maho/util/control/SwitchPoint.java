@@ -2,6 +2,9 @@ package amadeus.maho.util.control;
 
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -20,9 +23,9 @@ public class SwitchPoint<T> {
         public enum State {SAFE, UNSAFE}
         
         public Handle ensureSafe() = ensure(State.SAFE);
-    
+        
         public Handle ensureUnsafe() = ensure(State.UNSAFE);
-    
+        
     }
     
     public class Handle implements AutoCloseable {
@@ -41,9 +44,12 @@ public class SwitchPoint<T> {
         
     }
     
-    volatile @Nullable T             context;
-    final              Deque<Handle> deque = new LinkedList<>();
+    volatile @Nullable T context;
+    
+    final ConcurrentLinkedQueue<Handle> deque = { };
+    
     final Lock lock = new ReentrantLock();
+    
     final Condition condition = lock.newCondition();
     
     public void runWhen(final T context, final Runnable runnable) { try (final var ignored = ensure(context)) { runnable.run(); } }

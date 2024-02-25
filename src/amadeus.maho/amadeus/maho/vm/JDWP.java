@@ -1,10 +1,17 @@
 package amadeus.maho.vm;
 
 import java.lang.management.ManagementFactory;
+import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
+import amadeus.maho.core.MahoExport;
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.annotation.mark.IndirectCaller;
+import amadeus.maho.util.logging.LogLevel;
 
 public interface JDWP {
     
@@ -12,13 +19,19 @@ public interface JDWP {
     
         record Notification(Type type, String title, String content) implements IDECommand {
             
-            enum Type {
+            @RequiredArgsConstructor(AccessLevel.PRIVATE)
+            @FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = true)
+            public enum Type {
                 
-                INFORMATION,
-                WARNING,
-                ERROR;
+                INFORMATION(LogLevel.INFO),
+                WARNING(LogLevel.WARNING),
+                ERROR(LogLevel.ERROR);
+                
+                LogLevel level;
                 
             }
+            
+            public String asString() = STR."\{title}: \{content}";
             
         }
     
@@ -28,6 +41,12 @@ public interface JDWP {
         
         static void send(final IDECommand command) {
             breakpoint(); // set breakpoint here to enable message send
+        }
+        
+        @IndirectCaller
+        static void notify(final IDECommand.Notification notification, final @Nullable BiConsumer<LogLevel, String> logger = MahoExport.logger()?.namedLogger() ?? null) {
+            logger?.accept(notification.type.level, notification.asString());
+            send(notification);
         }
         
         private static void breakpoint() { }

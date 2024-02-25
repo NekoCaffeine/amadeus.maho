@@ -64,6 +64,8 @@ public @interface Patch {
     @IgnoredDefaultValue("target")
     String target() default "";
     
+    boolean onlyFirstTime() default false;
+    
     Remap remap() default @Remap;
     
     @IgnoredDefaultValue

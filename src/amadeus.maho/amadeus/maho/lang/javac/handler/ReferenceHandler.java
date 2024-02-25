@@ -26,7 +26,7 @@ import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.lang.reference.Mutable;
 import amadeus.maho.lang.reference.Observable;
 import amadeus.maho.lang.reference.Overwritable;
@@ -140,7 +140,7 @@ public abstract class ReferenceHandler<A extends Annotation> extends BaseHandler
             final Tuple2<Getter, JCTree.JCAnnotation> getter = annotations[0];
             boolean error = getter.v1.lazy();
             if (!error)
-                error |= tree.params.size() > 0;
+                error |= !tree.params.isEmpty();
             if (!error)
                 error |= owner instanceof JCTree.JCClassDecl decl && noneMatch(decl.mods.flags, INTERFACE);
             if (!error)
@@ -168,7 +168,7 @@ public abstract class ReferenceHandler<A extends Annotation> extends BaseHandler
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, owner, new JCDiagnostic.Error(MahoJavac.KEY, "reference.mark.nesting"));
     }
     
-    public static long findReferences(final HandlerMarker marker, final JCTree.JCModifiers modifiers, final Env<AttrContext> env) = references.stream()
+    public static long findReferences(final HandlerSupport marker, final JCTree.JCModifiers modifiers, final Env<AttrContext> env) = references.stream()
             .map(annotationType -> marker.getAnnotationsByTypeWithOuter(modifiers, env, modifiers, annotationType))
             .mapToInt(java.util.List::size)
             .sum();

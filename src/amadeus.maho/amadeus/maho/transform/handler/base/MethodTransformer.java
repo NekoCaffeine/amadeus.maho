@@ -25,6 +25,6 @@ public abstract class MethodTransformer<A extends Annotation> extends BaseTransf
     public void onAOT(final AOTTransformer aotTransformer) = aotTransformer.addMethodAnnotation(sourceMethod.name, sourceMethod.desc, annotation.annotationType());
     
     @Override
-    public String toString() = super.toString() + "#" + sourceMethod.name + sourceMethod.desc;
+    public String toString() = STR."\{super.toString()}#\{sourceMethod.name}\{sourceMethod.desc}";
     
 }

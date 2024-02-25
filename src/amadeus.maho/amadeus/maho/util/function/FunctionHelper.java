@@ -1,7 +1,6 @@
 package amadeus.maho.util.function;
 
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -12,10 +11,60 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 
 public interface FunctionHelper {
+    
+    @Extension
+    interface Ext {
+        
+        @Extension.Operator(">")
+        static Runnable then(final @Nullable Runnable runnable, final @Nullable Runnable after) {
+            if (runnable == null)
+                return after;
+            if (after == null)
+                return runnable;
+            return () -> {
+                after.run();
+                runnable.run();
+            };
+        }
+        
+        @Extension.Operator("~")
+        static void safeRun(final @Nullable Runnable runnable) {
+            if (runnable != null)
+                runnable.run();
+        }
+        
+        @Extension.Operator("^")
+        static void safeRun(final @Nullable Runnable runnable, final Consumer<Throwable> handler) {
+            try {
+                if (runnable != null)
+                    runnable.run();
+            } catch (final Throwable t) { handler.accept(t); }
+        }
+        
+        @Extension.Operator(">")
+        static <T> Consumer<T> then(final @Nullable Consumer<? super T> consumer, final @Nullable Consumer<? super T> after) {
+            if (consumer == null)
+                return (Consumer<T>) after;
+            if (after == null)
+                return (Consumer<T>) consumer;
+            return t -> {
+                consumer.accept(t);
+                after.accept(t);
+            };
+        }
+        
+        static <T> T TILDE(final Supplier<T> supplier) = supplier.get();
+        
+        static <A, B> B GET(final Function<A, B> function, final A a) = function.apply(a);
+        
+        static <T> void GET(final Consumer<T> consumer, final T t) = consumer.accept(t);
+        
+    }
     
     @SafeVarargs
     static <T> void always(final Consumer<T> consumer, final T... ts) = Stream.of(ts).forEach(consumer);
@@ -40,16 +89,6 @@ public interface FunctionHelper {
     static <A, B> Consumer<A> link(final Function<A, B> function, final Consumer<B> consumer) = a -> consumer.accept(function.apply(a));
     
     static <A, B, C> Function<A, C> map(final Function<A, B> functionA, final Function<B, C> functionB) = a -> functionB.apply(functionA.apply(a));
-    
-    static <A, B, C> BiConsumer<A, C> link(final Function<A, B> function, final BiConsumer<B, C> consumer) = (a, c) -> consumer.accept(function.apply(a), c);
-    
-    static <A, B> Consumer<A> linkA(final Supplier<B> supplier, final BiConsumer<A, B> consumer) = a -> consumer.accept(a, supplier.get());
-    
-    static <A, B> Consumer<B> linkB(final Supplier<A> supplier, final BiConsumer<A, B> consumer) = b -> consumer.accept(supplier.get(), b);
-    
-    static <A, B, C> Function<A, C> linkA(final Supplier<B> supplier, final BiFunction<A, B, C> consumer) = a -> consumer.apply(a, supplier.get());
-    
-    static <A, B, C> Function<B, C> linkB(final Supplier<A> supplier, final BiFunction<A, B, C> consumer) = b -> consumer.apply(supplier.get(), b);
     
     static <A, B> Supplier<B> map(final Supplier<A> supplier, final Function<A, B> function) = () -> function.apply(supplier.get());
     

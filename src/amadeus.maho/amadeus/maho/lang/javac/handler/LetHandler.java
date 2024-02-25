@@ -61,7 +61,7 @@ public class LetHandler extends JavacContext {
     
     public static final AtomicInteger counter = { };
     
-    public static Name nextName(final Names names = JavacContext.instance().names) = names.fromString("$let$" + counter.getAndIncrement());
+    public static Name nextName(final Names names = JavacContext.instance().names) = names.fromString(STR."$let$\{counter.getAndIncrement()}");
     
     @Hook
     private static Hook.Result visitTree(final Attr $this, final JCTree tree) {

@@ -19,12 +19,11 @@ import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.runtime.UnsafeHelper;
-import amadeus.maho.vm.JVM;
 import amadeus.maho.vm.reflection.JVMReflectiveOperationException;
 import amadeus.maho.vm.reflection.JVMSymbols;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public enum HotSpot implements JVM {
+public enum HotSpot {
     
     @Getter
     instance;
@@ -60,7 +59,7 @@ public enum HotSpot implements JVM {
             final @Nullable String fieldName = getStringRef(entry + fieldNameOffset);
             if (fieldName == null)
                 break;
-            structs.computeIfAbsent(getStringRef(entry + typeNameOffset), k -> new TreeSet<>()) +=
+            structs.computeIfAbsent(getStringRef(entry + typeNameOffset), _ -> new TreeSet<>()) +=
                     new HotSpotField(fieldName, getStringRef(entry + typeStringOffset), unsafe.getLong(entry + (unsafe.getInt(entry + isStaticOffset) != 0 ? addressOffset : offsetOffset)), unsafe.getInt(entry + isStaticOffset) != 0);
         }
         return structs;
@@ -149,7 +148,7 @@ public enum HotSpot implements JVM {
     public long getSymbol(final String name) {
         final long address = JVMSymbols.lookup(name);
         if (address == 0)
-            throw new JVMReflectiveOperationException("No such symbol: " + name);
+            throw new JVMReflectiveOperationException(STR."No such symbol: \{name}");
         return unsafe.getLong(address);
     }
     
@@ -170,7 +169,7 @@ public enum HotSpot implements JVM {
     public HotSpotType type(final String name) {
         final HotSpotType type = types[name];
         if (type == null)
-            throw new JVMReflectiveOperationException("No such type: " + name);
+            throw new JVMReflectiveOperationException(STR."No such type: \{name}");
         return type;
     }
     
@@ -178,7 +177,7 @@ public enum HotSpot implements JVM {
     public Number constant(final String name) {
         final Number constant = constants[name];
         if (constant == null)
-            throw new JVMReflectiveOperationException("No such constant: " + name);
+            throw new JVMReflectiveOperationException(STR."No such constant: \{name}");
         return constant;
     }
     
@@ -190,13 +189,13 @@ public enum HotSpot implements JVM {
     public HotSpotFlag flag(final String name) {
         final HotSpotFlag flag = flags[name];
         if (flag == null)
-            throw new JVMReflectiveOperationException("No such flag: " + name);
+            throw new JVMReflectiveOperationException(STR."No such flag: \{name}");
         return flag;
     }
     
     public void dump(final List<String> list, final String subHead) {
         list += "HotSpot Constants:";
-        constants.forEach((key, value) -> list += "%s const(%s) %s -> %s".formatted(subHead, value instanceof Long ? "long" : "int", key, value));
+        constants.forEach((key, value) -> list += STR."\{subHead} const(\{value instanceof Long ? "long" : "int"}) \{key} -> \{value}");
         list += "HotSpot Types:";
         types.values().forEach(type -> type.dump(list, subHead));
     }
@@ -210,16 +209,6 @@ public enum HotSpot implements JVM {
         final long objectSize = Maho.instrumentation().getObjectSize(target);
         (Privilege) unsafe.copyMemory0(target, oopDescSize, result, oopDescSize, objectSize - oopDescSize);
         return result;
-    }
-    
-    @Override
-    public <T> @Nullable T shadowClone(@Nullable final T target) {
-        if (target == null)
-            return null;
-        final Object result = UnsafeHelper.allocateInstanceOfType(target.getClass());
-        final long objectSize = Maho.instrumentation().getObjectSize(target);
-        (Privilege) unsafe.copyMemory0(target, oopDescSize, result, oopDescSize, objectSize - oopDescSize);
-        return (T) result;
     }
     
 }

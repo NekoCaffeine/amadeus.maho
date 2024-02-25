@@ -12,9 +12,10 @@ import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
 
+import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.Unsupported;
 import amadeus.maho.lang.javac.JavacContext;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.runtime.ObjectHelper;
@@ -25,9 +26,9 @@ public class UnsupportedHandler {
     
     @Hook
     private static void checkAllDefined(final Check $this, final JCDiagnostic.DiagnosticPosition pos, final Symbol.ClassSymbol symbol) {
-        final HandlerMarker instance = JavacContext.instance(HandlerMarker.class);
+        final HandlerSupport instance = JavacContext.instance(HandlerSupport.class);
         final TreeMaker maker = instance.maker;
-        final Env<AttrContext> env = instance.typeEnvs().get(symbol);
+        final Env<AttrContext> env = (Privilege) instance.typeEnvs.get(symbol);
         final java.util.List<Tuple2<Unsupported, JCTree.JCAnnotation>> annotations = instance.getAnnotationsByType(env.enclClass.mods, env, Unsupported.class);
         if (!annotations.isEmpty()) {
             maker.at(annotations[0].v2.pos);

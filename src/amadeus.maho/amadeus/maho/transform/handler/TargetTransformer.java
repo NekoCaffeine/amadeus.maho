@@ -74,12 +74,12 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
     private BiFunction<TransformContext, ClassNode, ClassNode> makeHandler(final ClassLoader loader) {
         final Class<?> targetType = lookupTargetType(sourceMethod);
         final Class<?> providerClass = ASMHelper.loadType(Type.getObjectType(sourceClass.name), false, loader);
-        final MethodType methodType = ASMHelper.loadMethodType(sourceMethod, false, loader);
+        final MethodType methodType = ASMHelper.loadMethodType(sourceMethod.desc, loader);
         final MethodHandle handle = MethodHandleHelper.lookup().findStatic(providerClass, sourceMethod.name, methodType);
         final boolean hasReturn = methodType.returnType() != void.class;
         if (targetType == ClassNode.class)
             return (context, node) -> {
-                TransformerManager.transform("transform", "%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), ASMHelper.sourceName(sourceClass.name), sourceMethod.name, sourceMethod.desc));
+                TransformerManager.transform("transform", STR."\{ASMHelper.sourceName(node.name)}\n->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}");
                 if (hasReturn)
                     return (ClassNode) handle.invoke(context, node) ?? node;
                 handle.invoke(context, node);
@@ -93,7 +93,7 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
                     final FieldNode fieldNode = iterator.next();
                     if ((uncheckName || selector.test(fieldNode.name)) &&
                             (uncheckDesc || fieldDesc.equals(fieldNode.desc))) {
-                        TransformerManager.transform("transform", "%s#%s%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), fieldNode.name, fieldNode.desc, ASMHelper.sourceName(sourceClass.name), sourceMethod.name, sourceMethod.desc));
+                        TransformerManager.transform("transform", STR."\{ASMHelper.sourceName(node.name)}#\{fieldNode.name}\{fieldNode.desc}\n->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}");
                         if (hasReturn) {
                             final @Nullable FieldNode result = (FieldNode) handle.invoke(context, node, fieldNode);
                             if (result == null)
@@ -113,7 +113,7 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
                     final MethodNode methodNode = iterator.next();
                     if ((uncheckName || selector.test(methodNode.name)) &&
                             (uncheckDesc || desc.equals(methodNode.desc))) {
-                        TransformerManager.transform("transform", "%s#%s%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), methodNode.name, methodNode.desc, ASMHelper.sourceName(sourceClass.name), sourceMethod.name, sourceMethod.desc));
+                        TransformerManager.transform("transform", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}");
                         if (hasReturn) {
                             final @Nullable MethodNode result = (MethodNode) handle.invoke(context, node, methodNode);
                             if (result == null)
@@ -132,7 +132,7 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
                 for (final MethodNode methodNode : node.methods) {
                     if ((uncheckName || selector.test(methodNode.name)) &&
                             (uncheckDesc || desc.equals(methodNode.desc))) {
-                        TransformerManager.transform("transform", "%s#%s%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), methodNode.name, methodNode.desc, ASMHelper.sourceName(sourceClass.name), sourceMethod.name, sourceMethod.desc));
+                        TransformerManager.transform("transform", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}");
                         for (final ListIterator<AbstractInsnNode> insnIterator = methodNode.instructions.iterator(); insnIterator.hasNext(); ) {
                             final AbstractInsnNode insn = insnIterator.next();
                             if (targetType.isInstance(insn))
@@ -178,18 +178,18 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
                         false, TargetTransformer.class.getClassLoader())))
                     throw new IllegalArgumentException("If the parameter list length is four, then the third and fourth parameters can only be MethodNode and subclasses of AbstractInsnNode");
                 if (args.length == 5 && !args[4].equals(Type.getType(ListIterator.class)))
-                    throw new IllegalArgumentException("When trying to match an instruction in a method body, the fifth argument must be of type %s.".formatted(ListIterator.class.getCanonicalName()));
+                    throw new IllegalArgumentException(STR."When trying to match an instruction in a method body, the fifth argument must be of type \{ListIterator.class.getCanonicalName()}.");
                 yield args[3];
             }
-            default   -> throw new IllegalArgumentException("Number of illegal parameters: args.length = " + args.length);
+            default   -> throw new IllegalArgumentException(STR."Number of illegal parameters: args.length = \{args.length}");
         };
         final Type returnType = Type.getReturnType(methodNode.desc);
         if (returnType != Type.VOID_TYPE)
             if (AbstractInsnNode.class.isAssignableFrom(ASMHelper.loadType(result, false, TargetTransformer.class.getClassLoader()))) {
                 if (!AbstractInsnNode.class.isAssignableFrom(ASMHelper.loadType(returnType, false, TargetTransformer.class.getClassLoader())))
-                    throw new IllegalArgumentException("The return target must be void or matched target(" + AbstractInsnNode.class.getName() + ")");
+                    throw new IllegalArgumentException(STR."The return target must be void or matched target(\{AbstractInsnNode.class.getName()})");
             } else if (!returnType.equals(result))
-                throw new IllegalArgumentException("The return target must be void or matched target(" + result.getClassName() + ")");
+                throw new IllegalArgumentException(STR."The return target must be void or matched target(\{result.getClassName()})");
         return ASMHelper.loadType(result, true, TargetTransformer.class.getClassLoader());
     }
     

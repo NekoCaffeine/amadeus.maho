@@ -24,11 +24,11 @@ import static java.nio.file.StandardOpenOption.*;
 public interface AgentInjector {
     
     static void inject(final String name, final Class<?> agent, final Class<?>... resources) throws IOException {
-        final String redirectKey = MahoExport.MAHO_AGENT_REDIRECT + "." + name, agentPath = Environment.local().lookup(redirectKey, "");
+        final String redirectKey = STR."\{MahoExport.MAHO_AGENT_REDIRECT}.\{name}", agentPath = Environment.local().lookup(redirectKey, "");
         if (!agentPath.isEmpty()) {
             final Path jarFile = Path.of(agentPath);
             if (Files.isDirectory(jarFile))
-                throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("%s: %s".formatted(redirectKey, agentPath)));
+                throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException(STR."\{redirectKey}: \{agentPath}"));
             if (!Files.isRegularFile(jarFile))
                 generateAgentJar(jarFile, agent, resources);
             inject(jarFile);
@@ -62,7 +62,7 @@ public interface AgentInjector {
     
     @SneakyThrows
     static Path generateAgentJar(final String prefix, final Class<?> agent, final Class<?>... resources) throws IOException {
-        final Path jarFile = Files.createTempFile(prefix + "-Agent-", Jar.SUFFIX);
+        final Path jarFile = Files.createTempFile(STR."\{prefix}-Agent-", Jar.SUFFIX);
         generateAgentJar(jarFile, agent, resources);
         return jarFile;
     }
@@ -87,7 +87,7 @@ public interface AgentInjector {
         }
     }
     
-    private static String path(final Class<?> clazz) = clazz.getName().replace('.', '/') + ".class";
+    private static String path(final Class<?> clazz) = STR."\{clazz.getName().replace('.', '/')}.class";
     
     private static byte[] getBytesFromClass(final Class<?> clazz) throws IOException {
         try (final var input = clazz.getClassLoader().getResourceAsStream(path(clazz))) {

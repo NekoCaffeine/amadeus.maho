@@ -26,8 +26,7 @@ import amadeus.maho.util.throwable.BreakException;
 public interface DebugHelper {
     
     @Target(ElementType.TYPE)
-    @Retention(RetentionPolicy.CLASS)
-    @interface Renderer {
+    @Retention(RetentionPolicy.CLASS) @interface Renderer {
         
         String value() default "";
         
@@ -46,7 +45,7 @@ public interface DebugHelper {
         
         default String codePathString() {
             final @Nullable Field field = codePath();
-            return field != null ? "%s#%s".formatted(field.getDeclaringClass().getCanonicalName(), field.getName()) : "";
+            return field != null ? STR."\{field.getDeclaringClass().getCanonicalName()}#\{field.getName()}" : "";
         }
         
     }
@@ -54,7 +53,7 @@ public interface DebugHelper {
     @NoArgsConstructor
     class NotImplementedError extends Error { }
     
-    boolean showBreakpoint = Environment.local().lookup("maho.debug.show.breakpoint", MahoExport.debug());
+    boolean showBreakpoint = Environment.local().lookup("amadeus.maho.debug.show.breakpoint", MahoExport.debug());
     
     Map<Object, Object> globalContext = new ConcurrentHashMap<>();
     
@@ -129,7 +128,7 @@ public interface DebugHelper {
     }
     
     static <K> boolean checkCount(final Map<Object, Object> context = globalContext(), final K contextKey, final IntPredicate valueChecker = it -> it > 0, final @Nullable IntUnaryOperator orElse = it -> it + 1) {
-        final AtomicInteger atomic = (AtomicInteger) context.computeIfAbsent(contextKey, it -> new AtomicInteger());
+        final AtomicInteger atomic = (AtomicInteger) context.computeIfAbsent(contextKey, _ -> new AtomicInteger());
         if (orElse == null)
             return valueChecker.test(atomic.get());
         int value;
@@ -141,9 +140,23 @@ public interface DebugHelper {
     }
     
     static void logTimeConsuming(final String name, final Runnable task) {
-        final long time = System.currentTimeMillis();
-        task.run();
-        System.out.println("Task %s is completed, it takes %d ms.".formatted(name, System.currentTimeMillis() - time));
+        if (MahoExport.debug()) {
+            final long time = System.currentTimeMillis();
+            try {
+                task.run();
+            } finally { System.out.println(STR."Task [\{name}] took \{System.currentTimeMillis() - time} ms"); }
+        } else
+            task.run();
+    }
+    
+    static <T> T logTimeConsuming(final String name, final Supplier<T> task) {
+        if (MahoExport.debug()) {
+            final long time = System.currentTimeMillis();
+            try {
+                return task.get();
+            } finally { System.out.println(STR."Task [\{name}] took \{System.currentTimeMillis() - time} ms"); }
+        } else
+            return task.get();
     }
     
 }

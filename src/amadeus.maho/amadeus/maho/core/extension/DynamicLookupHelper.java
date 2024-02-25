@@ -33,7 +33,7 @@ public interface DynamicLookupHelper {
     
     String shareDynamicLookup = Maho.SHARE_PACKAGE + ".DynamicLookup", DynamicLookupName = ASMHelper.className(shareDynamicLookup), _new = "new";
     
-    static MethodType methodType(final String desc, final @Nullable ClassLoader loader) = ASMHelper.loadMethodType(desc, false, loader);
+    static MethodType methodType(final String desc, final @Nullable ClassLoader loader) = ASMHelper.loadMethodType(desc, loader);
     
     Indexed.Default<ClassLoader> loaderIndexed = { };
     
@@ -73,7 +73,9 @@ public interface DynamicLookupHelper {
             .collect(Collectors.toMap(Tuple2::v1, Tuple2::v2));
     
     private static DynamicMethod dynamic(final Class<?> target, final ClassNode node, final Method method) {
-        final DynamicMethod dynamicMethod = DynamicMethod.ofMethod(target.getClassLoader(), "PrivilegeProxy$%s$%s".formatted(target.getSimpleName(), method.getName()), method, node);
+        final DynamicMethod dynamicMethod = DynamicMethod.ofMethod(target.getClassLoader(), STR."PrivilegeProxy$\{target.getSimpleName()}$\{method.getName()}", method, node);
+        dynamicMethod.sourceFile(node.sourceFile);
+        dynamicMethod.sourceDebug(node.sourceDebug);
         dynamicMethod.nestHostClass(ASMHelper.className(target));
         return dynamicMethod;
     }

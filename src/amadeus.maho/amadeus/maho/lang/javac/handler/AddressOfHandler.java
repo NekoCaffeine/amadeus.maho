@@ -143,12 +143,12 @@ public class AddressOfHandler extends JavacContext {
                 offset.type = symtab.longType;
                 mapping[unary] = offset;
                 if (!tuple.v2.contains(NEG)) {
-                    final JCTree.JCMethodInvocation put = maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent("put" + name, key -> lookup(Unsafe, name(key)))), List.of(offset, arg));
+                    final JCTree.JCMethodInvocation put = maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."put\{name}", key -> lookup(Unsafe, name(key)))), List.of(offset, arg));
                     put.type = symtab.voidType;
                     before.append(maker.Exec(put));
                 }
                 if (!tuple.v2.contains(POS)) {
-                    final JCTree.JCAssign assign = maker.Assign(arg, maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent("get" + name, key -> lookup(Unsafe, name(key)))), List.of(offset)));
+                    final JCTree.JCAssign assign = maker.Assign(arg, maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."get\{name}", key -> lookup(Unsafe, name(key)))), List.of(offset)));
                     assign.type = type;
                     after.append(maker.Exec(assign));
                 }

@@ -1,6 +1,7 @@
 package amadeus.maho.lang.javac.handler;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -22,6 +23,7 @@ import com.sun.tools.javac.util.ListBuffer;
 import com.sun.tools.javac.util.Name;
 
 import amadeus.maho.lang.javac.JavacContext;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
@@ -38,7 +40,8 @@ public class AccessibleHandler {
     private static boolean isAccessible(final Resolve $this, final Env<AttrContext> env, final Symbol.TypeSymbol symbol, final boolean checkInner) = true;
     
     @Hook
-    private static Hook.Result isAccessible(final Resolve $this, final Env<AttrContext> env, final Type site, final Symbol sym, final boolean checkInner) = Hook.Result.falseToVoid(sym instanceof Symbol.ClassSymbol);
+    private static Hook.Result isAccessible(final Resolve $this, final Env<AttrContext> env, final Type site, final Symbol sym, final boolean checkInner)
+            = Hook.Result.falseToVoid(sym instanceof Symbol.ClassSymbol || PrivilegeHandler.inPrivilegeContext(new ArrayList<>(HandlerSupport.attrContext()), env));
     
     @Hook(forceReturn = true)
     private static void addVisiblePackages(final Modules $this, final Symbol.ModuleSymbol symbol, final Map<Name, Symbol.ModuleSymbol> seenPackages,

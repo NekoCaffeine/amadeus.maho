@@ -33,6 +33,7 @@ import static org.objectweb.asm.Opcodes.*;
 public final class ProxyTransformer extends MethodTransformer<Proxy> implements ClassTransformer.Limited, RemapContext {
     
     Type targetType;
+    
     String selector, desc, realDesc;
     
     {
@@ -49,9 +50,9 @@ public final class ProxyTransformer extends MethodTransformer<Proxy> implements 
                      INVOKEINTERFACE,
                      GETFIELD,
                      PUTFIELD,
-                     INSTANCEOF -> targetType = Type.getArgumentTypes(realDesc)[0];
-                case NEW        -> targetType = Type.getReturnType(realDesc);
-                default         -> throw new IllegalArgumentException("Unable to determine target class, missing required fields('targetClass' or 'target').");
+                     INSTANCEOF    -> targetType = Type.getArgumentTypes(realDesc)[0];
+                case NEW           -> targetType = Type.getReturnType(realDesc);
+                default            -> throw new IllegalArgumentException("Unable to determine target class, missing required fields('targetClass' or 'target').");
             }
         desc = InvisibleType.Transformer.transformDescriptor(manager.remapper(), sourceMethod.visibleTypeAnnotations, mapDesc(sourceMethod.desc, annotation.value()));
     }
@@ -60,7 +61,7 @@ public final class ProxyTransformer extends MethodTransformer<Proxy> implements 
     public ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
         for (final MethodNode methodNode : node.methods)
             if (methodNode.name.equals(sourceMethod.name) && methodNode.desc.equals(sourceMethod.desc)) {
-                TransformerManager.transform("proxy", "%s#%s%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), methodNode.name, methodNode.desc, ASMHelper.sourceName(targetType.getInternalName()), selector, desc));
+                TransformerManager.transform("proxy", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{ASMHelper.sourceName(targetType.getInternalName())}#\{selector}\{desc}");
                 ASMHelper.rollback(methodNode, contextMethodNode -> {
                     final MethodGenerator generator = MethodGenerator.fromMethodNode(contextMethodNode);
                     if (annotation.useHandle() && (!checkPrivilegedHolding(node) || handler.isNotDefault(Proxy::useHandle))) {
@@ -113,7 +114,7 @@ public final class ProxyTransformer extends MethodTransformer<Proxy> implements 
                             case GETSTATIC,
                                  PUTSTATIC,
                                  GETFIELD,
-                                 PUTFIELD        -> {
+                                 PUTFIELD       -> {
                                 generator.loadArgs(argsTypes);
                                 generator.fieldInsn(annotation.value(), targetType, selector, targetMethod.getReturnType());
                             }
@@ -121,8 +122,9 @@ public final class ProxyTransformer extends MethodTransformer<Proxy> implements 
                                 generator.loadArg(0);
                                 generator.instanceOf(targetType);
                             }
-                            default              -> throw new IllegalArgumentException("Unsupported set: " + ASMHelper.sourceName(sourceClass.name) + "#" + sourceMethod.name + sourceMethod.desc + " [" +
-                                                                                       annotation.value() + " -> " + ASMHelper.OPCODE_LOOKUP.lookupFieldName(annotation.value()) + "]");
+                            default              -> throw new IllegalArgumentException(STR."""
+                                    Unsupported set: \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc} [\{annotation.value()}
+                                    -> \{ASMHelper.OPCODE_LOOKUP.lookupFieldName(annotation.value())}]""");
                         }
                     }
                     generator.returnValue();
@@ -136,12 +138,12 @@ public final class ProxyTransformer extends MethodTransformer<Proxy> implements 
     private static String mapDesc(final String desc, final int opcode) = switch (opcode) {
         case INVOKEVIRTUAL,
              INVOKESPECIAL,
-             INVOKEINTERFACE -> {
+             INVOKEINTERFACE    -> {
             final Type args[] = Type.getArgumentTypes(desc);
             yield Type.getMethodDescriptor(Type.getReturnType(desc), Arrays.copyOfRange(args, 1, args.length));
         }
-        case NEW             -> Type.getMethodDescriptor(Type.VOID_TYPE, Type.getArgumentTypes(desc));
-        default              -> desc;
+        case NEW                -> Type.getMethodDescriptor(Type.VOID_TYPE, Type.getArgumentTypes(desc));
+        default                 -> desc;
     };
     
     private static boolean checkPrivilegedHolding(final ClassNode node) = node.superName.equals(MagicAccessor.Bridge);

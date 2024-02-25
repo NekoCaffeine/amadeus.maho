@@ -108,7 +108,7 @@ public class AnnotationHandler<T> {
                         type.getClassLoader() ?? AnnotationHandler.class.getClassLoader(),
                         BaseAnnotation.class,
                         type.getClassLoader() == null ? BaseAnnotation.class : type,
-                        type.getClassLoader() == null ? type.getCanonicalName().replace('.', '_') : "BaseAnnotation",
+                        type.getClassLoader() == null ? type.asDebugName() : "BaseAnnotation",
                         type
                 };
                 wrapper.inheritableUniqueSignatureMethods()
@@ -129,6 +129,10 @@ public class AnnotationHandler<T> {
             }
     };
     
+    private static final ClassLocal<Annotation> defaultInstance = { it -> make((Class<? extends Annotation>) it, null) };
+    
+    public static <T extends Annotation> T defaultInstance(final Class<T> annotationType) = (T) defaultInstance[annotationType];
+    
     protected static <T> T wrapper(final Class<T> type) = UnsafeHelper.allocateInstance(annotationWrapper()[type]);
     
     public static <T extends Annotation> T make(final Class<T> type, final @Nullable ClassLoader contextLoader = type.getClassLoader(), final @Nullable List<Object> objects) = make(type, contextLoader, valueToMap(objects));
@@ -141,10 +145,10 @@ public class AnnotationHandler<T> {
     
     public static <K, V> Map<K, V> valueToMap(final @Nullable List<?> list) {
         if (list == null || list.isEmpty())
-            return new HashMap<>();
+            return Map.of();
         if (list.size() % 2 != 0)
             throw new RuntimeException("objects.size() % 2 != 0");
-        final Map<K, V> result = new HashMap<>();
+        final HashMap<K, V> result = { };
         K key = null;
         for (final Object obj : list)
             if (key == null)
@@ -217,19 +221,21 @@ public class AnnotationHandler<T> {
         contextLoader = loader;
         sourceMemberValues = new ConcurrentHashMap<>(memberValues);
         annotationData = AnnotationType.instance(annotationType);
-        memberValueGetters = memberValues.entrySet().stream().collect(Collectors.toConcurrentMap(Map.Entry::getKey, entry -> getter(entry.getValue(), method(entry.getKey()))));
+        memberValueGetters = memberValues.entrySet().stream()
+                .filter(entry -> method(entry.getKey()) != null)
+                .collect(Collectors.toConcurrentMap(Map.Entry::getKey, entry -> getter(entry.getValue(), method(entry.getKey()))));
     }
     
     @SneakyThrows
     protected Supplier<Object> getter(final Object value, final Method method, final boolean checkLoading = true) = checkLoading && method.isAnnotationPresent(DisallowLoading.class) ?
-            () -> DebugHelper.breakpointBeforeThrow(new IllegalStateException("%s#%s is annotated with @DisallowLoading".formatted(method.getDeclaringClass().getCanonicalName(), method.getName()))) :
+            () -> DebugHelper.breakpointBeforeThrow(new IllegalStateException(STR."\{method.getDeclaringClass().getCanonicalName()}#\{method.getName()} is annotated with @DisallowLoading")) :
             switch (value) {
-                case Supplier<?> supplier                                                                     -> (Supplier<Object>) supplier;
-                case Type type                                                                                -> lazy(() -> ASMHelper.loadType(type, false, contextLoader));
-                case Type[] types                                                                             -> lazy(() -> ASMHelper.loadTypes(Stream.of(types), false, contextLoader));
-                case AnnotationNode annotationNode                                                            ->
+                case Supplier<?> supplier                                                                       -> (Supplier<Object>) supplier;
+                case Type type                                                                                  -> lazy(() -> ASMHelper.loadType(type, false, contextLoader));
+                case Type[] types                                                                               -> lazy(() -> ASMHelper.loadTypes(Stream.of(types), false, contextLoader));
+                case AnnotationNode annotationNode                                                              ->
                         lazy(() -> make((Class<? extends Annotation>) Class.forName(ASMHelper.sourceName(annotationNode.desc), false, contextLoader), contextLoader, annotationNode.values));
-                case List<?> list                                                                             -> Enum[].class.isAssignableFrom(method.getReturnType()) ?
+                case List<?> list                                                                               -> Enum[].class.isAssignableFrom(method.getReturnType()) ?
                         lazy(() -> ((List<String[]>) list).stream()
                                 .map(args -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]))
                                 .toArray(TypeHelper.arrayConstructor(method.getReturnType().getComponentType()))) :
@@ -237,12 +243,13 @@ public class AnnotationHandler<T> {
                                 .map(element -> getter(element, method).get())
                                 .toArray(lookupArrayMapper(method))));
                 case String[] args when args.length == 2 && Enum.class.isAssignableFrom(method.getReturnType()) -> lazy(() -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]));
-                case null, default                                                                            -> () -> value;
+                case null,
+                     default                                                                                    -> () -> value;
             };
     
     protected IntFunction<Object[]> lookupArrayMapper(final Method method) {
         if (!method.getReturnType().isArray())
-            throw new IncompatibleClassChangeError(method + " return type is not an array.");
+            throw new IncompatibleClassChangeError(STR."\{method} return type is not an array.");
         return size -> (Object[]) Array.newInstance(TypeHelper.boxClass(method.getReturnType().getComponentType()), size);
     }
     
@@ -278,17 +285,18 @@ public class AnnotationHandler<T> {
         return annotationData().members().values().stream().allMatch(method -> ArrayHelper.deepEquals(lookupValue(method.getName()), handler != null ? handler.lookupValue(method.getName()) : method.invoke(obj)));
     }
     
-    protected String toStringImpl() = "@%s(%s)".formatted(type().getName(), sourceMemberValues().entrySet().stream()
-            .map(entry -> "%s = %s".formatted(entry.getKey(), toStringValue(switch (entry.getValue()) {
+    protected String toStringImpl() = STR."@\{type().getName()}(\{sourceMemberValues().entrySet().stream()
+            .map(entry -> STR."\{entry.getKey()} = \{toStringValue(switch (entry.getValue()) {
                 case AnnotationNode ignored -> lookupValue(entry.getKey());
                 case Object it              -> it;
-            })))
-            .collect(Collectors.joining(", ")));
+            })}")
+            .collect(Collectors.joining(", "))})";
     
     private String toStringValue(final Object object) = switch (object) {
         case Type type      -> type.getClassName();
         case Object[] array -> Stream.of(array).map(this::toStringValue).collect(Collectors.joining(", ", "[", "]"));
-        default             -> ObjectHelper.toString(object);
+        case null,
+             default        -> ObjectHelper.toString(object);
     };
     
     protected int hashCodeImpl() = new int[]{ 0 }.let(it -> values().forEach(entry -> it[0] = 127 * entry.getKey().hashCode() ^ ArrayHelper.deepHashCode(entry.getValue())))[0];

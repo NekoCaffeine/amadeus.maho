@@ -15,14 +15,19 @@ import com.sun.tools.javac.code.Lint;
 import com.sun.tools.javac.code.Preview;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.TypeMetadata;
+import com.sun.tools.javac.comp.Annotate;
+import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.DeferredAttr;
+import com.sun.tools.javac.comp.Env;
+import com.sun.tools.javac.comp.TypeEnter;
 import com.sun.tools.javac.jvm.ClassWriter;
 import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.jvm.PoolConstant;
 import com.sun.tools.javac.jvm.PoolWriter;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
+import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
@@ -38,6 +43,7 @@ import amadeus.maho.transform.mark.base.Slice;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.CallerContext;
+import amadeus.maho.util.misc.Environment;
 import amadeus.maho.vm.JDWP;
 
 import static amadeus.maho.util.bytecode.Bytecodes.PUTFIELD;
@@ -48,15 +54,22 @@ public class MahoJavac {
     
     public static final String KEY = "amadeus.maho.lang";
     
-    private static final boolean debugFlag = System.getProperty("amadeus.maho.lang.debug") != null || JDWP.isJDWPEnable();
+    private static final boolean reportFlag = Environment.local().lookup("amadeus.maho.javac.report", JDWP.isJDWPEnable());
     
     @Hook(value = JavaCompiler.CompilePolicy.class, isStatic = true)
     private static Hook.Result decode(final String option) = { SIMPLE };
     
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
+    private static void _init_(final JavaCompiler $this, final Context context) {
+        if (context.get(JavacContext.class) == null)
+            new JavacContext(context);
+    }
+    
     @Hook
-    private static void initPlugins(final BasicJavacTask $this, final Set<List<String>> pluginOpts) {
-        if ($this.getContext().get(JavacContext.class) == null)
-            new JavacContext($this.getContext());
+    private static void close(final JavaCompiler $this) {
+        final @Nullable JavacContext instance = JavacContext.instance();
+        if (instance != null && JavaCompiler.instance(instance.context) == $this)
+            JavacContext.drop();
     }
     
     @Hook(exactMatch = false, forceReturn = true)
@@ -67,6 +80,9 @@ public class MahoJavac {
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.TAIL)))
     private static void prepareCompiler(final JavacTaskImpl $this, final boolean forParse) = $this.getContext().get(JavacContext.class).mark();
+    
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.TAIL)))
+    private static void cleanup(final JavacTaskImpl $this) = JavacContext.drop();
     
     @Redirect(targetClass = TypeMetadata.Annotations.class, selector = "combine", slice = @Slice(@At(method = @At.MethodInsn(name = "check"))))
     private static void check(final boolean flag) { }
@@ -120,10 +136,18 @@ public class MahoJavac {
     private static Hook.Result duplicateError(final Check $this, final JCDiagnostic.DiagnosticPosition pos, final Symbol sym)
             = Hook.Result.falseToVoid(sym instanceof Symbol.VarSymbol varSymbol && varSymbol.name.toString().equals("_"), null);
     
+    // force checkClash = false
+    @Hook(forceReturn = true)
+    private static void checkClassPackageClash(final TypeEnter.ImportsPhase $this, final JCTree.JCPackageDecl tree) {
+        final Annotate annotate = (Privilege) Privilege.Outer.<TypeEnter>access($this).annotate;
+        final Env<AttrContext> env = (Privilege) $this.env;
+        annotate.annotateLater(tree.annotations, env, env.toplevel.packge, tree.pos());
+    }
+    
     // Disable some unnecessary warnings
     public static boolean skipLog(final String key) {
-        if (debugFlag && !key.startsWith("compiler.note.") && !key.equals("compiler.err.cant.resolve.location.args") && CallerContext.Stack.walker().walk(stream -> stream.noneMatch(MahoJavac::skipFrame)))
-            System.out.println("report: " + key); // breakpoint can be here
+        if (reportFlag && !key.startsWith("compiler.note.") && !key.equals("compiler.err.cant.resolve.location.args") && CallerContext.Stack.walker().walk(stream -> stream.noneMatch(MahoJavac::skipFrame)))
+            System.out.println(STR."report: \{key}"); // breakpoint can be here
         return key.startsWith("compiler.note.");
     }
     
@@ -132,22 +156,21 @@ public class MahoJavac {
             "compiler.err.initializer.not.allowed",
             "compiler.err.except.never.thrown.in.try",
             "compiler.err.record.component.and.old.array.syntax",
-            "compiler.err.underscore.as.identifier.in.lambda",
             "compiler.err.incompatible.thrown.types.in.mref",
             "compiler.warn.requires.transitive.automatic",
             "compiler.warn.incubating.modules",
             "compiler.warn.unknown.enum.constant",
             "compiler.warn.unknown.enum.constant.reason",
             "compiler.warn.sun.proprietary",
-            "compiler.warn.has.been.deprecated.for.removal",
-            "compiler.err.switch.expression.no.result.expressions" // SwitchHandler
+            "compiler.warn.has.been.deprecated.for.removal"
     ));
     
     public static final Set<Class<?>> skipClasses = new HashSet<>(java.util.List.of(DeferredAttr.class, SourceCodeAnalysisImpl.class, ExpressionToTypeInfo.class));
     
     private static boolean skipFrame(final StackWalker.StackFrame frame) = skipClasses.contains(frame.getDeclaringClass()) || frame.getDeclaringClass() == JavacContext.class && frame.getMethodName().equals("discardDiagnostic");
     
-    @Hook
-    private static Hook.Result report(final Log $this, final JCDiagnostic diagnostic) = Hook.Result.falseToVoid(disableErrorKeys.contains(diagnostic.getCode()) || skipLog(diagnostic.getCode()));
+    @Hook(metadata = @TransformMetadata(order = 1))
+    private static Hook.Result report(final Log $this, final JCDiagnostic diagnostic)
+            = Hook.Result.falseToVoid(!((Privilege) $this.diagnosticHandler instanceof Log.DiscardDiagnosticHandler) && (disableErrorKeys.contains(diagnostic.getCode()) || skipLog(diagnostic.getCode())));
     
 }

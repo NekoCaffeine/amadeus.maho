@@ -91,12 +91,12 @@ public class ChunkTable<H extends BinaryMapper, V extends BinaryMapper> implemen
                                     if (mark != null)
                                         mapper.compute(mark.unknown() ? null : mark.value(), (key, value) -> {
                                             if (value != null)
-                                                throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("Duplicate keys: %s, in outer class: %s".formatted((Object) key ?? "unknown", headerType.getCanonicalName())));
+                                                throw DebugHelper.breakpointBeforeThrow(new IllegalStateException(STR."Duplicate keys: \{(Object) key ?? "unknown"}, in outer class: \{headerType.getCanonicalName()}"));
                                             return inner;
                                         });
                                 });
                         final Class<?> cloneBaseType = cloneBaseType(headerType);
-                        final DynamicMethod.Lambda<Function> lambda = { headerType.getClassLoader(), "ChunkTable.WithMark.autoMapper", Function.class, cloneBaseType, BinaryMapper.class };
+                        final DynamicMethod.Lambda<Function> lambda = { headerType.getClassLoader(), STR."ChunkTable.AutomaticMapper$\{headerType.asDebugName()}", Function.class, cloneBaseType, BinaryMapper.class };
                         lambda.sourceFile(JVMTI.env().getSourceFileName(headerType));
                         final MethodGenerator generator = lambda.generator();
                         generator.loadArg(0);

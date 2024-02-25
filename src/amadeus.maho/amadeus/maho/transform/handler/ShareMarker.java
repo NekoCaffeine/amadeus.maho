@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -44,6 +45,25 @@ public final class ShareMarker extends BaseMarker<Share> {
     
     private static volatile boolean init;
     
+    public static void whenShare(final Queue<String> queue, final Runnable runnable) {
+        synchronized (markerQueue) {
+            queue.removeIf(loadedMapping::containsKey);
+            if (queue.isEmpty())
+                runnable.run();
+            else
+                markerQueue.add(Tuple.tuple(queue, runnable));
+        }
+    }
+    
+    public static void whenShare(final String require, final Runnable runnable) {
+        synchronized (markerQueue) {
+            if (loadedMapping.containsKey(require))
+                runnable.run();
+            else
+                markerQueue.add(Tuple.tuple(new LinkedList<String>().let(queue -> queue << require), runnable));
+        }
+    }
+    
     @Override
     public void onMark(final TransformerManager.Context context) {
         synchronized (markerQueue) {
@@ -53,9 +73,9 @@ public final class ShareMarker extends BaseMarker<Share> {
                     if (init || ASMHelper.className(Share.class).equals(sourceClass.name))
                         break block;
                     else
-                        markerQueue.add(Tuple.tuple(new ConcurrentLinkedQueue<>(Set.of(Share.class.getName())), () -> onShare(context)));
+                        markerQueue.add(Tuple.tuple(new LinkedList<>(Set.of(Share.class.getName())), () -> onShare(context)));
                 } else {
-                    final Queue<String> required = new ConcurrentLinkedQueue<>(List.of(annotation.required()));
+                    final Queue<String> required = new LinkedList<>(List.of(annotation.required()));
                     required.add(Share.class.getName());
                     loadedMapping.keySet().forEach(required::remove);
                     if (required.isEmpty())
@@ -71,9 +91,9 @@ public final class ShareMarker extends BaseMarker<Share> {
     
     @SneakyThrows
     public void onShare(final TransformerManager.Context context) {
-        final @Nullable String target = handler.isNotDefault(Share::value) ?  handler.<Type>lookupSourceValue(Share::value).getClassName() : handler.isNotDefault(Share::target) ? annotation.target() : null;
+        final @Nullable String target = handler.isNotDefault(Share::value) ? handler.<Type>lookupSourceValue(Share::value).getClassName() : handler.isNotDefault(Share::target) ? annotation.target() : null;
         ClassNode node = ASMHelper.newClassNode(sourceClass);
-        TransformerManager.transform("share", ASMHelper.sourceName(node.name) + (target == null ? "" : "\n->  " + target));
+        TransformerManager.transform("share", ASMHelper.sourceName(node.name) + (target == null ? "" : STR."\n->  \{target}"));
         if (handler.isNotDefault(Share::erase)) {
             final Erase erase = annotation.erase();
             final List<AnnotationNode> reservedAnnotationNodes = reservedAnnotationNodes(node, Retention.class, Target.class);

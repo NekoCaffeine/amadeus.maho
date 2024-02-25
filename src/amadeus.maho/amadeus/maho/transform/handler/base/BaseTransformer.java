@@ -151,12 +151,12 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
     
     private void checkRemapContext() {
         if (!(this instanceof RemapContext))
-            throw new IllegalArgumentException(getClass() + " must implement interface " + RemapContext.class.getName());
+            throw new IllegalArgumentException(STR."\{getClass()} must implement interface \{RemapContext.class.getName()}");
     }
     
     private void checkFlag(final boolean flag, final Method method) {
         if (flag)
-            throw new IllegalArgumentException("There can only be one kind of @Remap.X on the " + method);
+            throw new IllegalArgumentException(STR."There can only be one kind of @Remap.X on the \{method}");
     }
     
     protected Predicate<ClassNode> checkSwitch() {
@@ -192,7 +192,7 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
     }
     
     @Override
-    public String toString() = annotation + " => " + sourceClass.name;
+    public String toString() = STR."\{annotation} => \{sourceClass.name}";
     
     @Override
     public int compareTo(final ClassTransformer target) = order - (target instanceof BaseTransformer transformer ? transformer.order : 0);

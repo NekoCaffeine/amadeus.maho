@@ -10,7 +10,7 @@ import amadeus.maho.lang.RequiredArgsConstructor;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ResourceCounter {
     
-    volatile int count;
+    int count;
     
     final Runnable load, free;
     

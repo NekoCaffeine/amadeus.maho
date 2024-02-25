@@ -46,7 +46,7 @@ public class SetterHandler extends BaseHandler<Setter> {
     @Override
     public void processMethod(final Env<AttrContext> env, final JCTree.JCMethodDecl tree, final JCTree owner, final Setter annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
         boolean error = false;
-        if (error |= tree.params.size() > 0)
+        if (error |= !tree.params.isEmpty())
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "accessor.method.has-parameter", "@Setter"));
         if (error |= owner instanceof JCTree.JCClassDecl && noneMatch(((JCTree.JCClassDecl) owner).mods.flags, INTERFACE))
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "accessor.method.non-interface", "@Setter"));

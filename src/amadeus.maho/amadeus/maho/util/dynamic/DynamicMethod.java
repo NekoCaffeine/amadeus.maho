@@ -4,6 +4,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Method;
 import java.lang.reflect.TypeVariable;
 import java.util.LinkedList;
@@ -26,7 +27,6 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
@@ -36,7 +36,6 @@ import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.TransformerManager;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Preload;
-import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.transform.mark.base.TransformMetadata;
@@ -49,7 +48,6 @@ import amadeus.maho.util.bytecode.ClassWriter;
 import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.runtime.ArrayHelper;
-import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 import amadeus.maho.util.runtime.TypeHelper;
 import amadeus.maho.util.runtime.UnsafeHelper;
@@ -63,25 +61,35 @@ import static org.objectweb.asm.Opcodes.*;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class DynamicMethod {
     
-    @Preload
+    @Preload(initialized = true)
     @SneakyThrows
     @TransformProvider
-    public interface Delegating {
+    private interface Delegating {
+        
+        String DelegatingClassLoader = "jdk.internal.reflect.DelegatingClassLoader";
+        
+        MethodHandle constructor = MethodHandleHelper.lookup().findConstructor(Class.forName(DelegatingClassLoader), MethodType.methodType(void.class, ClassLoader.class));
+        
+        static @InvisibleType(DelegatingClassLoader) ClassLoader delegating(final @Nullable ClassLoader parent) = (ClassLoader) constructor.invoke(parent);
         
         String
-                DelegatingClassLoader       = "jdk.internal.reflect.DelegatingClassLoader",
                 MemberName                  = "java.lang.invoke.MemberName",
                 InnerClassLambdaMetafactory = "java.lang.invoke.InnerClassLambdaMetafactory",
                 ForwardingMethodGenerator   = "java.lang.invoke.InnerClassLambdaMetafactory$ForwardingMethodGenerator";
         
-        MethodHandle constructor = MethodHandleHelper.lookup().findConstructor(Class.forName(DelegatingClassLoader), MethodType.methodType(void.class, ClassLoader.class));
+        Class<?>
+                InnerClassLambdaMetafactoryClass = Class.forName(InnerClassLambdaMetafactory),
+                ForwardingMethodGeneratorClass   = Class.forName(ForwardingMethodGenerator);
         
-        @Proxy(NEW) // JIT inline
-        static @InvisibleType(DelegatingClassLoader) ClassLoader delegating(final @Nullable ClassLoader parent) = (ClassLoader) constructor.invoke(parent); // rollback: before inline
+        VarHandle
+                this$0              = MethodHandleHelper.lookup().findVarHandle(ForwardingMethodGeneratorClass, "this$0", InnerClassLambdaMetafactoryClass),
+                useImplMethodHandle = MethodHandleHelper.lookup().findVarHandle(InnerClassLambdaMetafactoryClass, "useImplMethodHandle", boolean.class),
+                implKind            = MethodHandleHelper.lookup().findVarHandle(InnerClassLambdaMetafactoryClass, "implKind", int.class),
+                implClass           = MethodHandleHelper.lookup().findVarHandle(InnerClassLambdaMetafactoryClass, "implClass", Class.class);
         
-        @Hook(avoidRecursion = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
-        private static Hook.Result checkAccess(final MethodHandles.Lookup $this, final byte refKind, final Class<?> refClass, final @InvisibleType(MemberName) Object memberName)
-                = Hook.Result.falseToVoid(bridgeClass.isAssignableFrom($this.lookupClass()), null);
+        @Hook(avoidRecursion = true, at = @At(insn = @At.Insn(opcode = ICONST_M1 /* TRUSTED == -1 */), ordinal = 0, offset = 1), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+        private static boolean checkAccess(final boolean capture /* allowedModes == TRUSTED */, final MethodHandles.Lookup $this, final byte refKind, final Class<?> refClass, final @InvisibleType(MemberName) Object memberName)
+                = capture || bridgeClass.isAssignableFrom($this.lookupClass());
         
         // # Cross-package constructor reference support
         
@@ -98,30 +106,21 @@ public class DynamicMethod {
                 final MethodType additionalBridges[])
                 = capture || bridgeClass.isAssignableFrom(caller.lookupClass());
         
-        @Proxy(GETFIELD)
-        private static boolean useImplMethodHandle(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
-        
         @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_newInvokeSpecial), ordinal = 0, offset = 1), capture = true, avoidRecursion = true,
                 metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static boolean generate_$NEW_DUP(final boolean capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType)
-                = capture && !useImplMethodHandle(Privilege.Outer.access($this));
-        
-        @Proxy(GETFIELD)
-        private static int implKind(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
+                = capture && !((boolean) useImplMethodHandle.get(this$0.get($this)));
         
         @Hook(at = @At(intInsn = @At.IntInsn(opcode = Bytecodes.BIPUSH, operand = MethodHandleInfo.REF_invokeStatic), ordinal = 0, offset = 1), capture = true, avoidRecursion = true,
                 metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static boolean generate_$insertParameterTypes(final boolean capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType)
-                = capture && implKind(Privilege.Outer.access($this)) != MethodHandleInfo.REF_newInvokeSpecial;
-        
-        @Proxy(GETFIELD)
-        private static Class<?> implClass(final @InvisibleType(InnerClassLambdaMetafactory) Object metafactory) = DebugHelper.breakpointThenError();
+                = capture && (int) implKind.get(this$0.get($this)) != MethodHandleInfo.REF_newInvokeSpecial;
         
         @Hook(at = @At(method = @At.MethodInsn(name = "descriptorString"), ordinal = 0), capture = true, avoidRecursion = true,
                 metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static MethodType generate_$changeReturnType(final MethodType capture, final @InvisibleType(ForwardingMethodGenerator) MethodVisitor $this, final MethodType methodType) {
-            final var metafactory = Privilege.Outer.access($this);
-            return implKind(metafactory) != MethodHandleInfo.REF_newInvokeSpecial ? capture : capture.changeReturnType(implClass(metafactory));
+            final var metafactory = this$0.get($this);
+            return (int) implKind.get(metafactory) != MethodHandleInfo.REF_newInvokeSpecial ? capture : capture.changeReturnType((Class<?>) implClass.get(metafactory));
         }
         
     }
@@ -151,7 +150,7 @@ public class DynamicMethod {
             else {
                 final TypeVariable<?> parameters[] = functionalInterfaceType.getTypeParameters();
                 if (parameters.length != genericTypes.length)
-                    throw new IncompatibleClassChangeError("The length of the generic parameter list is inconsistent. expected: %s, actual: %s".formatted(ArrayHelper.toString(parameters), ArrayHelper.toString(genericTypes)));
+                    throw new IncompatibleClassChangeError(STR."The length of the generic parameter list is inconsistent. expected: \{ArrayHelper.toString(parameters)}, actual: \{ArrayHelper.toString(genericTypes)}");
                 final java.lang.reflect.Type argsParameters[] = functionalMethod.getGenericParameterTypes();
                 // @formatter:off
                 final Type
@@ -184,6 +183,8 @@ public class DynamicMethod {
                     generator.endMethod();
                 }
             }
+            final MethodNode body = body();
+            body.access = ASMHelper.changeAccess(body.access, ACC_PUBLIC);
         }
         
         @Override
@@ -255,11 +256,11 @@ public class DynamicMethod {
     protected static final AtomicInteger counter = { };
     
     @IndirectCaller
-    protected static String contextDebugName() = CallerContext.caller().getSimpleName() + "$" + counter.getAndIncrement();
+    protected static String contextDebugName() = STR."\{CallerContext.caller().getSimpleName()}$\{counter.getAndIncrement()}";
     
     @IndirectCaller
     public static DynamicMethod ofMethod(final @Nullable ClassLoader loader, final String debugName = contextDebugName(), final Method method,
-            final ClassNode node = Maho.getClassNodeFromClassNonNull(method.getDeclaringClass()), final boolean copy = true) {
+            final ClassNode node = Maho.getClassNodeFromClassNonNull(method.getDeclaringClass())) {
         final DynamicMethod dynamicMethod = { loader };
         final Tuple2<ClassNode, MethodNode> tuple = methodBody(method, node);
         final MethodNode body = { tuple.v2.access, METHOD_NAME, tuple.v2.desc, null, null };
@@ -268,7 +269,7 @@ public class DynamicMethod {
         body.access |= ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC;
         if (noneMatch(body.access, ACC_STATIC)) {
             body.access |= ACC_STATIC;
-            body.desc = body.desc.replace("(", "(" + ASMHelper.classDesc(method.getDeclaringClass()));
+            body.desc = body.desc.replace("(", STR."(\{ASMHelper.classDesc(method.getDeclaringClass())}");
         }
         dynamicMethod.body(body);
         dynamicMethod.sourceFile(tuple.v1.sourceFile);
@@ -281,7 +282,7 @@ public class DynamicMethod {
         for (final MethodNode methodNode : node.methods)
             if (methodNode.name.equals(name) && methodNode.desc.equals(desc))
                 return { node, methodNode };
-        throw new UnsupportedOperationException("set method body: " + method);
+        throw new UnsupportedOperationException(STR."set method body: \{method}");
     }
     
     public static MethodHandle constructor(final Class<?> owner, final MethodType methodType) {
@@ -308,7 +309,7 @@ public class DynamicMethod {
     public String debugName() = debugName.replace('.', '$');
     
     @Getter
-    final Type wrapperType = Type.getObjectType(CLASS_NAME + "$" + debugName());
+    final Type wrapperType = Type.getObjectType(STR."\{CLASS_NAME}$\{debugName()}");
     
     @Getter
     final LinkedList<FieldNode> closure = { };
@@ -375,7 +376,7 @@ public class DynamicMethod {
     
     public boolean isStatic() = closure().stream().allMatch(fieldNode -> ASMHelper.anyMatch(fieldNode.access, ACC_STATIC));
     
-    protected static final String HOLDER_CLASS_NAME = DynamicMethod.class.getName() + "$Holder";
+    protected static final String HOLDER_CLASS_NAME = STR."\{DynamicMethod.class.getName()}$Holder";
     
     protected Class<?> holder() {
         final ClassNode node = { };
@@ -401,7 +402,7 @@ public class DynamicMethod {
     
     @SneakyThrows
     public MethodHandle handle() {
-        final MethodType methodType = ASMHelper.loadMethodType(methodDesc(), false, loader());
+        final MethodType methodType = ASMHelper.loadMethodType(methodDesc(), loader());
         return isStatic() ?
                 MethodHandleHelper.lookup().findStatic(wrapperClass(), methodName(), methodType) :
                 MethodHandleHelper.lookup().findVirtual(wrapperClass(), methodName(), methodType);
@@ -409,7 +410,7 @@ public class DynamicMethod {
     
     public void checkFieldNode(final FieldNode fieldNode) {
         if (!closure().contains(fieldNode))
-            throw new IllegalArgumentException(fieldNode.name + "/" + fieldNode.desc);
+            throw new IllegalArgumentException(STR."\{fieldNode.name}/\{fieldNode.desc}");
     }
     
     public MethodHandle getter(final FieldNode fieldNode) = getter(fieldNode.name, fieldNode.desc, ASMHelper.anyMatch(fieldNode.access, ACC_STATIC));

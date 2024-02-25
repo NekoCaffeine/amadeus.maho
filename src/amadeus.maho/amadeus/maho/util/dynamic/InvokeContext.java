@@ -20,7 +20,7 @@ public class InvokeContext {
     
     @Nullable Runnable before, after;
     
-    public InvokeContext(final Lock lock, final @Nullable Runnable before, final @Nullable Runnable after) = this(before >> lock::lock, after << lock::unlock);
+    public InvokeContext(final Lock lock, final @Nullable Runnable before, final @Nullable Runnable after) = this((Runnable) lock::lock > before, after > lock::unlock);
     
     public InvokeContext(final AtomicInteger counter) = this(counter::incrementAndGet, counter::decrementAndGet);
     

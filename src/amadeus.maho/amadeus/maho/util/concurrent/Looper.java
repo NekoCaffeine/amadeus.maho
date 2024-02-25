@@ -61,6 +61,7 @@ public class Looper implements Runnable {
         Supplier<EventBus> bus;
         
         LoopEvent.Pre pre = { this };
+        
         LoopEvent.Post post = { this };
         
         @Override
@@ -139,7 +140,7 @@ public class Looper implements Runnable {
     
     protected synchronized void markContext() {
         if (context() != null)
-            throw new IllegalThreadStateException("The loop is being executed by other threads: " + context());
+            throw new IllegalThreadStateException(STR."The loop is being executed by other threads: \{context()}");
         context(Thread.currentThread());
     }
     

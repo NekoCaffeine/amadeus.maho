@@ -1,17 +1,20 @@
 package amadeus.maho.lang.javac.handler;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.ListIterator;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Map;
 
 import com.sun.tools.javac.code.Attribute;
+import com.sun.tools.javac.code.Kinds;
 import com.sun.tools.javac.code.Scope;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.comp.ArgumentAttr;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.DeferredAttr;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.LambdaToMethod;
 import com.sun.tools.javac.comp.Lower;
@@ -37,13 +40,13 @@ import amadeus.maho.lang.Special;
 import amadeus.maho.lang.WeakLinking;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.JavacContext;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
-import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.runtime.ArrayHelper;
+import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.core.extension.DynamicLookup.*;
 import static amadeus.maho.util.bytecode.Bytecodes.*;
@@ -90,7 +93,7 @@ public class PrivilegeHandler extends JavacContext {
             default      -> {
                 final Type erasure = context.types.erasure(type);
                 if (erasure instanceof Type.ArrayType arrayType) {
-                    final StringBuilder builder = { 1 << 1 };
+                    final StringBuilder builder = { 1 << 4 };
                     Type elementType = arrayType;
                     while (elementType instanceof Type.ArrayType next) {
                         builder.append('[');
@@ -102,7 +105,7 @@ public class PrivilegeHandler extends JavacContext {
             }
         };
         
-        private static String objectDescriptor(final Type erasure) = "L" + erasure.tsym.flatName().toString().replace('.', '/') + ";";
+        private static String objectDescriptor(final Type erasure) = STR."L\{erasure.tsym.flatName().toString().replace('.', '/')};";
         
         {
             final Type.MethodType methodType = type.asMethodType();
@@ -112,24 +115,38 @@ public class PrivilegeHandler extends JavacContext {
         
         private Type mapType(final Type type) = switch (type.getTag()) {
             case BYTE,
-                    SHORT,
-                    CHAR,
-                    INT,
-                    LONG,
-                    FLOAT,
-                    DOUBLE,
-                    BOOLEAN,
-                    VOID -> type;
-            default      -> context.symtab.objectType;
+                 SHORT,
+                 CHAR,
+                 INT,
+                 LONG,
+                 FLOAT,
+                 DOUBLE,
+                 BOOLEAN,
+                 VOID -> type;
+            default   -> context.symtab.objectType;
         };
+        
+    }
+    
+    public static class TypeCastParensType extends ArgumentAttr.ArgumentType<JCTree.JCTypeCast> {
+        
+        ArgumentAttr attr;
+        
+        public TypeCastParensType(final ArgumentAttr argumentAttr, final JCTree.JCExpression tree, final Env<AttrContext> env, final JCTree.JCTypeCast speculativeTree, final Map<Attr.ResultInfo, Type> speculativeTypes = new HashMap<>()) {
+            argumentAttr.super(tree, env, speculativeTree, speculativeTypes);
+            attr = argumentAttr;
+        }
+        
+        @Override
+        protected Type overloadCheck(final Attr.ResultInfo resultInfo, final DeferredAttr.DeferredAttrContext deferredAttrContext) = (Privilege) attr.checkSpeculative(speculativeTree.expr, resultInfo);
+        
+        @Override
+        protected TypeCastParensType dup(final JCTree.JCTypeCast tree, final Env<AttrContext> env) = { attr, tree, env, speculativeTree, speculativeTypes };
         
     }
     
     private static final int
             SPECIAL = 1 << 8;
-    
-    @Getter
-    private static final AtomicInteger counter = { };
     
     Name
             Privilege          = name("amadeus.maho.lang.Privilege"),
@@ -138,22 +155,27 @@ public class PrivilegeHandler extends JavacContext {
             makePrivilegeProxy = name("makePrivilegeProxy"),
             _new               = name("new");
     
-    public static boolean inPrivilegeContext(final java.util.List<JCTree> context = new ArrayList<>(HandlerMarker.attrContext()))
-            = counter().get() > 0 || inPrivilegeMarkDomains(context) || canAccessByTypeCast(context);
+    LinkedList<JCTree.JCAnnotation> dequeLocal = { };
     
-    private static boolean inPrivilegeMarkDomains(final java.util.List<JCTree> context = new ArrayList<>(HandlerMarker.attrContext()))
+    public static boolean inPrivilegeContext(final java.util.List<JCTree> context, final @Nullable Env<AttrContext> env = null)
+            = inPrivilegeMarkDomains(context) || canAccessByTypeCast(context, env);
+    
+    private static boolean inPrivilegeMarkDomains(final java.util.List<JCTree> context)
             = context.stream().map(JavacContext::symbol).nonnull().anyMatch(symbol -> hasAnnotation(symbol, Privilege.class));
     
-    private static boolean canAccessByTypeCast(final java.util.List<JCTree> context) {
+    private static boolean canAccessByTypeCast(final java.util.List<JCTree> context, final @Nullable Env<AttrContext> env) {
         @Nullable JCTree prev = null;
         for (final ListIterator<JCTree> iterator = context.listIterator(context.size()); iterator.hasPrevious(); ) {
             final JCTree next = iterator.previous();
+            if (env != null && next instanceof JCTree.JCPolyExpression polyExpression)
+                if (env.tree == polyExpression && env.next?.tree ?? null instanceof JCTree.JCTypeCast cast && cast.expr == polyExpression && cast.clazz.type.tsym.flatName() == instance(PrivilegeHandler.class).Privilege)
+                    return true;
             if (prev == null && (next instanceof JCTree.JCIdent || next instanceof JCTree.JCFieldAccess || next instanceof JCTree.JCNewClass) ||
-                    next instanceof JCTree.JCMethodInvocation invocation && invocation.meth == prev ||
-                    // next instanceof JCTree.JCNewClass newClass && newClass.clazz == prev ||
-                    next instanceof JCTree.JCAssign assign && assign.lhs == prev ||
-                    next instanceof JCTree.JCAssignOp assignOp && assignOp.lhs == prev ||
-                    next instanceof JCTree.JCParens) {
+                next instanceof JCTree.JCMethodInvocation invocation && invocation.meth == prev ||
+                next instanceof JCTree.JCAssign assign && assign.lhs == prev ||
+                next instanceof JCTree.JCAssignOp assignOp && assignOp.lhs == prev ||
+                next instanceof JCTree.JCParens ||
+                HandlerSupport.speculativeContext()[next] == prev) {
                 prev = next;
                 continue;
             }
@@ -162,37 +184,36 @@ public class PrivilegeHandler extends JavacContext {
         return false;
     }
     
-    private static final String ImportsPhase = "com.sun.tools.javac.comp.TypeEnter$ImportsPhase";
+    @Hook(forceReturn = true)
+    private static boolean importAccessible(final Check $this, final Symbol symbol, final Symbol.PackageSymbol packageSymbol) = true;
     
     @Hook
-    private static void resolveImports_$Enter(final @InvisibleType(ImportsPhase) Object $this, final JCTree.JCCompilationUnit tree, final Env<AttrContext> env) = counter().getAndIncrement();
-    
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
-    private static void resolveImports_$Finally(final @InvisibleType(ImportsPhase) Object $this, final JCTree.JCCompilationUnit tree, final Env<AttrContext> env) = counter().getAndDecrement();
-    
-    @Hook
-    private static Hook.Result isAccessible(final Resolve $this, final Env<AttrContext> env, final Symbol.TypeSymbol c, final boolean checkInner) = Hook.Result.falseToVoid(inPrivilegeContext());
-    
-    @Hook
-    private static Hook.Result isAccessible(final Resolve $this, final Env<AttrContext> env, final Type site, final Symbol sym, final boolean checkInner) = Hook.Result.falseToVoid(inPrivilegeContext());
-    
-    private static final ThreadLocal<LinkedList<JCTree.JCAnnotation>> dequeLocal = ThreadLocal.withInitial(LinkedList::new);
+    private static Hook.Result selectBest(
+            final Resolve $this,
+            final Env<AttrContext> env,
+            final Type site,
+            final List<Type> argTypes,
+            final List<Type> typeArgTypes,
+            final Symbol sym,
+            final Symbol bestSoFar,
+            final boolean allowBoxing,
+            final boolean useVarargs) = Hook.Result.falseToVoid(sym instanceof Resolve.AccessError, bestSoFar); // NPE: sym.owner == null
     
     @Hook
     private static <T extends JCTree> void translate_$Enter(final LambdaToMethod $this, final T tree) {
         if (tree instanceof JCTree.JCMethodDecl decl)
-            dequeLocal.get().addFirst(instance(PrivilegeHandler.class).marker.getAnnotationTreesByType(decl.mods, (Privilege) $this.attrEnv, Privilege.class).stream().findFirst().orElse(null));
+            instance(PrivilegeHandler.class).dequeLocal.addFirst(instance(PrivilegeHandler.class).marker.getAnnotationTreesByType(decl.mods, (Privilege) $this.attrEnv, Privilege.class).stream().findFirst().orElse(null));
     }
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     private static <T extends JCTree> void translate_$Exit(final LambdaToMethod $this, final T tree) {
         if (tree instanceof JCTree.JCMethodDecl decl)
-            dequeLocal.get().removeFirst();
+            instance(PrivilegeHandler.class).dequeLocal.removeFirst();
     }
     
     @Hook
     private static void makeLambdaBody(final LambdaToMethod $this, final JCTree.JCLambda tree, final JCTree.JCMethodDecl lambdaMethodDecl)
-            = dequeLocal.get().stream().nonnull().findFirst().ifPresent(annotation -> {
+            = instance(PrivilegeHandler.class).dequeLocal.stream().nonnull().findFirst().ifPresent(annotation -> {
         lambdaMethodDecl.mods.annotations = lambdaMethodDecl.mods.annotations.append(annotation);
         final PrivilegeHandler handler = instance(PrivilegeHandler.class);
         lambdaMethodDecl.sym.appendAttributes(List.of(new Attribute.Compound(handler.symtab.enterClass(handler.mahoModule, handler.Privilege).type, List.nil())));
@@ -260,54 +281,27 @@ public class PrivilegeHandler extends JavacContext {
         }
     }
     
-    public static String mapMethodName(final String name) = "$access$" + name.replace("<", "$_").replace(">", "_$");
-    
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
-    private static boolean importAccessible(final boolean capture, final Check $this, final Symbol symbol, final Symbol.PackageSymbol packageSymbol) = capture || inPrivilegeContext();
+    public static String mapMethodName(final String name) = STR."$access$\{name.replace("<", "$_").replace(">", "_$")}";
     
     @Hook(at = @At(var = @At.VarInsn(opcode = ILOAD, var = 4), ordinal = 0))
     private static Hook.Result access(final Lower $this, final Symbol sym, final JCTree.JCExpression expression, final JCTree.JCExpression enclOp, final boolean refSuper)
-            = inPrivilegeContext(HandlerMarker.lowerContext()) ? new Hook.Result(expression) : Hook.Result.VOID;
+            = inPrivilegeContext(HandlerSupport.lowerContext()) ? new Hook.Result(expression) : Hook.Result.VOID;
     
     @Hook
     private static Hook.Result accessConstructor(final Lower $this, final JCDiagnostic.DiagnosticPosition pos, final Symbol constructor) {
         final PrivilegeHandler instance = instance(PrivilegeHandler.class);
         if (pos instanceof JCTree.JCMethodInvocation && !instance.isAccessible((Privilege) $this.currentClass, constructor.owner.type, constructor) || constructor.baseSymbol().name == instance._new)
-            instance.makeIndyQualifier((JCTree.JCExpression) HandlerMarker.lowerContext()[-1], constructor);
+            instance.makeIndyQualifier((JCTree.JCExpression) HandlerSupport.lowerContext()[-1], constructor);
         return Hook.Result.VOID;
-    }
-    
-    protected Type site(final JCTree.JCExpression expression, final Symbol sym) = expression instanceof JCTree.JCFieldAccess access ? access.selected.type : sym.owner.type;
-    
-    // # AccessibleHandler#isAccessible
-    public boolean isAccessible(final Symbol.ClassSymbol context, final Symbol.TypeSymbol target, final boolean checkInner = false) = true;
-    // public boolean isAccessible(final Symbol.ClassSymbol context, final Symbol.TypeSymbol target, final boolean checkInner = false) {
-    //     final boolean isAccessible = switch ((short) (target.flags() & AccessFlags)) {
-    //         case PRIVATE   -> context == target.owner || context.outermostClass() == target.owner.outermostClass();
-    //         case PROTECTED -> context.packge() == target.packge() || isInnerSubClass(context, target.owner);
-    //         case 0         -> context.packge() == target.packge();
-    //         default        -> true;
-    //     };
-    //     return !checkInner || target.type.getEnclosingType() == Type.noType ? isAccessible : isAccessible && isAccessible(context, target.type.getEnclosingType(), checkInner);
-    // }
-    
-    protected boolean isAccessible(final Symbol.ClassSymbol context, final Type t, final boolean checkInner = false)
-            = t.hasTag(ARRAY) ? isAccessible(context, types.cvarUpperBound(types.elemtype(t))) : isAccessible(context, t.tsym, checkInner);
-    
-    protected boolean isInnerSubClass(final Symbol.ClassSymbol inner, final Symbol base) {
-        @Nullable Symbol.ClassSymbol c = inner;
-        while (c != null && !c.isSubClass(base, types))
-            c = c.owner.enclClass();
-        return c != null;
     }
     
     // # AccessibleHandler#isAccessible
     public boolean isAccessible(final Symbol.ClassSymbol context, final Type site, final Symbol target, final boolean checkInner = false)
-            = target.name == names._this || target instanceof Symbol.ClassSymbol || (target.name != names.init || target.owner == site.tsym) && switch ((short) (target.flags() & AccessFlags)) {
+    = target.name == names._this || target instanceof Symbol.ClassSymbol || (target.name != names.init || target.owner == site.tsym) && switch ((short) (target.flags() & AccessFlags)) {
         case PRIVATE   -> (context == target.owner || context.outermostClass() == target.owner.outermostClass()) && target.isInheritedIn(site.tsym, types);
-        case PROTECTED -> context.packge() == target.packge() || isProtectedAccessible(target, context, site) || isAccessible(context, site, checkInner) && notOverriddenIn(site, target);
-        case 0         -> context.packge() == target.packge() && isAccessible(context, site, checkInner) && target.isInheritedIn(site.tsym, types) && notOverriddenIn(site, target);
-        default        -> isAccessible(context, site, checkInner) && notOverriddenIn(site, target);
+        case PROTECTED -> context.packge() == target.packge() || isProtectedAccessible(target, context, site) || notOverriddenIn(site, target);
+        case 0         -> context.packge() == target.packge() && target.isInheritedIn(site.tsym, types) && notOverriddenIn(site, target);
+        default        -> notOverriddenIn(site, target);
     };
     
     protected boolean notOverriddenIn(final Type site, final Symbol symbol) {
@@ -328,7 +322,7 @@ public class PrivilegeHandler extends JavacContext {
     }
     
     private JCTree.JCExpression makeIndyQualifier(final JCTree.JCExpression expression, final Symbol target, final int modifiers = 0,
-            final boolean outerStatement = HandlerMarker.lowerContext().size() > 2 && HandlerMarker.lowerContext()[-3] instanceof JCTree.JCExpressionStatement) {
+            final boolean outerStatement = HandlerSupport.lowerContext().size() > 2 && HandlerSupport.lowerContext()[-3] instanceof JCTree.JCExpressionStatement) {
         final Symbol.MethodSymbol bsm = lookupDynamicLookupMethod(makePrivilegeSite);
         final PoolConstant.LoadableConstant className = PoolConstant.LoadableConstant.String(target.enclClass().flatName().toString());
         final boolean isStatic = anyMatch(target.flags(), STATIC);
@@ -339,8 +333,8 @@ public class PrivilegeHandler extends JavacContext {
             if (!isStatic && !(expression instanceof JCTree.JCNewClass))
                 argTypes = argTypes.prepend(methodSymbol.owner.type);
             final Type returnType = expression instanceof JCTree.JCNewClass ? methodSymbol.owner.type : methodSymbol.type.asMethodType().restype;
-            final PoolConstant.LoadableConstant opcode = PoolConstant.LoadableConstant.Int(modifiers & ~0xFF |
-                    ((modifiers & SPECIAL) != 0 && target instanceof Symbol.MethodSymbol ? INVOKESPECIAL : expression instanceof JCTree.JCNewClass ? NEW : opcode(target)));
+            final PoolConstant.LoadableConstant opcode = PoolConstant.LoadableConstant.Int(modifiers & ~0xFF | ((modifiers & SPECIAL) != 0 && target instanceof Symbol.MethodSymbol ?
+                    INVOKESPECIAL : expression instanceof JCTree.JCNewClass ? NEW : opcode(target)));
             final PoolConstant.LoadableConstant constants[] = { opcode, className };
             final PrivilegeMethodSymbol dynamicMethodSymbol = {
                     methodSymbol.name == names.init ? _new : methodSymbol.name, symtab.noSymbol, bsm.asHandle(), new Type.MethodType(
@@ -364,7 +358,7 @@ public class PrivilegeHandler extends JavacContext {
                     dynamicMethodSymbol.owner = target.owner;
                     final JCTree.JCMethodInvocation dynamicInvocation = maker.Apply(List.nil(), maker.Ident(dynamicMethodSymbol), invocation.args);
                     dynamicInvocation.type = dynamicMethodSymbol.type.asMethodType().restype = symtab.voidType;
-                    final @Nullable JCTree.JCMethodDecl method = HandlerMarker.lowerContext().descendingStream().cast(JCTree.JCMethodDecl.class).findFirst().orElse(null);
+                    final @Nullable JCTree.JCMethodDecl method = HandlerSupport.lowerContext().descendingStream().cast(JCTree.JCMethodDecl.class).findFirst().orElse(null);
                     if (method != null && method.name == names.init)
                         method.name = method.sym.name = _new;
                     throw new ReLowException(dynamicInvocation, invocation);
@@ -432,7 +426,7 @@ public class PrivilegeHandler extends JavacContext {
         final Symbol.TypeSymbol target = site.tsym.isInterface() ? handler.symtab.objectType.tsym : site.tsym;
         for (final Symbol sym : target.members().getSymbolsByName(handler._new, Scope.LookupKind.NON_RECURSIVE))
             if (sym.kind == MTH && (sym.flags_field & SYNTHETIC) == 0)
-                bestSoFar = selectBest($this, env, site, argTypes, typeArgTypes,
+                bestSoFar = (Privilege) $this.selectBest(env, site, argTypes, typeArgTypes,
                         new Symbol.MethodSymbol(sym.flags(), handler._new, new Type.ForAll(site.tsym.type.getTypeArguments().appendList(sym.type instanceof Type.ForAll forAll ? forAll.tvars : List.nil()),
                                 handler.types.createMethodTypeWithReturn(sym.type.asMethodType(), site)), site.tsym) {
                             @Override
@@ -447,13 +441,28 @@ public class PrivilegeHandler extends JavacContext {
     @Hook(value = TreeInfo.class, isStatic = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
     private static boolean isExpressionStatement(final boolean capture, final JCTree.JCExpression tree) = capture || tree instanceof JCTree.JCTypeCast;
     
+    @Hook
+    private static Hook.Result visitTree(final ArgumentAttr $this, final JCTree that) {
+        if (that instanceof JCTree.JCTypeCast cast) {
+            final PrivilegeHandler handler = instance(PrivilegeHandler.class);
+            final Env<AttrContext> env = (Privilege) $this.env;
+            if (((Privilege) $this.attr).attribType(cast.clazz, env).tsym.flatName() == handler.Privilege) {
+                (Privilege) $this.processArg(cast, speculativeTree -> new TypeCastParensType($this, cast, env, speculativeTree));
+                return Hook.Result.NULL;
+            } else if (cast.clazz.toString().contains("Privilege"))
+                DebugHelper.breakpoint();
+        }
+        return Hook.Result.VOID;
+    }
+    
     @Hook(at = @At(method = @At.MethodInsn(name = "attribType"), ordinal = 0), before = false, capture = true)
     private static Hook.Result visitTypeCast(final Type capture, final Attr $this, final JCTree.JCTypeCast tree) {
         final PrivilegeHandler handler = instance(PrivilegeHandler.class);
         if (capture.tsym.flatName() == handler.Privilege) {
-            result($this, tree.type = $this.attribExpr(tree.expr, env($this).dup(tree)));
+            (Privilege) ($this.result = (Privilege) $this.check(tree, (Privilege) $this.attribTree(tree.expr, ((Privilege) $this.env).dup(tree), (Privilege) $this.resultInfo), Kinds.KindSelector.VAL, (Privilege) $this.resultInfo));
             return Hook.Result.NULL;
-        }
+        }else if (tree.clazz.toString().contains("Privilege"))
+            DebugHelper.breakpoint();
         return Hook.Result.VOID;
     }
     
@@ -471,7 +480,7 @@ public class PrivilegeHandler extends JavacContext {
             final JCTree.JCExpression result;
             try {
                 final JCTree.JCExpression parent = TreeInfo.skipParens($this.translate(tree.expr));
-                final LinkedList<JCTree> trees = HandlerMarker.lowerContext();
+                final LinkedList<JCTree> trees = HandlerSupport.lowerContext();
                 int modifiers = 0;
                 if (hasAnnotation(type, WeakLinking.class))
                     modifiers |= WEAK_LINKING;

@@ -30,7 +30,7 @@ import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
 import amadeus.maho.lang.javac.handler.base.DelayedContext;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.lang.javac.handler.base.Syntax;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
@@ -66,11 +66,11 @@ public class DelegateAndIncludeHandler extends BaseSyntaxHandler {
                     if (symbol instanceof Symbol.VarSymbol)
                         return true;
                     if (symbol instanceof Symbol.MethodSymbol methodSymbol) {
-                        if (methodSymbol.params.size() == 0)
+                        if (methodSymbol.params.isEmpty())
                             return true;
                         if (site != null) {
                             final DelegateAndIncludeHandler handler = instance(DelegateAndIncludeHandler.class);
-                            final @Nullable Env<AttrContext> errorEnv = handler.typeEnvs().get(site.tsym);
+                            final @Nullable Env<AttrContext> errorEnv = (Privilege) handler.typeEnvs.get(site.tsym);
                             final @Nullable JCTree def = errorEnv == null ? null : ~errorEnv.enclClass.defs.stream().lookup(it -> symbol(it) == methodSymbol);
                             final JCDiagnostic.Error error = { MahoJavac.KEY, "delegate.method.must.have.no.parameters", methodSymbol };
                             if (def != null)
@@ -152,13 +152,14 @@ public class DelegateAndIncludeHandler extends BaseSyntaxHandler {
             final boolean useVarargs) {
         if (name == name.table.names.init || capture.kind == AMBIGUOUS)
             return capture;
-        final @Nullable JCTree tree = HandlerMarker.attrContext().peekLast();
+        final @Nullable JCTree tree = HandlerSupport.attrContext().peekLast();
         if (tree == null)
             return capture;
         final DelegateAndIncludeHandler handler = instance(DelegateAndIncludeHandler.class);
         final TreeMaker maker = handler.maker;
         // try fix same method sig static error, see com.sun.tools.javac.comp.Attr#visitSelect rs.accessBase(rs.new StaticError(sym)...)
-        final Symbol methodNotFound = methodNotFound($this), p_result[] = { tree instanceof JCTree.JCFieldAccess access && symbol(access.selected)?.kind ?? MTH == TYP && noneMatch(capture.flags(), STATIC) ? methodNotFound : capture };
+        final Symbol methodNotFound = (Privilege) $this.methodNotFound,
+                p_result[] = { tree instanceof JCTree.JCFieldAccess access && symbol(access.selected)?.kind ?? MTH == TYP && noneMatch(capture.flags(), STATIC) ? methodNotFound : capture };
         if (p_result[0].kind == MTH)
             return p_result[0];
         final Symbol.TypeSymbol objectTypeSymbol = handler.symtab.objectType.tsym;
@@ -184,7 +185,7 @@ public class DelegateAndIncludeHandler extends BaseSyntaxHandler {
                                     access.selected = symbol instanceof Symbol.MethodSymbol methodSymbol ? apply(maker, maker.Select(access.selected, symbol), methodSymbol) : maker.Select(access.selected, symbol);
                                     throw new ReAttrException(access, access);
                                 }
-                                default                                 -> throw new UnsupportedOperationException(tree.getClass() + " - " + tree);
+                                default                                 -> throw new UnsupportedOperationException(STR."\{tree.getClass()} - \{tree}");
                             }
                         }
                     }));

@@ -1,10 +1,13 @@
 package amadeus.maho.util.concurrent;
 
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
 import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.Spliterator;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -13,11 +16,16 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.RequiredArgsConstructor;
+import amadeus.maho.util.dynamic.ReferenceCollector;
 
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class ConcurrentWeakIdentityHashSet<E> extends AbstractSet<E> implements Set<E> {
+public class ConcurrentWeakIdentityHashSet<E> extends AbstractSet<E> implements Set<E>, ReferenceCollector.Collectible<E> {
+    
+    @NoArgsConstructor
+    public static class Managed<E> extends ConcurrentWeakIdentityHashSet<E> implements ReferenceCollector.Manageable<E> { }
     
     @Getter
     @Default
@@ -72,5 +80,11 @@ public class ConcurrentWeakIdentityHashSet<E> extends AbstractSet<E> implements 
     
     @Override
     public Stream<E> parallelStream() = set.parallelStream();
+    
+    @Override
+    public ReferenceQueue<E> referenceQueue() = map().referenceQueue();
+    
+    @Override
+    public void collect(final Reference<? extends E> reference) = map().collect(reference);
     
 }

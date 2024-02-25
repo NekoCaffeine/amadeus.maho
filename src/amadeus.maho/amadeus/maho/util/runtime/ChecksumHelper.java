@@ -3,12 +3,15 @@ package amadeus.maho.util.runtime;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+
+import jdk.internal.misc.Unsafe;
 
 import amadeus.maho.lang.Extension;
 import amadeus.maho.util.math.MathHelper;
@@ -41,9 +44,12 @@ public interface ChecksumHelper {
                     final var complete = MessageDigest.getInstance(algorithm);
                     long pos = 0L;
                     final long size = channel.size();
+                    final Unsafe unsafe = UnsafeHelper.unsafe();
                     while (pos < size) {
                         final long min = MathHelper.min(size - pos, 1 << 30);
-                        complete.update(fileChannel.map(FileChannel.MapMode.READ_ONLY, pos, min));
+                        final MappedByteBuffer mapped = fileChannel.map(FileChannel.MapMode.READ_ONLY, pos, min);
+                        complete.update(mapped);
+                        unsafe.invokeCleaner(mapped);
                         pos += min;
                     }
                     return complete.hex();

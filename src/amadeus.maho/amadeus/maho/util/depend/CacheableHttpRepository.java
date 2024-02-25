@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -47,7 +46,7 @@ public abstract class CacheableHttpRepository implements Repository {
     ConcurrentHashMap<Project.Dependency, CompletableFuture<Collection<Project.Dependency>>> recursiveResolveCache = { };
 
     @Override
-    public String debugInfo() = getClass().getSimpleName() + ": " + rootUrl();
+    public String debugInfo() = STR."\{getClass().getSimpleName()}: \{rootUrl()}";
 
     public abstract String uri(final Project project, final String extension);
 
@@ -60,12 +59,12 @@ public abstract class CacheableHttpRepository implements Repository {
     public Path cache(final Path relative, final Path cache = cacheDir() / relative) throws IOException {
         if (Files.exists(cache))
             if (checkCacheCompleteness(cache)) {
-                logger().accept(DEBUG, "The local cache of %s detected, use it.".formatted(relative));
+                logger().accept(DEBUG, STR."The local cache of \{relative} detected, use it.");
                 return cache;
             } else
-                logger().accept(WARNING, "The local cache of %s was detected, but it has been corrupted and will be downloaded again.".formatted(relative));
+                logger().accept(WARNING, STR."The local cache of \{relative} was detected, but it has been corrupted and will be downloaded again.");
         else
-            logger().accept(DEBUG, "The local cache of %s could not be detected and will be downloaded.".formatted(relative));
+            logger().accept(DEBUG, STR."The local cache of \{relative} could not be detected and will be downloaded.");
         return downloadDataFormRemote(relative, cache);
     }
 
@@ -88,7 +87,7 @@ public abstract class CacheableHttpRepository implements Repository {
     public Path downloadDataFormRemote(final Path relative, final Path cache = cacheDir() / relative, final boolean completenessMetadata = false) throws IOException {
         int retries = maxRetries();
         final HttpRequest request = request(relative).build();
-        logger().accept(DEBUG, "Downloading %s => %s".formatted(request.uri(), cache));
+        logger().accept(DEBUG, STR."Downloading \{request.uri()} => \{cache}");
         final ArrayList<Throwable> throwables = { };
         do {
             try {

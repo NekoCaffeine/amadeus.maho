@@ -50,7 +50,7 @@ public record ClassLoaderDelegate(
     @Getter
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class ShellClassLoader extends URLClassLoader {
-    
+        
         @ToString
         @EqualsAndHashCode
         private record ClassFile(byte data[], long timestamp) { }
@@ -64,9 +64,9 @@ public record ClassLoaderDelegate(
             @FieldDefaults(level = AccessLevel.PRIVATE)
             public class Connection extends URLConnection {
                 
-                InputStream in;
+                InputStream               in;
                 Map<String, List<String>> fields;
-                List<String> fieldNames;
+                List<String>              fieldNames;
                 
                 @Override
                 public void connect() {
@@ -130,7 +130,7 @@ public record ClassLoaderDelegate(
             classFiles[toResourceString(name)] = { bytes, System.currentTimeMillis() };
             TransformerManager.DebugDumper.dumpBytecode(name, bytes, TransformerManager.DebugDumper.dump_shell);
         }
-    
+        
         @Override
         protected Class<?> findClass(final String name) throws ClassNotFoundException {
             final @Nullable ShellClassLoader.ClassFile file = classFiles[toResourceString(name)];
@@ -161,16 +161,16 @@ public record ClassLoaderDelegate(
         private @Nullable URL doFindResource(final String name) {
             if (classFiles.containsKey(name))
                 try {
-                    return { null, new URI("jshell", null, "/" + name, null).toString(), new ResourceURLStreamHandler(name) };
+                    return URL.of(new URI("jshell", null, STR."/\{name}", null), new ResourceURLStreamHandler(name));
                 } catch (final MalformedURLException | URISyntaxException ex) { throw new InternalError(ex); }
             return null;
         }
         
-        private String toResourceString(final String className) = className.replace('.', '/') + ".class";
+        private String toResourceString(final String className) = STR."\{className.replace('.', '/')}.class";
         
         @Override
         public void addURL(final URL url) = super.addURL(url);
-    
+        
     }
     
     @Override
@@ -193,7 +193,7 @@ public record ClassLoaderDelegate(
                 loaded.getDeclaredMethods();
             }
             
-        } catch (final Throwable ex) { throw new ExecutionControl.ClassInstallException("load: " + ex.getMessage(), loadedMark); }
+        } catch (final Throwable ex) { throw new ExecutionControl.ClassInstallException(STR."load: \{ex.getMessage()}", loadedMark); }
     }
     
     @Override
@@ -214,7 +214,7 @@ public record ClassLoaderDelegate(
     public Class<?> findClass(final String name) throws ClassNotFoundException {
         final Class<?> klass = classes[name];
         if (klass == null)
-            throw new ClassNotFoundException(name + " not found");
+            throw new ClassNotFoundException(STR."\{name} not found");
         else
             return klass;
     }

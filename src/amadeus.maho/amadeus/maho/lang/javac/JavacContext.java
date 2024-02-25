@@ -21,11 +21,11 @@ import java.util.stream.Stream;
 import jdk.internal.misc.Unsafe;
 
 import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 
 import com.sun.tools.javac.code.AnnoConstruct;
 import com.sun.tools.javac.code.ClassFinder;
-import com.sun.tools.javac.code.Kinds;
 import com.sun.tools.javac.code.Lint;
 import com.sun.tools.javac.code.Scope;
 import com.sun.tools.javac.code.Symbol;
@@ -33,26 +33,24 @@ import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Annotate;
-import com.sun.tools.javac.comp.ArgumentAttr;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.ConstFold;
 import com.sun.tools.javac.comp.DeferredAttr;
 import com.sun.tools.javac.comp.Enter;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.InferenceContext;
-import com.sun.tools.javac.comp.Lower;
 import com.sun.tools.javac.comp.MemberEnter;
 import com.sun.tools.javac.comp.Operators;
 import com.sun.tools.javac.comp.Resolve;
 import com.sun.tools.javac.comp.TypeEnter;
+import com.sun.tools.javac.comp.TypeEnvs;
 import com.sun.tools.javac.jvm.ByteCodes;
-import com.sun.tools.javac.jvm.ClassReader;
 import com.sun.tools.javac.jvm.Code;
 import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.jvm.Items;
 import com.sun.tools.javac.jvm.PoolConstant;
-import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.parser.JavaTokenizer;
 import com.sun.tools.javac.parser.JavacParser;
 import com.sun.tools.javac.parser.Tokens;
@@ -63,14 +61,12 @@ import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
-import com.sun.tools.javac.util.ListBuffer;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Names;
 import com.sun.tools.javac.util.Warner;
 
 import amadeus.maho.core.MahoExport;
-import amadeus.maho.core.extension.DynamicLookupHelper;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.Default;
@@ -85,8 +81,7 @@ import amadeus.maho.lang.inspection.ConstructorContract;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.inspection.TestOnly;
 import amadeus.maho.lang.javac.handler.base.AnnotationProxyMaker;
-import amadeus.maho.lang.javac.handler.base.DelayedContext;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.Redirect;
@@ -104,11 +99,9 @@ import amadeus.maho.util.runtime.MethodHandleHelper;
 import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
 import amadeus.maho.util.tuple.Tuple3;
-import amadeus.maho.vm.JVM;
 
 import static amadeus.maho.util.bytecode.Bytecodes.NEW;
 import static com.sun.tools.javac.code.Flags.*;
-import static com.sun.tools.javac.code.Kinds.Kind.*;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
 import static org.objectweb.asm.Opcodes.*;
 
@@ -163,8 +156,9 @@ public class JavacContext {
         @Redirect(targetClass = Items.DynamicItem.class, slice = @Slice(@At(method = @At.MethodInsn(name = "emitLdc"))))
         private static void load(final Code code, final DynamicVarSymbol member) {
             switch (member.type.getTag()) {
-                case LONG, DOUBLE -> code.emitop2(ByteCodes.ldc2w, member, (writer, constant) -> (Privilege) writer.putConstant(constant));
-                default           -> code.emitLdc(member);
+                case LONG,
+                     DOUBLE -> code.emitop2(ByteCodes.ldc2w, member, (writer, constant) -> (Privilege) writer.putConstant(constant));
+                default     -> code.emitLdc(member);
             }
         }
         
@@ -187,13 +181,13 @@ public class JavacContext {
         Check.CheckContext context;
         
         public boolean compatible(final Type found, final Type req, final Warner warn) = context.compatible(found, req, warn);
-    
+        
         public void report(final JCDiagnostic.DiagnosticPosition pos, final JCDiagnostic details) = context.report(pos, details);
-    
+        
         public Warner checkWarner(final JCDiagnostic.DiagnosticPosition pos, final Type found, final Type req) = context.checkWarner(pos, found, req);
-    
+        
         public InferenceContext inferenceContext() = context.inferenceContext();
-    
+        
         public DeferredAttr.DeferredAttrContext deferredAttrContext() = context.deferredAttrContext();
         
     }
@@ -237,6 +231,12 @@ public class JavacContext {
             if (value != tree)
                 debugCount[0]++;
             return value != tree ? value : super.translate(tree);
+        }
+        
+        @Override
+        public void visitErroneous(final JCTree.JCErroneous tree) {
+            tree.errs = translate(tree.errs);
+            result = tree;
         }
         
         public static void translate(final Map<? extends JCTree, ? extends JCTree> mapping, final boolean debug = false, final JCTree... trees) {
@@ -292,7 +292,7 @@ public class JavacContext {
         }
         
         @Override
-        public AnnotationVisitor visitAnnotation(final String descriptor, final boolean visible) {
+        public @Nullable AnnotationVisitor visitAnnotation(final String descriptor, final boolean visible) {
             for (final String annotationType : annotationTypes)
                 if (descriptor.equals(annotationType))
                     if (mapper != null)
@@ -303,19 +303,19 @@ public class JavacContext {
         }
         
         @SafeVarargs
-        public static boolean hasAnnotations(final org.objectweb.asm.ClassReader reader, final Class<? extends Annotation>... annotationTypes) {
+        public static boolean hasAnnotations(final ClassReader reader, final Class<? extends Annotation>... annotationTypes) {
             try {
-                reader.accept(new ClassAnnotationFinder(annotationTypes), org.objectweb.asm.ClassReader.SKIP_CODE);
+                reader.accept(new ClassAnnotationFinder(annotationTypes), ClassReader.SKIP_CODE);
                 return false;
             } catch (final Break ignored) { return true; }
         }
         
         @SafeVarargs
-        public static void process(final org.objectweb.asm.ClassReader reader, final Function<Class<? extends Annotation>, AnnotationVisitor> mapper, final Class<? extends Annotation>... annotationTypes)
-                = reader.accept(new ClassAnnotationFinder(mapper, annotationTypes), org.objectweb.asm.ClassReader.SKIP_CODE);
+        public static void process(final ClassReader reader, final Function<Class<? extends Annotation>, AnnotationVisitor> mapper, final Class<? extends Annotation>... annotationTypes)
+                = reader.accept(new ClassAnnotationFinder(mapper, annotationTypes), ClassReader.SKIP_CODE);
         
         @SafeVarargs
-        public static void processVoid(final org.objectweb.asm.ClassReader reader, final Consumer<Class<? extends Annotation>> consumer, final Class<? extends Annotation>... annotationTypes) = process(reader, annotationType -> {
+        public static void processVoid(final ClassReader reader, final Consumer<Class<? extends Annotation>> consumer, final Class<? extends Annotation>... annotationTypes) = process(reader, annotationType -> {
             consumer.accept(annotationType);
             return null;
         }, annotationTypes);
@@ -559,69 +559,49 @@ public class JavacContext {
         
     }
     
-    private static final String TypeEnvs = "com.sun.tools.javac.comp.TypeEnvs";
-    
-    @Proxy(value = INVOKESTATIC, target = TypeEnvs)
-    private static native @InvisibleType(TypeEnvs) Object instance(Context context);
-    
-    @Proxy(GETFIELD)
-    private static native HashMap<Symbol.TypeSymbol, Env<AttrContext>> map(@InvisibleType(TypeEnvs) Object typeEnvs);
-    
-    @Proxy(INVOKEVIRTUAL)
-    private static native <T> Context.Key<T> key(Context $this, Class<T> clazz);
-    
-    @Hook
-    private static Hook.Result remove(final @InvisibleType(TypeEnvs) Object $this, final Symbol.TypeSymbol sym) = { map($this).get(sym) };
-    
     private static final ThreadLocal<JavacContext> contextLocal = { };
     
     public static @Nullable JavacContext instance() = contextLocal.get();
+    
+    public static void drop() = contextLocal.remove();
     
     @SneakyThrows
     public static <T> T instance(final Class<T> clazz, @Nullable final Function<Context, T> orElseGet = null) {
         final Context context = contextLocal.get().context;
         @Nullable T result = context.get(clazz);
         if (result == null) {
-            final Context.Key<T> key = key(context, clazz);
-            synchronized (key) {
-                if ((result = context.get(key)) == null)
+            final Context.Key<T> key = (Privilege) context.key(clazz);
+            if ((result = context.get(key)) == null)
+                try {
                     context.put(key, result = (orElseGet != null ? orElseGet :
                             (Function<Context, T>) it -> (T) MethodHandleHelper.lookup().findConstructor(clazz, MethodType.methodType(void.class, Context.class)).invoke(context)).apply(context));
-            }
+                } catch (final NoSuchMethodException e) { throw DebugHelper.breakpointBeforeThrow(e); }
         }
         return result;
     }
     
-    Context              context;
-    Annotate             annotate;
-    JavaCompiler         compiler;
-    Check                check;
-    TreeMaker            maker;
-    Operators            operators;
-    Names                names;
-    Types                types;
-    Resolve              resolve;
-    Lower                lower;
-    ClassFinder          finder;
-    ClassReader          reader;
-    Attr                 attr;
-    ArgumentAttr         argumentAttr;
-    DeferredAttr         deferredAttr;
-    Symtab               symtab;
-    Gen                  gen;
-    Lint                 lint;
-    Log                  log;
-    JCDiagnostic.Factory diagnostic;
-    Enter                enter;
-    TypeEnter            typeEnter;
-    MemberEnter          memberEnter;
-    Object               constFold;
+    Context      context;
+    Annotate     annotate;
+    TreeMaker    maker;
+    Operators    operators;
+    Names        names;
+    Types        types;
+    Resolve      resolve;
+    ClassFinder  finder;
+    Attr         attr;
+    DeferredAttr deferredAttr;
+    Symtab       symtab;
+    Gen          gen;
+    Lint         lint;
+    Log          log;
+    Enter        enter;
+    TypeEnter    typeEnter;
+    MemberEnter  memberEnter;
+    TypeEnvs     typeEnvs;
+    ConstFold    constFold;
     
-    DelayedContext      delayedContext;
-    HandlerMarker       marker;
+    HandlerSupport      marker;
     Symbol.ModuleSymbol transientModule, mahoModule;
-    
-    public HashMap<Symbol.TypeSymbol, Env<AttrContext>> typeEnvs() = map(instance(context));
     
     public JavacContext(final Context context) = init(context);
     
@@ -630,45 +610,32 @@ public class JavacContext {
         if (getClass() == JavacContext.class)
             mark();
         annotate = Annotate.instance(context);
-        compiler = JavaCompiler.instance(context);
-        check = Check.instance(context);
         maker = TreeMaker.instance(context);
         operators = Operators.instance(context);
         names = Names.instance(context);
         types = Types.instance(context);
         resolve = Resolve.instance(context);
-        lower = Lower.instance(context);
         finder = ClassFinder.instance(context);
-        reader = ClassReader.instance(context);
         attr = Attr.instance(context);
-        argumentAttr = ArgumentAttr.instance(context);
         deferredAttr = DeferredAttr.instance(context);
         symtab = Symtab.instance(context);
         gen = Gen.instance(context);
         lint = Lint.instance(context);
         log = Log.instance(context);
-        diagnostic = JCDiagnostic.Factory.instance(context);
         enter = Enter.instance(context);
         typeEnter = TypeEnter.instance(context);
         memberEnter = MemberEnter.instance(context);
-        constFold = instance_$ConstFold(context);
-        delayedContext = DelayedContext.instance(context);
+        typeEnvs = TypeEnvs.instance(context);
+        constFold = ConstFold.instance(context);
         context.put((Class<? super JavacContext>) getClass(), this);
-        marker = this instanceof HandlerMarker handlerMarker ? handlerMarker : context.get(HandlerMarker.class);
+        marker = this instanceof HandlerSupport handlerMarker ? handlerMarker : context.get(HandlerSupport.class);
         if (marker == null)
-            context.put(HandlerMarker.class, marker = { context });
+            context.put(HandlerSupport.class, marker = { context });
         transientModule = symtab.enterModule(name("amadeus.maho.lang.javac.runtime"));
         mahoModule = symtab.enterModule(name("amadeus.maho"));
     }
     
     public synchronized void mark() = contextLocal.set(this);
-    
-    public boolean atomicShouldCast(final Type vartype) = switch (vartype.getTag()) {
-        case BOOLEAN,
-                INT,
-                LONG -> false;
-        default      -> true;
-    };
     
     public static boolean anyMatch(final long flags, final long mask) = (flags & mask) != 0;
     
@@ -686,7 +653,7 @@ public class JavacContext {
         case JCTree.JCMethodDecl it      -> it.sym;
         case JCTree.JCPackageDecl it     -> it.packge;
         case JCTree.JCModuleDecl it      -> it.sym;
-        case null, default               -> null;
+        default                          -> null;
     };
     
     public static @Nullable JCTree.JCModifiers modifiers(final JCTree tree) = switch (tree) {
@@ -694,7 +661,7 @@ public class JavacContext {
         case JCTree.JCMethodDecl it   -> it.mods;
         case JCTree.JCClassDecl it    -> it.mods;
         case JCTree.JCModuleDecl it   -> it.mods;
-        case null, default            -> null;
+        default                       -> null;
     };
     
     public static @Nullable Name name(final JCTree tree) = switch (tree) {
@@ -704,90 +671,14 @@ public class JavacContext {
         case JCTree.JCMethodDecl it   -> it.name;
         case JCTree.JCClassDecl it    -> it.name;
         case JCTree.JCModuleDecl it   -> TreeInfo.fullName(it.qualId);
-        case null, default            -> null;
+        default                       -> null;
     };
-    
-    public static final String ConstFold = "com.sun.tools.javac.comp.ConstFold";
-    
-    @Proxy(value = INVOKESTATIC, target = ConstFold, selector = "instance")
-    private static native @InvisibleType(ConstFold) Object instance_$ConstFold(Context context);
-    
-    @Proxy(INVOKEVIRTUAL)
-    private static native Type fold1(@InvisibleType(ConstFold) Object $this, int opcode, Type operand);
-    
-    @Proxy(INVOKEVIRTUAL)
-    private static native Type fold2(@InvisibleType(ConstFold) Object $this, int opcode, Type left, Type right);
-    
-    public Type fold(final int opcode, final Type operand) = fold1(constFold, opcode, operand);
-    
-    public Type fold(final int opcode, final Type left, final Type right) = fold2(constFold, opcode, left, right);
-    
-    @Proxy(GETFIELD)
-    public static native Tokens.Token token(JavacParser $this);
-    
-    @Proxy(value = GETSTATIC, targetClass = JavacParser.class)
-    public static native int EXPR();
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native Name ident(JavacParser $this, boolean advanceOnErrors);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native JCTree.JCExpression argumentsOpt(JavacParser $this, List<JCTree.JCExpression> typeArgs, JCTree.JCExpression t);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native JCTree.JCExpression typeArgumentsOpt(JavacParser $this, JCTree.JCExpression t);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native List<JCTree.JCExpression> typeArgumentsOpt(JavacParser $this, int useMode);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native Type classEnter(Enter $this, JCTree tree, Env<AttrContext> env);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native void memberEnter(MemberEnter $this, JCTree tree, Env<AttrContext> env);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native Env<AttrContext> methodEnv(MemberEnter $this, JCTree.JCMethodDecl tree, Env<AttrContext> env);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native <T extends JCTree> T to(JavacParser $this, T t);
     
     @Proxy(INVOKEVIRTUAL)
     public static native <T extends JCTree> T toP(JavacParser $this, T t);
     
-    @Proxy(INVOKEVIRTUAL)
-    public static native void selectExprMode(JavacParser $this);
-    
     @Proxy(GETFIELD)
     public static native TreeMaker F(JavacParser $this);
-    
-    public static final String
-            Attr$ResultInfo                  = "com.sun.tools.javac.comp.Attr$ResultInfo",
-            Resolve$MethodResolutionContext  = "com.sun.tools.javac.comp.Resolve$MethodResolutionContext",
-            Resolve$MethodResolutionPhase    = "com.sun.tools.javac.comp.Resolve$MethodResolutionPhase",
-            Resolve$SymbolNotFoundError      = "com.sun.tools.javac.comp.Resolve$SymbolNotFoundError",
-            Resolve$InapplicableSymbolError  = "com.sun.tools.javac.comp.Resolve$InapplicableSymbolError",
-            Resolve$InapplicableSymbolsError = "com.sun.tools.javac.comp.Resolve$InapplicableSymbolsError";
-    
-    @Proxy(value = INVOKESTATIC, targetClass = Resolve.class)
-    public static native boolean isStatic(Env<AttrContext> env);
-    
-    public static boolean isValid(final Symbol symbol, final Env<AttrContext> env) = isValid(symbol, isStatic(env));
-    
-    public static boolean isValid(final Symbol symbol, final boolean isStatic = false) = symbol.exists() && !(isStatic && symbol.kind == MTH && symbol.owner.kind == TYP && noneMatch(symbol.flags(), STATIC));
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native Symbol findMethod(
-            Resolve $this,
-            Env<AttrContext> env,
-            Type site,
-            Name name,
-            List<Type> argTypes,
-            List<Type> typeargtypes,
-            Type inType,
-            Symbol bestSoFar,
-            boolean allowBoxing,
-            boolean useVarargs);
     
     @Proxy(INVOKEVIRTUAL)
     public static native Symbol findMethodInScope(
@@ -803,66 +694,8 @@ public class JavacContext {
             boolean useVarargs,
             boolean abstractok);
     
-    @Proxy(INVOKEVIRTUAL)
-    public static native Symbol selectBest(
-            Resolve $this,
-            Env<AttrContext> env,
-            Type site,
-            List<Type> argTypes,
-            List<Type> typeArgTypes,
-            Symbol sym,
-            Symbol bestSoFar,
-            boolean allowBoxing,
-            boolean useVarargs);
-    
-    
-    @Proxy(GETFIELD)
-    public static native @InvisibleType(Resolve$MethodResolutionContext) Object currentResolutionContext(Resolve $this);
-    
-    @Proxy(PUTFIELD)
-    public static native void currentResolutionContext(Resolve $this, @InvisibleType(Resolve$MethodResolutionContext) Object value);
-    
-    @Proxy(NEW)
-    public static native @InvisibleType(Resolve$MethodResolutionContext) Object instanceMethodResolutionContext(Resolve $this);
-    
-    @Proxy(PUTFIELD)
-    public static native void step(@InvisibleType(Resolve$MethodResolutionContext) Object $this, @InvisibleType(Resolve$MethodResolutionPhase) Object value);
-    
-    @Proxy(value = INVOKESTATIC, target = Resolve$MethodResolutionPhase)
-    public static native @InvisibleType(Resolve$MethodResolutionPhase) Object valueOf(String name);
-    
-    @Proxy(GETFIELD)
-    public static native @InvisibleType(Resolve$SymbolNotFoundError) Symbol methodNotFound(Resolve $this);
-    
-    @Proxy(GETFIELD)
-    public static native @InvisibleType(Attr$ResultInfo) Object resultInfo(Attr $this);
-    
-    @Proxy(GETFIELD)
-    public static native @InvisibleType(Attr$ResultInfo) Object unknownExprInfo(Attr $this);
-    
     @Proxy(GETFIELD)
     public static native Env<AttrContext> env(Attr $this);
-    
-    @Proxy(PUTFIELD)
-    public static native void result(Attr $this, Type value);
-    
-    @Proxy(GETFIELD)
-    public static native Type pt(@InvisibleType(Attr$ResultInfo) Object $this);
-    
-    @Proxy(value = INSTANCEOF, target = Resolve$InapplicableSymbolError)
-    public static native boolean instanceofInapplicableSymbolError(Object object);
-    
-    @Proxy(value = INSTANCEOF, target = Resolve$InapplicableSymbolsError)
-    public static native boolean instanceofInapplicableSymbolsError(Object object);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native Symbol thisSym(Attr $this, JCDiagnostic.DiagnosticPosition pos, Env<AttrContext> env);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native AttrContext dup(AttrContext $this);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native Kinds.KindSelector attribArgs(Attr $this, Kinds.KindSelector initialKind, List<JCTree.JCExpression> trees, Env<AttrContext> env, ListBuffer<Type> argTypes);
     
     public JCTree.JCExpression IdentQualifiedName(final Class<?> type) = IdentQualifiedName(type.getCanonicalName());
     
@@ -992,7 +825,7 @@ public class JavacContext {
     public static Stream<Symbol.ClassSymbol> allSupers(final Symbol.TypeSymbol symbol) = switch (symbol) {
         case Symbol.TypeVariableSymbol variableSymbol -> variableSymbol.getBounds().stream().map(it -> it.tsym).flatMap(JavacContext::allSupers).distinct();
         case Symbol.ClassSymbol classSymbol           -> allSupers(classSymbol);
-        default                                       -> throw new IllegalStateException("Unexpected value: " + symbol);
+        default                                       -> throw new IllegalStateException(STR."Unexpected value: \{symbol}");
     };
     
     public @Nullable JCTree.JCClassDecl lookupInnerClassDecl(final Env<AttrContext> env, final Name name) = env.enclClass.defs.stream()
@@ -1041,7 +874,7 @@ public class JavacContext {
     
     public static Function<String, String> simplify(final String context) {
         final Set<String> mark = new HashSet<>();
-        return name -> mark.add(name) ? name : context + "$" + name;
+        return name -> mark.add(name) ? name : STR."\{context}$\{name}";
     }
     
     public JCTree.JCMethodInvocation unsafeFieldBaseAccess(final TreeMaker maker, final JCDiagnostic.DiagnosticPosition position, final Env<AttrContext> env, final Symbol.VarSymbol field, final String name,
@@ -1066,13 +899,13 @@ public class JavacContext {
             final PoolConstant.LoadableConstant... args) {
         final Symbol.MethodSymbol accessor = resolve.resolveInternalMethod(position, env, symtab.enterClass(symtab.java_base, name(Unsafe.class)).type, name(name), List.from(args).map(types::constantType), List.nil());
         final PoolConstant.LoadableConstant constants[] = { accessor.asHandle(), unsafe(position, env) };
-        return { name("$%s$%s".formatted(field.name, name)), symtab.noSymbol, constantInvokeBSM(position, env).asHandle(), constType, ArrayHelper.addAll(constants, args) };
+        return { name(STR."$\{field.name}$\{name}"), symtab.noSymbol, constantInvokeBSM(position, env).asHandle(), constType, ArrayHelper.addAll(constants, args) };
     }
     
     public DynamicVarSymbol fieldConstant(final JCDiagnostic.DiagnosticPosition position, final Env<AttrContext> env, final Symbol.VarSymbol field) {
         final Symbol.MethodSymbol accessor = resolve.resolveInternalMethod(position, env, symtab.classType, name("getDeclaredField"), List.of(symtab.stringType), List.nil());
         final PoolConstant.LoadableConstant constants[] = { accessor.asHandle(), (Type.ClassType) field.owner.type, PoolConstant.LoadableConstant.String(field.name.toString()) };
-        return { name("$%s$field".formatted(field.name)), symtab.noSymbol, constantInvokeBSM(position, env).asHandle(), symtab.enterClass(symtab.java_base, name(Field.class)).type, constants };
+        return { name(STR."$\{field.name}$field"), symtab.noSymbol, constantInvokeBSM(position, env).asHandle(), symtab.enterClass(symtab.java_base, name(Field.class)).type, constants };
     }
     
     public Symbol.MethodSymbol constantInvokeBSM(final JCDiagnostic.DiagnosticPosition position, final Env<AttrContext> env) = resolve.resolveInternalMethod(position, env,
@@ -1083,11 +916,10 @@ public class JavacContext {
     public Symbol.MethodSymbol lookupDynamicLookupMethod(final Name name) {
         final Symbol.ClassSymbol dynamicLookupClass = symtab.enterClass(mahoModule, name("amadeus.maho.core.extension.DynamicLookup"));
         final Symbol.MethodSymbol bsm = (Symbol.MethodSymbol) dynamicLookupClass.members().getSymbolsByName(name, Scope.LookupKind.NON_RECURSIVE).iterator().next();
-        final Symbol.ClassSymbol dynamicLookupClassShare = JVM.local().shadowClone(dynamicLookupClass);
-        dynamicLookupClassShare.flags_field |= PUBLIC;
-        dynamicLookupClassShare.owner = symtab.enterPackage(mahoModule, name("amadeus.maho.share"));
-        dynamicLookupClassShare.fullname = dynamicLookupClassShare.flatname = name(DynamicLookupHelper.shareDynamicLookup);
-        dynamicLookupClassShare.erasure_field = dynamicLookupClassShare.type = new Type.ClassType(Type.noType, null, dynamicLookupClassShare);
+        final Symbol.PackageSymbol owner = symtab.enterPackage(mahoModule, name("amadeus.maho.share"));
+        final Symbol.ClassSymbol dynamicLookupClassShare = { dynamicLookupClass.flags_field | PUBLIC, dynamicLookupClass.name, owner };
+        dynamicLookupClassShare.members_field = dynamicLookupClass.members_field;
+        dynamicLookupClassShare.trans_local = List.nil();
         return { bsm.flags_field, bsm.name, bsm.type, dynamicLookupClassShare };
     }
     

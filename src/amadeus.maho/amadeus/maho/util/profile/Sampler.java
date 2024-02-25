@@ -1,8 +1,5 @@
 package amadeus.maho.util.profile;
 
-import java.lang.invoke.MethodType;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
@@ -23,19 +20,6 @@ import amadeus.maho.util.tuple.Tuple2;
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class Sampler<T> {
-    
-    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-    public static class Interceptor extends Sampler<String> implements amadeus.maho.intercept.Interceptor {
-        
-        ThreadLocal<Deque<Handle>> handleLocal = ThreadLocal.withInitial(ArrayDeque::new);
-        
-        @Override
-        public void enter(final Class<?> clazz, final String name, final MethodType methodType, final Object... args) = handleLocal.get() << handle("%s#%s%s".formatted(clazz.getName(), name, methodType.descriptorString()));
-        
-        @Override
-        public void exit() = handleLocal.get().pollLast()?.close();
-        
-    }
     
     @EqualsAndHashCode
     public record Frame(long start, long end, long total = end - start) implements Comparable<Frame> {
@@ -103,7 +87,7 @@ public class Sampler<T> {
         if (count == 0L)
             return "<empty>";
         final Tuple2<T, Frame> min = ~min(), max = ~max();
-        return "min: %s ns, max: %s ns, total: %d ms, count: %d, avg: %.3f ms".formatted(min.v1 + " => " + min.v2, max.v1 + " => " + max.v2, total / (int) 1e6, count, total / 1e6 / count);
+        return "min: %s ns, max: %s ns, total: %d ms, count: %d, avg: %.3f ms".formatted(STR."\{min.v1} => \{min.v2}", STR."\{max.v1} => \{max.v2}", total / (int) 1e6, count, total / 1e6 / count);
     }
     
 }

@@ -15,7 +15,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import amadeus.maho.intercept.Interceptor;
+import amadeus.maho.profile.Profiler;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Default;
 import amadeus.maho.lang.Extension;
@@ -28,7 +28,7 @@ import amadeus.maho.util.container.Node;
 import amadeus.maho.util.control.LinkedForkedIterator;
 
 @FieldDefaults(level = AccessLevel.PROTECTED)
-public class InvokeTimer implements Interceptor {
+public class InvokeTimer implements Profiler {
     
     @RequiredArgsConstructor
     @FieldDefaults(level = AccessLevel.PUBLIC)
@@ -43,12 +43,12 @@ public class InvokeTimer implements Interceptor {
         
         public long sum() = endTime() - startTime();
         
-        public void start() = startTime = System.nanoTime();
+        public void start() = startTime = System.currentTimeMillis();
         
-        public void end() = endTime = System.nanoTime();
+        public void end() = endTime = System.currentTimeMillis();
         
         @Override
-        public String toString() = clazz.getName() + "#" + name + desc + " [" + sum() + "ns]";
+        public String toString() = STR."\{clazz.getName()}#\{name}\{desc} [\{sum()}ns]";
         
     }
     
@@ -71,7 +71,7 @@ public class InvokeTimer implements Interceptor {
     ArrayDeque<Node<InvokeNode>> history = { }, context = { };
     
     @Override
-    public void enter(final Class<?> clazz, final String name, final MethodType methodType, final Object... args) {
+    public void enter(final Class<?> clazz, final String name, final MethodType methodType) {
         final InvokeNode invokeNode = { clazz, name, methodType.descriptorString() };
         final @Nullable Node<InvokeNode> parent = context.peekLast();
         final Node<InvokeNode> node = parent == null ? new Node<>(invokeNode) : parent.sub(invokeNode);

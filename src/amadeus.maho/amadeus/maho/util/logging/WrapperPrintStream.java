@@ -25,7 +25,7 @@ public class WrapperPrintStream extends PrintStream {
     
     public String pull() {
         final var builder = builder();
-        if (builder.length() == 0)
+        if (builder.isEmpty())
             return "";
         try { return builder.toString(); } finally { builder.setLength(0); }
     }

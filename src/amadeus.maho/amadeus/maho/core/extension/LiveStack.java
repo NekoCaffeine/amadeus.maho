@@ -94,12 +94,12 @@ public class LiveStack {
     private Function<Object, String> localToString = obj -> {
         try {
             return obj instanceof Object[] ? Arrays.deepToString((Object[]) obj) : obj == null ? "<null>" : obj.toString();
-        } catch (Throwable t) { return "Throwable(%s): %s".formatted(t.getClass().getName(), t.getMessage()); }
+        } catch (Throwable t) { return STR."Throwable(\{t.getClass().getName()}): \{t.getMessage()}"; }
     };
     
     @Setter
     @Getter
-    private Function<Class<?>, ModuleDescriptor> descriptorMapper = clazz -> null;
+    private Function<Class<?>, ModuleDescriptor> descriptorMapper = _ -> null;
     
     public void addDescriptorMapper(final Function<Class<?>, ModuleDescriptor> descriptorMapper) {
         final Function<Class<?>, ModuleDescriptor> source = descriptorMapper();
@@ -127,7 +127,7 @@ public class LiveStack {
                 stream.println($this);
                 final StackTraceElement[] trace = getOurStackTrace($this);
                 for (final StackTraceElement traceElement : trace)
-                    stream.println("\t" + (traceElement.getFileName()?.startsWith(ARROW) ?? false ? traceElement.getFileName() : "at " + traceElement));
+                    stream.println(STR."\t\{traceElement.getFileName()?.startsWith(ARROW) ?? false ? traceElement.getFileName() : STR."at \{traceElement}"}");
                 for (final var suppressed : $this.getSuppressed())
                     printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, "\t", mark);
                 @Nullable final Throwable ourCause = $this.getCause();
@@ -139,7 +139,7 @@ public class LiveStack {
     
     private static void printEnclosedStackTrace(final Throwable $this, final PrintStream stream, final StackTraceElement enclosingTrace[], final String caption, final String prefix, final Set<Throwable> mark) {
         if (mark.contains($this))
-            stream.println(prefix + caption + "[CIRCULAR REFERENCE: " + $this + "]");
+            stream.println(STR."\{prefix}\{caption}[CIRCULAR REFERENCE: \{$this}]");
         else {
             mark.add($this);
             final StackTraceElement trace[] = getOurStackTrace($this);
@@ -152,11 +152,11 @@ public class LiveStack {
             final int framesInCommon = trace.length - 1 - m;
             stream.println(prefix + caption + $this);
             for (int i = 0; i <= m; i++)
-                stream.println(prefix + "\t" + (trace[i].getFileName()?.startsWith(ARROW) ?? false ? trace[i].getFileName() : "at " + trace[i]));
+                stream.println(STR."\{prefix}\t\{trace[i].getFileName()?.startsWith(ARROW) ?? false ? trace[i].getFileName() : STR."at \{trace[i]}"}");
             if (framesInCommon != 0)
-                stream.println(prefix + "\t... " + framesInCommon + " more");
+                stream.println(STR."\{prefix}\t... \{framesInCommon} more");
             for (final var suppressed : $this.getSuppressed())
-                printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, prefix + "\t", mark);
+                printEnclosedStackTrace(suppressed, stream, trace, SUPPRESSED_CAPTION, STR."\{prefix}\t", mark);
             @Nullable final Throwable ourCause = $this.getCause();
             if (ourCause != null)
                 printEnclosedStackTrace(ourCause, stream, trace, CAUSE_CAPTION, prefix, mark);
@@ -363,11 +363,10 @@ public class LiveStack {
                     localList.put(offset == -1 ? null : parameters[offset], locals[i] == null ? "<null>" :
                             type.isAssignableFrom(locals[i].getClass()) ? locals[i] : "<invalid>");
             }
-            return String.format("%s locals: %s", result,
-                    localList.entrySet().stream()
-                            .map(entry -> "%s: %s".formatted(entry.getKey() == null ? "this" :
-                                    "%s %s".formatted(entry.getKey().getType().getSimpleName(), entry.getKey().getName()), instance().localToString().apply(entry.getValue()).replace("\r", "").replace("\n", "\\n")))
-                            .toList());
+            return STR."\{result} locals: \{localList.entrySet().stream()
+                    .map(entry -> STR."\{entry.getKey() == null ? "this" :
+                            STR."\{entry.getKey().getType().getSimpleName()} \{entry.getKey().getName()}"}: \{instance().localToString().apply(entry.getValue()).replace("\r", "").replace("\n", "\\n")}")
+                    .toList()}";
         } catch (final Throwable throwable) {
             fuseProtection(throwable);
             return result;
@@ -377,7 +376,7 @@ public class LiveStack {
     private static synchronized void fuseProtection(final Throwable throwable) {
         if (hackFlag) {
             hackFlag = false;
-            context.set(null);
+            context.remove();
             stackTraceExtender.clear();
             contextExtender.get().clear();
             printStackTrace("Fuse protection, the JVM may be about to crash. If you want to avoid this problem, please disable amadeus.maho.core.extension.LiveStack", throwable);
@@ -387,7 +386,7 @@ public class LiveStack {
     public static void fork(final Object target) {
         if (hackFlag)
             stackTraceExtender.computeIfAbsent(target, key -> walker.walk(stream ->
-                    Stream.concat(Stream.of(new StackTraceElement("amadeus.maho.hacking.lsf.HackerLiveStackFrame", "fork", "↑ " + Thread.currentThread(), -1)), stream
+                    Stream.concat(Stream.of(new StackTraceElement("amadeus.maho.hacking.lsf.HackerLiveStackFrame", "fork", STR."↑ \{Thread.currentThread()}", -1)), stream
                                     .dropWhile(frame -> !frame.getDeclaringClass().isInstance(target))
                                     .dropWhile(frame -> frame.getDeclaringClass().isInstance(target))
                                     .map(LiveStack::of))

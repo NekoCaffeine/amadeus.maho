@@ -28,6 +28,7 @@ import amadeus.maho.lang.ResourceBundle;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
+import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.handler.base.Handler;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
@@ -50,7 +51,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     @Override
     public void processClass(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final JCTree owner, final ResourceBundle annotation, final JCTree.JCAnnotation annotationTree, final boolean advance)
-            = delayedContext.todos() += () -> {
+            = instance(DelayedContext.class).todos() += () -> {
         final Path location = location(annotation);
         if (Files.isDirectory(location)) {
             final FieldDefaultsHandler fieldDefaultsHandler = instance(FieldDefaultsHandler.class);
@@ -70,7 +71,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
                                 if (agentAnnotation != null) {
                                     try {
                                         final Pattern pattern = Pattern.compile(agentAnnotation.value());
-                                        final Map<String, Integer> namedGroupsIndex = pattern.namedGroupsIndex();
+                                        final Map<String, Integer> namedGroupsIndex = pattern.namedGroups();
                                         final java.util.List<String> missingKey = methodSymbol.params().stream().map(symbol -> symbol.name.toString()).filterNot(namedGroupsIndex.keySet()::contains).toList();
                                         if (missingKey.isEmpty())
                                             agents.compute(agentAnnotation.value(), (regex, agentMethod) -> addAgent(regex, annotationTree, agentMethod, methodSymbol, pattern, agentAnnotation));
@@ -123,7 +124,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     protected boolean shouldHandle(final Path path, final ResourceAgent agentAnnotation) = ArrayHelper.contains(agentAnnotation.types(), Files.isDirectory(path) ? ResourceAgent.Type.DIRECTORY : ResourceAgent.Type.FILE);
     
     protected Name name(final String format, final Matcher matcher, final Path location, final Path path) {
-        final Map<String, Integer> map = matcher.pattern().namedGroupsIndex();
+        final Map<String, Integer> map = matcher.pattern().namedGroups();
         final @Nullable String group = map.containsKey("name") ? matcher.group("name") : null, name = format.formatted(group ?? defaultName(location, path));
         final int p_index[] = { -1 };
         return name(name.codePoints().map(c -> (++p_index[0] == 0 ? Character.isJavaIdentifierStart(c) : Character.isJavaIdentifierPart(c)) ? c : '_').collectCodepoints());
@@ -146,7 +147,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     protected Path location(final ResourceBundle annotation) {
         final String value = annotation.value();
-        return !value.isEmpty() && value.charAt(0) == '!' ? Path.of(value.substring(1)) : Path.of(Environment.local().lookup("maho.build.project.root", "")) / value;
+        return !value.isEmpty() && value.charAt(0) == '!' ? Path.of(value.substring(1)) : Path.of(Environment.local().lookup("amadeus.maho.build.project.root", "")) / value;
     }
     
 }

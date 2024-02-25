@@ -66,7 +66,7 @@ public interface ToStringHelper {
         
         @SneakyThrows
         public Function<Object, String> generate(final Class<?> target) {
-            final DynamicMethod.Lambda<Function<Object, String>> lambda = { target.getClassLoader(), "ToString$" + target.getName().replace('.', '_'), Function.class, Object.class, String.class };
+            final DynamicMethod.Lambda<Function<Object, String>> lambda = { target.getClassLoader(), STR."ToString$\{target.asDebugName()}", Function.class, Object.class, String.class };
             final MethodGenerator generator = lambda.generator();
             final StringBuilder builder = { 1 << 6 };
             final LinkedList<Type> argsTypes = { };

@@ -21,8 +21,9 @@ import amadeus.maho.lang.Rearrange;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
+import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.handler.base.Handler;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
@@ -49,7 +50,7 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
         if (alias.length == 0 || Stream.of(alias).mapToInt(String::length).anyMatch(it -> it != length))
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.target.invalid.fields.alisa"));
         final Type componentType = recordFields[0].sym.type;
-        delayedContext.todos() += () -> {
+        instance(DelayedContext.class).todos() += () -> {
             if (recordFields.stream().skip(1L).anyMatch(field -> !types.isSameType(componentType, field.sym.type)))
                 log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.components.must.be.same"));
             if (annotation.accessJavacTypes(Rearrange::adapters)
@@ -65,7 +66,7 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
     private static Symbol findField(final Symbol capture, final Resolve $this, final Env<AttrContext> env, final Type site, final Name name, final Symbol.TypeSymbol symbol) {
         if (capture.kind == Kinds.Kind.VAR || capture.kind == Kinds.Kind.AMBIGUOUS)
             return capture;
-        if (HandlerMarker.attrContext().peekLast() instanceof JCTree.JCFieldAccess access && symbol instanceof Symbol.ClassSymbol classSymbol) {
+        if (HandlerSupport.attrContext().peekLast() instanceof JCTree.JCFieldAccess access && symbol instanceof Symbol.ClassSymbol classSymbol) {
             final @Nullable Rearrange rearrange = symbol.getAnnotation(Rearrange.class);
             if (rearrange != null && rearrange.alias().length > 0) {
                 final String string = name.toString();

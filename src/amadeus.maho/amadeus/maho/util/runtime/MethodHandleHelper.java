@@ -82,7 +82,7 @@ public interface MethodHandleHelper {
     
     @SneakyThrows
     static MethodHandle constructor(final Class<?> wrapperClass, final String desc) {
-        final MethodType methodType = ASMHelper.loadMethodType(desc, false, wrapperClass.getClassLoader());
+        final MethodType methodType = ASMHelper.loadMethodType(desc, wrapperClass.getClassLoader());
         return lookup().findConstructor(wrapperClass, methodType);
     }
     
@@ -90,7 +90,7 @@ public interface MethodHandleHelper {
     
     @SneakyThrows
     static MethodHandle method(final Class<?> wrapperClass, final String name, final String desc) {
-        final MethodType methodType = ASMHelper.loadMethodType(desc, false, wrapperClass.getClassLoader());
+        final MethodType methodType = ASMHelper.loadMethodType(desc, wrapperClass.getClassLoader());
         return lookup().findVirtual(wrapperClass, name, methodType);
     }
     

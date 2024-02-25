@@ -107,7 +107,7 @@ public class AssignHandler {
             case EQ -> {
                 final int pos = token.pos;
                 $this.nextToken();
-                selectExprMode($this);
+                (Privilege) $this.selectExprMode();
                 final JCTree.JCExpression rhs = $this.variableInitializer(); // !!! MUST NOT INLINE, otherwise it will CONTAMINATE the position of the tree !!!
                 return { toP($this, F($this).at(pos).Assign(t, rhs)) };
             }

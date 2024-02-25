@@ -9,7 +9,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.sun.tools.javac.code.Flags;
-import com.sun.tools.javac.code.Lint;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
@@ -39,12 +38,10 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
 import amadeus.maho.lang.javac.handler.base.Syntax;
 import amadeus.maho.transform.mark.Hook;
-import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
 
 import static amadeus.maho.lang.javac.handler.DefaultValueHandler.PRIORITY;
-import static amadeus.maho.util.bytecode.Bytecodes.PUTFIELD;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.parser.Tokens.TokenKind.EQ;
 
@@ -187,7 +184,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                         maker.toplevel = env.toplevel;
                         try {
                             final List<JCTree.JCVariableDecl> params = methodDecl.params;
-                            final Env<AttrContext> methodEnv = methodEnv(memberEnter, methodDecl, env);
+                            final Env<AttrContext> methodEnv = (Privilege) memberEnter.methodEnv(methodDecl, env);
                             (Privilege) (methodEnv.info.lint = lint);
                             final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping = params.stream()
                                     .filter(decl -> decl.init != null)
@@ -220,7 +217,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
     }
     
     public JCTree.JCMethodDecl derivedMethod(final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression restype, final List<JCTree.JCTypeParameter> typarams,
-            final List<JCTree.JCVariableDecl> params, final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, final JCTree.JCExpression defaultValue, final JCTree.JCMethodDecl source)
+            final List<JCTree.JCVariableDecl> params, final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, final @Nullable JCTree.JCExpression defaultValue, final JCTree.JCMethodDecl source)
             = new DerivedMethod(mods, name, restype, typarams, null, params, thrown, body, defaultValue, null, source).let(result -> result.pos = maker.pos);
     
     protected JCTree.JCBlock body(final JCTree.JCMethodDecl methodDecl, final List<JCTree.JCVariableDecl> params, final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping,

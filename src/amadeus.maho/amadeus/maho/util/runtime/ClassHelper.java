@@ -64,4 +64,10 @@ public interface ClassHelper {
         return (T) handle.invoke();
     }
     
+    static String asDebugName(final Class<?> $this) {
+        final String name = $this.getCanonicalName() ?? $this.getName();
+        final int index = name.indexOf('/');
+        return (index == -1 ? name : name.substring(0, index)).replace('.', '_');
+    }
+    
 }

@@ -25,6 +25,6 @@ public abstract class FieldTransformer<A extends Annotation> extends BaseTransfo
     public void onAOT(final AOTTransformer aotTransformer) = aotTransformer.addFieldAnnotation(sourceField.name, sourceField.desc, annotation.annotationType());
     
     @Override
-    public String toString() = super.toString() + "#" + sourceField.name + ":" + sourceField.desc;
+    public String toString() = STR."\{super.toString()}#\{sourceField.name}:\{sourceField.desc}";
     
 }

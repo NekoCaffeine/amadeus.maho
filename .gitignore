@@ -8,3 +8,4 @@ hs_err*
 /build/GithubConfig.default.cfg
 /build/upgrade/
 /build/upgrade-modules/
+/run/

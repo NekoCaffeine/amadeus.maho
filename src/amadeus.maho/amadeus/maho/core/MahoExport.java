@@ -41,7 +41,7 @@ public final class MahoExport {
         public static void setupFilter(final Predicate<ResourcePath.ClassInfo> value) = setupFilter = setupFilter() == null ? value : setupFilter().and(value);
         
         public static void skip(final String packageName) {
-            final String name = packageName + ".";
+            final String name = STR."\{packageName}.";
             setupFilter(info -> !info.className().startsWith(name));
         }
         
@@ -61,19 +61,19 @@ public final class MahoExport {
     public static final String VERSION = "DEV";
     
     public static final String
-            MAHO_WORK_DIRECTORY           = "maho.work.directory", // string
-            MAHO_AGENT_REDIRECT           = "maho.agent.redirect", // string
-            MAHO_EXPERIMENTAL             = "maho.experimental", // boolean
-            MAHO_SETUP_SKIP               = "maho.setup.skip", // String array split(";")
-            MAHO_LOGS_ENABLE              = "maho.logs.enable", // boolean
-            MAHO_LOGS_LEVEL               = "maho.logs.level", // Enum name
-            MAHO_LOGS_ENCODE              = "maho.logs.encode", // String
-            MAHO_LOGS_INSTANCE            = "maho.logs.instance", // String
-            MAHO_LOGS_FORCED_INTERRUPTION = "maho.logs.forced.interruption", // boolean
-            MAHO_LOGS_OUTPUT_FILE         = "maho.logs.output.file", // boolean
-            MAHO_DEBUG_MODE               = "maho.debug", // boolean
-            MAHO_DEBUG_HOTSWAP            = "maho.debug.hotswap", // boolean
-            MAHO_DEBUG_DUMP_BYTECODE      = "maho.debug.dump.bytecode"; // boolean
+            MAHO_WORK_DIRECTORY           = "amadeus.maho.work.directory", // string
+            MAHO_AGENT_REDIRECT           = "amadeus.maho.agent.redirect", // string
+            MAHO_EXPERIMENTAL             = "amadeus.maho.experimental", // boolean
+            MAHO_SETUP_SKIP               = "amadeus.maho.setup.skip", // String array split(";")
+            MAHO_LOGS_ENABLE              = "amadeus.maho.logs.enable", // boolean
+            MAHO_LOGS_LEVEL               = "amadeus.maho.logs.level", // Enum name
+            MAHO_LOGS_ENCODE              = "amadeus.maho.logs.encode", // String
+            MAHO_LOGS_INSTANCE            = "amadeus.maho.logs.instance", // String
+            MAHO_LOGS_FORCED_INTERRUPTION = "amadeus.maho.logs.forced.interruption", // boolean
+            MAHO_LOGS_OUTPUT_FILE         = "amadeus.maho.logs.output.file", // boolean
+            MAHO_DEBUG_MODE               = "amadeus.maho.debug", // boolean
+            MAHO_DEBUG_HOTSWAP            = "amadeus.maho.debug.hotswap", // boolean
+            MAHO_DEBUG_DUMP_BYTECODE      = "amadeus.maho.debug.dump.bytecode"; // boolean
     
     private static final Environment env = Environment.local();
     
@@ -110,7 +110,7 @@ public final class MahoExport {
     
     public static void wrapperStdOut() = LoggerHelper.wrapperStdOut(logger());
     
-    public static int bytecodeVersion() = Opcodes.V17;
+    public static int bytecodeVersion() = Opcodes.V21;
     
     public static int asmAPIVersion() = Opcodes.ASM9;
     

@@ -20,7 +20,7 @@ public interface Interrupt {
         
     }
     
-    static void doInterruptible(final InterruptibleRunnable runnable, final Runnable interruptCallback = () -> { }) {
+    static void doInterruptible(final InterruptibleRunnable runnable, final @Nullable Runnable interruptCallback = null) {
         try {
             runnable.run();
         } catch (final InterruptedException e) {
@@ -29,33 +29,30 @@ public interface Interrupt {
         }
     }
     
-    static <T> @Nullable T getInterruptible(final InterruptibleGetter<T> getter, final Supplier<T> interruptGetter = () -> null) {
+    static <T> @Nullable T getInterruptible(final InterruptibleGetter<T> getter, final @Nullable Supplier<T> interruptGetter = null) {
         try {
             return getter.get();
         } catch (final InterruptedException e) {
             Thread.interrupted();
-            return interruptGetter.get();
+            return interruptGetter?.get() ?? null;
         }
     }
     
     @SneakyThrows
-    static void doUninterruptible(final Runnable runnable) {
-        try {
-            runnable.run();
-        } catch (final InterruptedException e) {
-            Thread.interrupted();
-            throw new InterruptedIOException();
-        }
+    static void doUninterruptible(final InterruptibleRunnable runnable) {
+        while (true)
+            try {
+                runnable.run();
+                return;
+            } catch (final InterruptedException e) { Thread.interrupted(); }
     }
     
     @SneakyThrows
-    static <T> T getUninterruptible(final Supplier<T> supplier) {
-        try {
-            return supplier.get();
-        } catch (final InterruptedException e) {
-            Thread.interrupted();
-            throw new InterruptedIOException();
-        }
+    static <T> T getUninterruptible(final InterruptibleGetter<T> supplier) {
+        while (true)
+            try {
+                return supplier.get();
+            } catch (final InterruptedException e) { Thread.interrupted(); }
     }
     
 }

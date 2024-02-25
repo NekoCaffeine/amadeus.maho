@@ -2,6 +2,7 @@ package amadeus.maho.lang.javac.handler.base;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -25,12 +26,11 @@ import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.Flow;
 import com.sun.tools.javac.comp.Lower;
 import com.sun.tools.javac.comp.Modules;
-import com.sun.tools.javac.comp.Operators;
 import com.sun.tools.javac.comp.TypeEnter;
 import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeCopier;
 import com.sun.tools.javac.tree.TreeScanner;
-import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.Log;
 
 import amadeus.maho.lang.Getter;
@@ -41,6 +41,7 @@ import amadeus.maho.lang.Special;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.lang.javac.handler.AccessibleHandler;
+import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.InvisibleType;
@@ -53,11 +54,11 @@ import static com.sun.tools.javac.code.Flags.PARAMETER;
 
 @TransformProvider
 @NoArgsConstructor
-public class HandlerMarker extends JavacContext {
+public class HandlerSupport extends JavacContext {
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void initModules(final Modules $this, final com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> trees) {
-        final HandlerMarker marker = instance(HandlerMarker.class);
+        final HandlerSupport marker = instance(HandlerSupport.class);
         final List<DynamicAnnotationHandler> handlers = Stream.concat(marker.baseHandlers().stream(), marker.syntaxHandlers().stream()).cast(DynamicAnnotationHandler.class).toList();
         final Set<Symbol.ModuleSymbol> allModules = $this.allModules();
         handlers.forEach(handler -> handler.initModules(allModules));
@@ -85,18 +86,20 @@ public class HandlerMarker extends JavacContext {
     }
     
     @Getter
-    private final List<BaseHandler<Annotation>> baseHandlers = Handler.Marker.handlerTypes().stream().map(Supplier::get)
+    private final List<BaseHandler<Annotation>> baseHandlers = Handler.Marker.handlerTypes().stream()
+            .map(Supplier::get)
             .map(JavacContext::instance)
             .collect(Collectors.toCollection(ArrayList::new));
     
     @Getter
-    private final List<BaseSyntaxHandler> syntaxHandlers = Syntax.SyntaxMarker.syntaxTypes().values().stream().map(Supplier::get)
+    private final List<BaseSyntaxHandler> syntaxHandlers = Syntax.SyntaxMarker.syntaxTypes().values().stream()
+            .map(Supplier::get)
             .map(JavacContext::instance)
             .collect(Collectors.toCollection(ArrayList::new));
     
-    public static final ThreadLocal<LinkedList<JCTree>> attrContextLocal = ThreadLocal.withInitial(LinkedList::new);
+    LinkedList<JCTree> attrContext = { };
     
-    public static LinkedList<JCTree> attrContext() = attrContextLocal.get();
+    public static LinkedList<JCTree> attrContext() = instance(HandlerSupport.class).attrContext;
     
     @Hook
     private static void attribTree_$Enter(
@@ -111,7 +114,7 @@ public class HandlerMarker extends JavacContext {
             final JCTree tree,
             final Env<AttrContext> env,
             final Attr.ResultInfo resultInfo) {
-        final HandlerMarker instance = instance(HandlerMarker.class);
+        final HandlerSupport instance = instance(HandlerSupport.class);
         instance.syntaxHandlers().forEach(handler -> handler.attribTree(tree, env));
         if (env.enclMethod != null && tree instanceof JCTree.JCVariableDecl decl && noneMatch(decl.mods.flags, PARAMETER)) // local var
             instance.process(env, tree, env.enclMethod, false);
@@ -168,12 +171,24 @@ public class HandlerMarker extends JavacContext {
             $this.attribType(tree.vartype, (Privilege) $this.env);
     }
     
+    IdentityHashMap<JCTree, JCTree> speculativeContext = { };
+    
+    public static IdentityHashMap<JCTree, JCTree> speculativeContext() = instance(HandlerSupport.class).speculativeContext;
+    
+    @Hook(at = @At(method = @At.MethodInsn(name = "copy")), before = false, capture = true)
+    private static <Z> void attribSpeculative_$Copy(final JCTree capture, final DeferredAttr $this, final JCTree tree, final Env<AttrContext> env, final Attr.ResultInfo resultInfo, final TreeCopier<Z> deferredCopier,
+            final Supplier<Log.DiagnosticHandler> handlerSupplier, final DeferredAttr.AttributionMode attributionMode, final ArgumentAttr.LocalCacheContext localCache) = speculativeContext()[tree] = capture;
+    
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+    private static <Z> void attribSpeculative_$Finally(final DeferredAttr $this, final JCTree tree, final Env<AttrContext> env, final Attr.ResultInfo resultInfo, final TreeCopier<Z> deferredCopier,
+            final Supplier<Log.DiagnosticHandler> handlerSupplier, final DeferredAttr.AttributionMode attributionMode, final ArgumentAttr.LocalCacheContext localCache) = speculativeContext() -= tree;
+    
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
     private static JCTree attribSpeculative(final JCTree capture, final DeferredAttr $this, final JCTree tree, final Env<AttrContext> env, final Attr.ResultInfo resultInfo, final Supplier<Log.DiagnosticHandler> handlerSupplier,
             final DeferredAttr.AttributionMode attributionMode, final ArgumentAttr.LocalCacheContext localCache, final @Hook.LocalVar(index = 7) Env<AttrContext> localEnv) = localEnv.tree;
     
     @Hook(at = @At(field = @At.FieldInsn(name = "flags_field")))
-    private static void finishClass_$Pre(final TypeEnter.MembersPhase $this, final JCTree.JCClassDecl tree, final JCTree defaultConstructor, final Env<AttrContext> env) = instance(HandlerMarker.class).preprocessing(tree, env);
+    private static void finishClass_$Pre(final TypeEnter.MembersPhase $this, final JCTree.JCClassDecl tree, final JCTree defaultConstructor, final Env<AttrContext> env) = instance(HandlerSupport.class).preprocessing(tree, env);
     
     public void preprocessing(final JCTree.JCClassDecl tree, final Env<AttrContext> env) {
         baseHandlers().forEach(handler -> handler.preprocessing(env));
@@ -182,16 +197,19 @@ public class HandlerMarker extends JavacContext {
     }
     
     @Hook(at = @At(method = @At.MethodInsn(name = "memberEnter")), before = false)
-    private static void finishClass_$Post(final TypeEnter.MembersPhase $this, final JCTree.JCClassDecl tree, final JCTree defaultConstructor, final Env<AttrContext> env) = instance(HandlerMarker.class).postprocessing($this, tree, env);
-    
+    private static void finishClass_$Post(final TypeEnter.MembersPhase $this, final JCTree.JCClassDecl tree, final JCTree defaultConstructor, final Env<AttrContext> env) = instance(HandlerSupport.class).postprocessing($this, tree, env);
     
     private void postprocessing(final TypeEnter.MembersPhase $this, final JCTree.JCClassDecl tree, final Env<AttrContext> env) {
-        final com.sun.tools.javac.util.List<Env<AttrContext>> todo = (Privilege) $this.todo;
-        final Symbol.ClassSymbol superSymbol = (Symbol.ClassSymbol) env.enclClass.sym.getSuperclass().tsym;
-        final Env<AttrContext> superEnv = typeEnvs()[superSymbol];
-        if (todo.contains(superEnv)) {
-            (Privilege) ($this.todo = todo.stream().filter(it -> it != superEnv).collect(com.sun.tools.javac.util.List.collector()));
-            (@Special Privilege) ((TypeEnter.Phase) $this).doCompleteEnvs(com.sun.tools.javac.util.List.of(superEnv));
+        if (!(context instanceof MultiThreadedContext)) {
+            final com.sun.tools.javac.util.List<Env<AttrContext>> todo = (Privilege) $this.todo;
+            final @Nullable Symbol.ClassSymbol superSymbol = (Symbol.ClassSymbol) types.supertype(env.enclClass.sym.type).tsym;
+            if (superSymbol != null) {
+                final @Nullable Env<AttrContext> superEnv = (Privilege) typeEnvs.get(superSymbol);
+                if (superEnv != null && todo.contains(superEnv)) {
+                    (Privilege) ($this.todo = todo.stream().filter(it -> it != superEnv).collect(com.sun.tools.javac.util.List.collector()));
+                    (@Special Privilege) ((TypeEnter.Phase) $this).doCompleteEnvs(com.sun.tools.javac.util.List.of(superEnv));
+                }
+            }
         }
         processClassDecl(tree, env, false);
     }
@@ -271,31 +289,15 @@ public class HandlerMarker extends JavacContext {
         if (!advance) {
             final Env<AttrContext> dup = env.dup(env.enclClass);
             process(env, tree, env.enclClass, true);
-            classEnter(enter, tree, dup);
-            memberEnter(memberEnter, tree, dup);
+            (Privilege) enter.classEnter(tree, dup);
+            (Privilege) memberEnter.memberEnter(tree, dup);
             process(env, tree, env.enclClass, false);
         }
     }
     
-    @Hook
-    private static Hook.Result resolveUnary(final Operators $this, final JCDiagnostic.DiagnosticPosition pos, final JCTree.Tag tag, final Type op)
-            = Hook.Result.nullToVoid(instance(HandlerMarker.class).syntaxHandlers().stream()
-            .map(handler -> handler.resolveUnary(pos, tag, op))
-            .nonnull()
-            .findAny()
-            .orElse(null));
+    LinkedList<JCTree> flowContext = { };
     
-    @Hook
-    private static Hook.Result resolveBinary(final Operators $this, final JCDiagnostic.DiagnosticPosition pos, final JCTree.Tag tag, final Type op1, final Type op2)
-            = Hook.Result.nullToVoid(instance(HandlerMarker.class).syntaxHandlers().stream()
-            .map(handler -> handler.resolveBinary(pos, tag, op1, op2))
-            .nonnull()
-            .findAny()
-            .orElse(null));
-    
-    public static final ThreadLocal<LinkedList<JCTree>> flowContextLocal = ThreadLocal.withInitial(LinkedList::new);
-    
-    public static LinkedList<JCTree> flowContext() = flowContextLocal.get();
+    public static LinkedList<JCTree> flowContext() = instance(HandlerSupport.class).flowContext;
     
     @Hook
     private static void visitClassDef_$Enter(final Flow.FlowAnalyzer $this, final JCTree.JCClassDecl decl) = flowContext().addLast(decl);
@@ -315,9 +317,9 @@ public class HandlerMarker extends JavacContext {
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     private static void visitMethodDef_$Exit(final Flow.FlowAnalyzer $this, final JCTree.JCMethodDecl decl) = flowContext().removeLast();
     
-    public static final ThreadLocal<LinkedList<JCTree>> lowerContextLocal = ThreadLocal.withInitial(LinkedList::new);
+    LinkedList<JCTree> lowerContext = { };
     
-    public static LinkedList<JCTree> lowerContext() = lowerContextLocal.get();
+    public static LinkedList<JCTree> lowerContext() = instance(HandlerSupport.class).lowerContext;
     
     @Hook
     private static void translate_$Enter(final Lower $this, final JCTree tree) = lowerContext().addLast(tree);
@@ -334,9 +336,9 @@ public class HandlerMarker extends JavacContext {
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     private static void translate_$Exit(final Lower $this, final JCTree tree) = lowerContext().removeLast();
     
-    public static final ThreadLocal<LinkedList<JCTree>> genContextLocal = ThreadLocal.withInitial(LinkedList::new);
+    LinkedList<JCTree> genContext = { };
     
-    public static LinkedList<JCTree> genContext() = genContextLocal.get();
+    public static LinkedList<JCTree> genContext() = instance(HandlerSupport.class).genContext;
     
     @Hook
     private static void genDef_$Enter(final Gen $this, final JCTree tree, final Env<?> env) = genContext().addLast(tree);

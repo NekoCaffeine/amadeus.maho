@@ -59,7 +59,7 @@ public interface Shell {
         @Proxy(GETFIELD)
         private static native JShell state(@InvisibleType(TaskFactory) Object $this);
         
-        public static void leave() = local.set(null);
+        public static void leave() = local.remove();
         
         public static JavaFileManager memoryFileManager() = fileManager(local.get());
         
@@ -77,19 +77,19 @@ public interface Shell {
     @SneakyThrows
     @IndirectCaller
     static int attachTool(final List<String> runtimeOptions = Javac.runtimeOptions()) {
-        try { return JavaShellToolBuilder.builder().start(Stream.concat(Stream.of("-execution", "maho"), runtimeOptions.stream().map("-C"::concat)).toArray(String[]::new)); } finally { Context.leave(); }
+        try { return JavaShellToolBuilder.builder().start(Stream.concat(Stream.of("-execution", "maho", "-n"), runtimeOptions.stream().map("-C"::concat)).toArray(String[]::new)); } finally { Context.leave(); }
     }
     
     @Setter
     @Getter
     @Mutable
-    String imports = Stream.of(Shell.class, Object.class)
+    String imports = STR."\{Stream.of(Shell.class, Object.class)
             .map(Class::getModule)
             .map(Module::getPackages)
             .flatMap(Collection::stream)
             .filter(pkg -> pkg.startsWith("java.") || pkg.startsWith("amadeus."))
             .map("import %s.*;"::formatted)
-            .collect(Collectors.joining("\n", "\n", "\n")) + "import static amadeus.maho.util.shell.ShellHelper.*;";
+            .collect(Collectors.joining("\n", "\n", "\n"))}import static amadeus.maho.util.shell.ShellHelper.*;";
     
     static void extraModule(final Module module = CallerContext.caller().getModule()) = imports(imports() + List.of(module.getPackages().stream().map("import %s.*;"::formatted).collect(Collectors.joining())));
     
@@ -100,15 +100,15 @@ public interface Shell {
     Set<String> extra = new LinkedHashSet<>() += "amadeus.maho.util.runtime.ModuleHelper.openAllBootModule();";
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
-    private static String getResourceString(final String capture, final JShellTool $this, final String key) = "startup.feedback".equals(key) ? capture + """
+    private static String getResourceString(final String capture, final JShellTool $this, final String key) = "startup.feedback".equals(key) ? capture + STR."""
             
             /set mode maho concise -quiet
-            /set prompt maho "%s> " "   ...> "
+            /set prompt maho "\{JDWP.isJDWPEnable() ? "maho-dbg" : "maho"}> " "   ...> "
             /set feedback maho
             
-            %s
+            \{String.join("\n", extra())}
             
-            """.formatted(JDWP.isJDWPEnable() ? "maho-dbg" : "maho", String.join("\n", extra())) : capture;
+            """ : capture;
     
     @Hook
     private static Hook.Result displayEvalException(final JShellTool $this, final EvalException ex, final StackTraceElement caused[]) {

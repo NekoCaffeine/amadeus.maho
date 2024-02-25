@@ -22,6 +22,7 @@ import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
 
 import amadeus.maho.lang.Extension;
+import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.JavacContext;
@@ -140,7 +141,7 @@ public class AnnotationProxyMaker {
             that.arg.accept(this);
             final @Nullable Object arg = result();
             if (arg != null)
-                result = context.fold(that.operator.opcode, context.symtab.objectType.constType(arg)).constValue();
+                result = ((Privilege) context.constFold.fold1(that.operator.opcode, context.symtab.objectType.constType(arg))).constValue();
         }
         
         @Override
@@ -150,7 +151,7 @@ public class AnnotationProxyMaker {
             that.rhs.accept(this);
             final @Nullable Object rhs = result();
             if (lhs != null && rhs != null)
-                result = context.fold(that.operator.opcode, context.symtab.objectType.constType(lhs), context.symtab.objectType.constType(rhs)).constValue();
+                result = ((Privilege) context.constFold.fold2(that.operator.opcode, context.symtab.objectType.constType(lhs), context.symtab.objectType.constType(rhs))).constValue();
         }
         
         public void error(final JCTree tree, final JCDiagnostic.Error errorKey) {

@@ -54,6 +54,7 @@ import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.StringHelper;
 import amadeus.maho.util.tuple.Tuple2;
+import amadeus.maho.vm.JDWP;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.*;
 import static org.objectweb.asm.Opcodes.*;
@@ -74,7 +75,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
             for (final MethodNode methodNode : node.methods)
                 if (methodNode.name.equals(sourceMethod.name) && methodNode.desc.equals(sourceMethod.desc)) {
                     context.markModified().markCompute(methodNode, ComputeType.MAX);
-                    TransformerManager.transform("hook.reference", "%s#%s%s".formatted(ASMHelper.sourceName(node.name), methodNode.name, methodNode.desc));
+                    TransformerManager.transform("hook.reference", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}");
                     for (final AbstractInsnNode insn : methodNode.instructions)
                         if (insn instanceof MethodInsnNode methodInsnNode && methodInsnNode.owner.equals(TYPE_HOOK_RESULT.getInternalName()) && methodInsnNode.name.equals(ASMHelper._INIT_)) {
                             final InsnList shadowList = { };
@@ -115,8 +116,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
     
     @TransformTarget(targetClass = ClassLoader.class, selector = "findNative")
     private static MethodNode remapNativeEntryName(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
-        context.markModified();
-        context.compute(methodNode, ComputeType.MAX);
+        context.markModified().compute(methodNode, ComputeType.MAX);
         final InsnList insnList = { };
         final MethodGenerator generator = MethodGenerator.fromShadowMethodNode(methodNode, insnList);
         generator.loadArg(1);
@@ -159,9 +159,15 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
         if (handler.isNotDefault(Hook::value))
             target = handler.<Type>lookupSourceValue(Hook::value).getClassName();
         else
-            target = annotation.target().isEmpty() && !annotation.isStatic() && !desc.startsWith("()") ? Type.getArgumentTypes(desc)[0].getClassName() : annotation.target();
+            target = annotation.target().isEmpty() && !annotation.isStatic() && !desc.startsWith("()") ? checkNotPrimitiveType(Type.getArgumentTypes(desc)[0]).getClassName() : annotation.target();
         if (target.isEmpty())
             throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("Unable to determine target class, missing required fields('value' or 'target')."));
+    }
+    
+    private Type checkNotPrimitiveType(final Type type) {
+        if (!type.getDescriptor().startsWith("L"))
+            throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException(STR."Unable to determine target class, invalid parameter descriptor: \{type.getDescriptor()}"));
+        return type;
     }
     
     @Override
@@ -175,7 +181,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
             if (methodChecker.test(methodNode)) {
                 final At redirect[] = annotation.lambdaRedirect();
                 if (redirect.length == 0) {
-                    TransformerManager.transform("hook", "%s#%s%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), methodNode.name, methodNode.desc, ASMHelper.sourceName(sourceClass.name), sourceMethod.name, sourceMethod.desc));
+                    TransformerManager.transform("hook", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}");
                     hit |= hookMethod(context, node, methodNode);
                 } else {
                     final ArrayList<MethodNode> targetMethodNodes = { };
@@ -191,24 +197,30 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                                         if (node.name.equals(handle.getOwner()))
                                             ASMHelper.lookupMethodNode(node, handle.getName(), handle.getDesc()).ifPresent(targetMethodNodes::add);
                                         else
-                                            throw new UnsupportedOperationException("The target anonymous function should be a member of the current class, current: %s, target: %s.".formatted(node.name, handle.getOwner()));
+                                            throw new UnsupportedOperationException(STR."The target anonymous function should be a member of the current class, current: \{node.name}, target: \{handle.getOwner()}.");
                                     else
                                         throw new UnsupportedOperationException("Unable to locate implementation as MethodHandle.");
                                 else
-                                    throw new UnsupportedOperationException("The target of a lambda Redirect must be invokedynamic. The actual opcode is: " + target.getOpcode());
+                                    throw new UnsupportedOperationException(STR."The target of a lambda Redirect must be invokedynamic. The actual opcode is: \{target.getOpcode()}");
                         });
                         if (targetMethodNodes.isEmpty())
                             break;
                     }
                     for (final MethodNode targetMethodNode : targetMethodNodes) {
-                        TransformerManager.transform("hook", "%s#%s%s => %s#%s\n->  %s#%s%s".formatted(ASMHelper.sourceName(node.name), methodNode.name, methodNode.desc, targetMethodNode.name, targetMethodNode.desc,
-                                ASMHelper.sourceName(sourceClass.name), sourceMethod.name, sourceMethod.desc));
+                        TransformerManager.transform("hook", STR."""
+                                \{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc} => \{targetMethodNode.name}#\{targetMethodNode.desc}
+                                ->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}""");
                         hit |= hookMethod(context, node, targetMethodNode);
                     }
                 }
             }
-        if (!hit)
-            TransformerManager.transform("hook", "Missing: %s#%s%s".formatted(ASMHelper.sourceName(sourceClass.name), sourceMethod.name, sourceMethod.desc));
+        if (!hit && metadata.important()) {
+            final String debugInfo = STR."Missing: \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}";
+            TransformerManager.transform("hook", debugInfo);
+            final JDWP.IDECommand.Notification notification = { JDWP.IDECommand.Notification.Type.WARNING, getClass().getSimpleName(), debugInfo };
+            JDWP.MessageQueue.send(notification);
+            DebugHelper.breakpoint();
+        }
         return node;
     }
     
@@ -305,7 +317,10 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
             if (returnOpcode != RETURN)
                 generator.getField(TYPE_HOOK_RESULT, "result", ASMHelper.TYPE_OBJECT); // Object
             switch (returnOpcode) {
-                case IRETURN, LRETURN, FRETURN, DRETURN -> {
+                case IRETURN,
+                     LRETURN,
+                     FRETURN,
+                     DRETURN -> {
                     generator.checkCast(ASMHelper.boxType(returnType));
                     generator.unbox(returnType);
                 }
@@ -342,7 +357,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                         final List<AbstractInsnNode> targets = At.Lookup.findTargets(jump[key], manager.remapper(), methodNode.instructions);
                         final int size = targets.size();
                         if (size != 1)
-                            throw new IllegalStateException("targets.size() == " + size);
+                            throw new IllegalStateException(STR."targets.size() == \{size}");
                         final AbstractInsnNode target = targets[0];
                         if (target instanceof LabelNode labelNode)
                             generator.goTo(labelNode.markLabel());

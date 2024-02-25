@@ -75,7 +75,7 @@ public class GetterHandler extends BaseHandler<Getter> {
                 };
                 default                                 -> "Reference";
             };
-            final JCTree.JCVariableDecl mark = maker.VarDef(maker.Modifiers(PRIVATE | tree.mods.flags & STATIC), name("$" + tree.name.toString() + "$mark"), maker.TypeIdent(TypeTag.INT), null);
+            final JCTree.JCVariableDecl mark = maker.VarDef(maker.Modifiers(PRIVATE | tree.mods.flags & STATIC), name(STR."$\{tree.name.toString()}$mark"), maker.TypeIdent(TypeTag.INT), null);
             if (shouldInjectVariable(env, mark.name))
                 injectMember(env, mark);
             final Name $value = name("$value");
@@ -85,20 +85,20 @@ public class GetterHandler extends BaseHandler<Getter> {
                             maker.SwitchExpression(unsafeFieldBaseAccess(maker, tree, env, mark.sym, "compareAndExchangeInt", maker.Literal(0), maker.Literal(1)), List.of(
                                     maker.Case(CaseTree.CaseKind.RULE, List.of(maker.ConstantCaseLabel(maker.Literal(0))), null, List.of(
                                             maker.VarDef(maker.Modifiers(FINAL), $value, unpackedType, tree.init),
-                                            maker.Exec(unsafeFieldBaseAccess(maker, tree, env, tree.sym, "put%sOpaque".formatted(type), maker.Ident($value))),
+                                            maker.Exec(unsafeFieldBaseAccess(maker, tree, env, tree.sym, STR."put\{type}Opaque", maker.Ident($value))),
                                             maker.Exec(unsafeFieldBaseAccess(maker, tree, env, mark.sym, "putIntRelease", maker.Literal(2))),
                                             maker.Yield(maker.Ident($value))
                                     ), null),
                                     maker.Case(CaseTree.CaseKind.RULE, List.of(maker.ConstantCaseLabel(maker.Literal(1))), null, List.of(
                                             maker.WhileLoop(
-                                                    maker.Binary(JCTree.Tag.NE, unsafeFieldBaseAccess(maker, tree, env, mark.sym, "getIntOpaque".formatted()), maker.Literal(2)),
+                                                    maker.Binary(JCTree.Tag.NE, unsafeFieldBaseAccess(maker, tree, env, mark.sym, "getIntOpaque"), maker.Literal(2)),
                                                     maker.Exec(maker.Apply(List.nil(), maker.Select(IdentQualifiedName(Thread.class), name("onSpinWait")), List.nil()))
                                             ),
                                             maker.Exec(unsafe(tree, env).invocation(maker, "loadLoadFence")),
-                                            maker.Yield(maker.TypeCast(unpackedType, unsafeFieldBaseAccess(maker, tree, env, tree.sym, "get%sOpaque".formatted(type))))
+                                            maker.Yield(maker.TypeCast(unpackedType, unsafeFieldBaseAccess(maker, tree, env, tree.sym, STR."get\{type}Opaque")))
                                     ), null),
                                     maker.Case(CaseTree.CaseKind.RULE, List.of(maker.DefaultCaseLabel()), null, List.of(
-                                            maker.Yield(maker.TypeCast(unpackedType, unsafeFieldBaseAccess(maker, tree, env, tree.sym, "get%sOpaque".formatted(type))))
+                                            maker.Yield(maker.TypeCast(unpackedType, unsafeFieldBaseAccess(maker, tree, env, tree.sym, STR."get\{type}Opaque")))
                                     ), null)
                             ))))
             );

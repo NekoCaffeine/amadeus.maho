@@ -21,19 +21,19 @@ public interface MahoProfile {
     static void dump(final Map<String, Sampler<?>> samplers = samplers(), final List<String> list, final String subHead) {
         final String subHead2 = subHead.repeat(2), subHead3 = subHead.repeat(3);
         list += "Maho Profile:";
-        list += subHead + "Samplers:";
+        list += STR."\{subHead}Samplers:";
         samplers.forEach((name, sampler) -> {
             final long total = ~sampler.total(), count = ~sampler.count();
             if (count == 0L)
-                list += subHead2 + name + ": <empty>";
+                list += STR."\{subHead2}\{name}: <empty>";
             else {
                 final Tuple2<?, Sampler.Frame> min = ~sampler.min(), max = ~sampler.max();
                 list += subHead2 + name + " [ total: %d ms, count: %d, avg: %.3f ns ]".formatted(total / (int) 1e6, count, (double) total / count);
-                list += subHead3 + "min: %s".formatted(min.v1 + " => " + min.v2);
-                list += subHead3 + "max: %s".formatted(max.v1 + " => " + max.v2);
+                list += subHead3 + STR."min: \{STR."\{min.v1} => \{min.v2}"}";
+                list += subHead3 + STR."max: \{STR."\{max.v1} => \{max.v2}"}";
                 sampler.data().forEach((key, frames) -> {
                     final long sum = frames.stream().mapToLong(Sampler.Frame::total).sum(), size = frames.size();
-                    list += subHead3 + "%s".formatted(key) + " [ total: %d ms, count: %d, avg: %.3f ns ]".formatted(sum / (int) 1e6, size, (double) sum / size);
+                    list += subHead3 + STR."\{key}" + " [ total: %d ms, count: %d, avg: %.3f ns ]".formatted(sum / (int) 1e6, size, (double) sum / size);
                 });
             }
         });

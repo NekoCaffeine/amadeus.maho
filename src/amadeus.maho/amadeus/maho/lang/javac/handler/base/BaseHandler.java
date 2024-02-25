@@ -34,7 +34,7 @@ public abstract class BaseHandler<A extends Annotation> extends JavacContext imp
             case JCTree.JCClassDecl decl    -> processClass(env, decl, owner, annotation, annotationTree, advance);
             case JCTree.JCVariableDecl decl -> processVariable(env, decl, owner, annotation, annotationTree, advance);
             case JCTree.JCMethodDecl decl   -> processMethod(env, decl, owner, annotation, annotationTree, advance);
-            default                         -> throw new AssertionError("Unreachable area: " + tree.getClass());
+            default                         -> throw new AssertionError(STR."Unreachable area: \{tree.getClass()}");
         }
     }
     

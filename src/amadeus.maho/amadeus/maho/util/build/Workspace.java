@@ -32,15 +32,14 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
     public self clean(final Module module) = --(root() / module.path() / buildOutputDir());
     
     public Process run(final Module module, final int debugPort = -1, final List<String> jvmArgs = List.of(), final boolean openTerminal = true,
-            final Path runDir = root() / module.path() / "run", final Predicate<Path> useModulePath = path -> true)
-            = run(runDir, openTerminal, runArgs(module, debugPort, jvmArgs, useModulePath));
+            final Path runDir = root() / module.path() / "run", final Predicate<Path> useModulePath = path -> true) = run(runDir, openTerminal, runArgs(module, debugPort, jvmArgs, useModulePath));
     
     public List<String> runArgs(final Module module, final int debugPort = -1, final List<String> jvmArgs = List.of(), final Predicate<Path> useModulePath = path -> true) {
         final ArrayList<String> args = { };
         final ArrayList<Path> p = { }, cp = { };
         args += Environment.local().lookup(ScriptHelper.MAHO_JAVA_EXECUTION, (Path.of(System.getProperty("java.home")) / "bin" / "java").toAbsolutePath().toString());
         if (debugPort != -1)
-            args += "-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:" + debugPort;
+            args += STR."-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:\{debugPort}";
         args *= jvmArgs;
         p += (root() / output(Jar.MODULES_DIR, module)).toAbsolutePath();
         module.dependencies().stream()
@@ -66,9 +65,9 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
         if (openTerminal) {
             final String command = String.join(" ", args);
             switch (getOSType()) {
-                case WINDOWS -> commands *= List.of("cmd", "/c", "start", "/wait", "cmd", "/c", "%s & pause > nul".formatted(command));
-                case LINUX   -> commands *= List.of("xterm", "-e", "%s ; read -n 1 -s".formatted(command));
-                case MAC     -> commands *= List.of("osascript", "-e", "tell application 'Terminal' to do script '%s ; read -n 1 -s'".formatted(command));
+                case WINDOWS -> commands *= List.of("cmd", "/c", "start", "/wait", "cmd", "/c", STR."\{command} & pause > nul");
+                case LINUX   -> commands *= List.of("xterm", "-e", STR."\{command} ; read -n 1 -s");
+                case MAC     -> commands *= List.of("osascript", "-e", STR."tell application 'Terminal' to do script '\{command} ; read -n 1 -s'");
                 default      -> throw unsupportedOSType();
             }
         } else
@@ -82,7 +81,7 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
                 .start();
     }
     
-    static UnsupportedOperationException unsupportedOSType() = { "Unsupported OS Type: %s %s (%s)".formatted(System.getProperty("os.name"), System.getProperty("os.version"), System.getProperty("os.arch")) };
+    static UnsupportedOperationException unsupportedOSType() = { STR."Unsupported OS Type: \{System.getProperty("os.name")} \{System.getProperty("os.version")} (\{System.getProperty("os.arch")})" };
     
     public static Workspace here(final Path buildDir = Path.of("build"), final Path outputDir = Path.of("output"))
             = { Path.of(""), Config.of(Config.Locator.ofFileSystem(buildDir)), buildDir, outputDir };

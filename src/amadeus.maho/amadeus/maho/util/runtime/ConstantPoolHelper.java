@@ -93,7 +93,7 @@ public interface ConstantPoolHelper {
                         return method;
                     else
                         return last;
-                if (method.getName().equals("valueOf") && method.getParameterCount() == 1)
+                if (TypeHelper.isBoxedMethod(method))
                     last = method;
                 else
                     return method;
@@ -115,7 +115,7 @@ public interface ConstantPoolHelper {
                             return method;
                         else
                             return last;
-                    if (method.getName().equals("valueOf") && method.getParameterCount() == 1)
+                    if (TypeHelper.isBoxedMethod(method))
                         last = method;
                     else
                         return method;

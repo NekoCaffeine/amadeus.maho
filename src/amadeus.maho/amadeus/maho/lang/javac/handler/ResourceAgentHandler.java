@@ -28,7 +28,7 @@ public class ResourceAgentHandler extends BaseHandler<ResourceAgent> {
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "resource.agent.invalid.parameter"));
         try {
             final Pattern pattern = Pattern.compile(annotation.value());
-            final Map<String, Integer> namedGroupsIndex = pattern.namedGroupsIndex();
+            final Map<String, Integer> namedGroupsIndex = pattern.namedGroups();
             final List<String> missingKey = tree.sym.params().stream().map(symbol -> symbol.name.toString()).filterNot(namedGroupsIndex.keySet()::contains).toList();
             if (!missingKey.isEmpty())
                 log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "resource.agent.missing.key", missingKey));

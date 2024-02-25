@@ -35,7 +35,7 @@ public interface ScriptHelper {
             ALL_SYSTEM      = "ALL-SYSTEM",
             ALL_MODULE_PATH = "ALL-MODULE-PATH";
     
-    String MAHO_JAVA_EXECUTION = "maho.java.execution";
+    String MAHO_JAVA_EXECUTION = "amadeus.maho.java.execution";
     
     static void useMahoImageIfPossible() {
         final @Nullable String image = System.getenv(MahoImage.VARIABLE);
@@ -58,23 +58,23 @@ public interface ScriptHelper {
         args += module;
     });
     
-    static void addAgent(final Collection<String> args, final Path agentJar) = args += "-javaagent:%s".formatted(agentJar.toAbsolutePath() | "/");
+    static void addAgent(final Collection<String> args, final Path agentJar) = args += STR."-javaagent:\{agentJar.toAbsolutePath() | "/"}";
     
     static void println(final Object msg) = System.out.println(msg);
     
-    static void info(final Object msg) = System.out.println("INFO: " + msg);
+    static void info(final Object msg) = System.out.println(STR."INFO: \{msg}");
     
     static void debug(final Object msg) {
         if (MahoExport.debug())
-            System.out.println("DEBUG: " + msg);
+            System.out.println(STR."DEBUG: \{msg}");
     }
     
-    static void warning(final Object msg) = System.err.println("WARNING: " + msg);
+    static void warning(final Object msg) = System.err.println(STR."WARNING: \{msg}");
     
-    static void error(final Object msg) = System.err.println("ERROR: " + msg);
+    static void error(final Object msg) = System.err.println(STR."ERROR: \{msg}");
     
     static void fatal(final Object msg) {
-        System.err.println("FATAL: " + msg);
+        System.err.println(STR."FATAL: \{msg}");
         System.exit(-1);
     }
     

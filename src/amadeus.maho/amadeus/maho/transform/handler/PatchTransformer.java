@@ -67,11 +67,13 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
     
     @Override
     public ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
-        TransformerManager.transform("patch", "%s\n->  %s".formatted(ASMHelper.sourceName(node.name), ASMHelper.sourceName(sourceClass.name)));
-        final ClassNode copy = ASMHelper.newClassNode(sourceClass);
-        final ClassNode patch = handler.isNotDefault(Patch::remap) ? new RemapTransformer(manager, annotation.remap(), copy).transformWithoutContext(copy, loader) : copy;
-        patch(context, manager.remapper(), patch, node, annotation.metadata().remap());
-        context.markModified();
+        if (!annotation.onlyFirstTime() || clazz == null) {
+            TransformerManager.transform("patch", STR."\{ASMHelper.sourceName(node.name)}\n->  \{ASMHelper.sourceName(sourceClass.name)}");
+            final ClassNode copy = ASMHelper.newClassNode(sourceClass);
+            final ClassNode patch = handler.isNotDefault(Patch::remap) ? new RemapTransformer(manager, annotation.remap(), copy).transformWithoutContext(copy, loader) : copy;
+            patch(context, manager.remapper(), patch, node, annotation.metadata().remap());
+            context.markModified();
+        }
         return node;
     }
     
@@ -213,7 +215,7 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
     }
     
     public static String getMethodName(final ClassNode node, final String name) {
-        String newName = "$runtime_source$_" + name;
+        String newName = STR."$runtime_source$_\{name}";
         for (final MethodNode method : node.methods)
             if (method.name.equals(newName))
                 newName = getMethodName(node, newName);
@@ -269,15 +271,13 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
         for (final AbstractInsnNode insn : methodNode.instructions) {
             if (insn instanceof TypeInsnNode type)
                 type.desc = replace(type.desc, patchName, clazzName);
-            else if (insn instanceof FieldInsnNode) {
-                if (!isSuper) {
-                    final FieldInsnNode field = (FieldInsnNode) insn;
-                    field.owner = replace(field.owner, patchName, clazzName);
-                }
-            } else if (insn instanceof MethodInsnNode method) {
-                final boolean flag = !isSuper || method.getOpcode() == INVOKESPECIAL;
+            else if (insn instanceof FieldInsnNode fieldInsn) {
+                if (!isSuper)
+                    fieldInsn.owner = replace(fieldInsn.owner, patchName, clazzName);
+            } else if (insn instanceof MethodInsnNode methodInsn) {
+                final boolean flag = !isSuper || methodInsn.getOpcode() == INVOKESPECIAL;
                 if (flag)
-                    method.owner = replace(method.owner, patchName, clazzName);
+                    methodInsn.owner = replace(methodInsn.owner, patchName, clazzName);
             } else if (insn instanceof InvokeDynamicInsnNode invokeDynamicInsn) {
                 final String patchDesc = ASMHelper.classDesc(patchName), clazzDesc = ASMHelper.classDesc(clazzName);
                 invokeDynamicInsn.desc = invokeDynamicInsn.desc.replace(patchDesc, clazzDesc);
@@ -294,9 +294,9 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
                                 handle.getName(), handle.getDesc().replace(patchDesc, clazzDesc), ((Handle) invokeDynamicInsn.bsmArgs[i]).isInterface());
             } else if (insn instanceof FrameNode frame) {
                 if (frame.local != null)
-                    frame.local.replaceAll(o -> o instanceof String ? replace((String) o, patchName, clazzName) : o);
+                    frame.local.replaceAll(o -> o instanceof String name ? replace(name, patchName, clazzName) : o);
                 if (frame.stack != null)
-                    frame.stack.replaceAll(o -> o instanceof String ? replace((String) o, patchName, clazzName) : o);
+                    frame.stack.replaceAll(o -> o instanceof String name ? replace(name, patchName, clazzName) : o);
             }
         }
     }

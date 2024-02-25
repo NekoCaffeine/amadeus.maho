@@ -59,11 +59,7 @@ interface DynamicLookup {
     MethodHandle proxy = proxy();
     
     @SneakyThrows
-    private static MethodHandle proxy() {
-        final Class<?> hotspot = Class.forName("amadeus.maho.vm.reflection.hotspot.HotSpot", true, MahoBridge.bridgeClassLoader());
-        final MethodHandles.Lookup lookup = lookup();
-        return lookup.findVirtual(hotspot, "copyObjectWithoutHead", MethodType.methodType(Object.class, Class.class, Object.class)).bindTo(lookup.findStatic(hotspot, "instance", MethodType.methodType(hotspot)).invoke());
-    }
+    private static MethodHandle proxy() = lookup().findStatic(Class.forName("amadeus.maho.util.dynamic.Cloner", true, MahoBridge.bridgeClassLoader()), "copyFields", MethodType.methodType(Object.class, Class.class, Object.class));
     
     MethodHandle allocateInstance = lookup().findVirtual(Unsafe.class, "allocateInstance", MethodType.methodType(Object.class, Class.class)).bindTo(Unsafe.getUnsafe());
     
@@ -84,7 +80,7 @@ interface DynamicLookup {
         if (hasRealType) {
             methodType = (MethodType) DynamicLookup.methodType.invokeExact(realDesc, envClassLoader);
             if (sourceType.parameterCount() != methodType.parameterCount())
-                throw new IllegalArgumentException(sourceType + " -> " + methodType);
+                throw new IllegalArgumentException(STR."\{sourceType} -> \{methodType}");
         }
         final MethodType sourceRealType = methodType;
         Class<?> returnType = null;
@@ -115,7 +111,7 @@ interface DynamicLookup {
                 case GETFIELD           -> lookup.findGetter(owner, name, methodType.returnType());
                 case PUTFIELD           -> putCatch(lookup.findSetter(owner, name, methodType.parameterType(1)), methodType);
                 case INSTANCEOF         -> isInstance.bindTo(owner);
-                default                 -> throw new UnsupportedOperationException("Unsupported opcode: " + opcode);
+                default                 -> throw new UnsupportedOperationException(STR."Unsupported opcode: \{opcode}");
             };
         } catch (final ReflectiveOperationException e) {
             if ((opcode & WEAK_LINKING) != 0 && (e instanceof NoSuchFieldException || e instanceof NoSuchMethodException))
@@ -161,7 +157,7 @@ interface DynamicLookup {
                 case PUTSTATIC          -> putCatch(lookup.findStaticSetter(owner, name, realType.parameterType(0)), realType);
                 case GETFIELD           -> lookup.findGetter(owner, name, realType.returnType());
                 case PUTFIELD           -> putCatch(lookup.findSetter(owner, name, realType.parameterType(1)), realType);
-                default                 -> throw new UnsupportedOperationException("Unsupported opcode: " + opcode);
+                default                 -> throw new UnsupportedOperationException(STR."Unsupported opcode: \{opcode}");
             }, methodType));
         } catch (final ReflectiveOperationException e) {
             if ((opcode & WEAK_LINKING) != 0 && (e instanceof NoSuchFieldException || e instanceof NoSuchMethodException))

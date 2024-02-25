@@ -23,7 +23,7 @@ public interface ATFiles {
             lineCounter[0]++;
             final String array[] = line.split(" ");
             if (array.length < 2)
-                throw new AbnormalFormatException("Invalid number of parameters(" + array.length + ").", atFile, lineCounter[0]);
+                throw new AbnormalFormatException(STR."Invalid number of parameters(\{array.length}).", atFile, lineCounter[0]);
             boolean flag = false;
             int accessModifier = 0, addModifier = 0, delModifier = 0;
             for (int i = 0, len = array.length - 1; i < len; i++) {
@@ -39,18 +39,18 @@ public interface ATFiles {
                             switch (string.charAt(0)) {
                                 case '+' -> addModifier |= access;
                                 case '-' -> delModifier |= access;
-                                default -> throw new AbnormalFormatException("Missing pre-marker '+' or '-': " + string, atFile, lineCounter[0]);
+                                default -> throw new AbnormalFormatException(STR."Missing pre-marker '+' or '-': \{string}", atFile, lineCounter[0]);
                             }
                         else if (string != name)
-                            throw new AbnormalFormatException("The permission modifier cannot apply the marker '+' or '-': " + string, atFile, lineCounter[0]);
+                            throw new AbnormalFormatException(STR."The permission modifier cannot apply the marker '+' or '-': \{string}", atFile, lineCounter[0]);
                         else {
                             if (i != 0)
-                                throw new AbnormalFormatException("The permission modifier must be in the first one: " + string, atFile, lineCounter[0]);
+                                throw new AbnormalFormatException(STR."The permission modifier must be in the first one: \{string}", atFile, lineCounter[0]);
                             accessModifier = access;
                         }
                     }
                 } else if (i != len - 1 || array.length < 3)
-                    throw new AbnormalFormatException("Invalid parameter: " + string, atFile, lineCounter[0]);
+                    throw new AbnormalFormatException(STR."Invalid parameter: \{string}", atFile, lineCounter[0]);
                 else
                     flag = true;
                 final ATRule atRule = { accessModifier, addModifier, delModifier };

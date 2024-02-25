@@ -230,7 +230,7 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
     protected Stream<JCTree.JCStatement> writeArray(final JCTree.JCExpression output, final JCTree.JCExpression field, final Type type, final boolean bigEndian, final boolean unsigned, final int layer) = switch (type.getTag()) {
         case BYTE -> Stream.of(write(output, field, Function.identity()));
         default   -> {
-            final JCTree.JCIdent element = maker.Ident(name("$element_" + layer));
+            final JCTree.JCIdent element = maker.Ident(name(STR."$element_\{layer}"));
             yield Stream.of(maker.ForeachLoop(maker.VarDef(maker.Modifiers(FINAL), element.name, maker.Type(element.type = type), null),
                     field, maker.Block(0L, write(output, element, type, bigEndian, unsigned, layer + 1).collect(List.collector()))));
         }
@@ -247,7 +247,7 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
         case CHAR    -> writeNByte(output, field, 1, bigEndian, it -> maker.TypeCast(symtab.intType, it));
         case ARRAY   -> writeArray(output, field, ((Type.ArrayType) type).elemtype, bigEndian, unsigned, layer);
         case CLASS   -> Stream.of(maker.Exec(maker.Apply(List.nil(), maker.Select(maker.Parens(maker.TypeCast(IdentQualifiedName(BinaryMapper.class), field)), name(serialization)), List.of(output))));
-        default      -> throw new IllegalArgumentException("type: " + type);
+        default      -> throw new IllegalArgumentException(STR."type: \{type}");
     };
     
     protected JCTree.JCExpression read(final JCTree.JCExpression input, final Function<JCTree.JCExpression, JCTree.JCExpression> transformer, final EOFContext.Type type)
@@ -270,7 +270,7 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
         if (firstType != EOFContext.Type.THROW)
             maker.If(maker.Binary(JCTree.Tag.LT, maker.Literal(0), maker.Select(field, names.length)),
                     maker.Block(0L, read(input, maker.Indexed(field, maker.Literal(0)).let(it -> it.type = type), type, bigEndian, unsigned, constant, layer + 1, context).collect(List.collector())), null);
-        final Name index = name("$index_" + layer);
+        final Name index = name(STR."$index_\{layer}");
         return Stream.of(maker.ForLoop(List.of(maker.VarDef(maker.Modifiers(0L), index, maker.TypeIdent(TypeTag.INT), maker.Literal(TypeTag.INT, firstType != EOFContext.Type.THROW ? 1 : 0))),
                 maker.Binary(JCTree.Tag.LT, maker.Ident(index), maker.Select(field, names.length)), List.of(maker.Exec(maker.Unary(JCTree.Tag.POSTINC, maker.Ident(index)))),
                 maker.Block(0L, read(input, maker.Indexed(field, maker.Ident(index)).let(it -> it.type = type), type, bigEndian, unsigned, constant, layer + 1, context).collect(List.collector()))));
@@ -292,7 +292,7 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
         case CHAR    -> readNBytes(input, 1, bigEndian, afterRead(field, constant), context);
         case ARRAY   -> readArray(input, field, ((Type.ArrayType) type).elemtype, bigEndian, unsigned, constant, layer, context);
         case CLASS   -> Stream.of(maker.Exec(maker.Apply(List.nil(), maker.Select(maker.Parens(maker.TypeCast(IdentQualifiedName(BinaryMapper.class), field)), name(deserialization)), List.of(input))));
-        default      -> throw new IllegalArgumentException("type: " + type);
+        default      -> throw new IllegalArgumentException(STR."type: \{type}");
     };
     
 }

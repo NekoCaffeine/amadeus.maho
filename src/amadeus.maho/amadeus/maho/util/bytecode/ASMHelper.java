@@ -33,6 +33,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import jdk.internal.misc.Unsafe;
+
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ConstantDynamic;
@@ -128,6 +130,7 @@ public interface ASMHelper {
             TYPE_LIST                            = Type.getType(List.class),
             TYPE_MAP                             = Type.getType(Map.class),
             TYPE_SET                             = Type.getType(Set.class),
+            TYPE_UNSAFE                          = Type.getType(Unsafe.class),
             TYPE_CALL_SITE                       = Type.getType(CallSite.class),
             TYPE_METHOD_HANDLES_LOOKUP           = Type.getType(MethodHandles.Lookup.class),
             TYPE_METHOD_TYPE                     = Type.getType(MethodType.class),
@@ -140,7 +143,7 @@ public interface ASMHelper {
             METHOD_INIT_   = { _INIT_, VOID_METHOD_DESC },
             METHOD_CLINIT_ = { _CLINIT_, VOID_METHOD_DESC };
     
-    int asm_api_version = Environment.local().lookup("maho.asm.api.version", ASM9);
+    int asm_api_version = Environment.local().lookup("amadeus.maho.asm.api.version", ASM9);
     
     static boolean anyMatch(final int access, final int mask) = (access & mask) != 0;
     
@@ -186,37 +189,37 @@ public interface ASMHelper {
     
     static int returnOpcode(final Type type) = switch (type.getSort()) {
         case Type.BYTE,
-                Type.SHORT,
-                Type.INT,
-                Type.BOOLEAN -> IRETURN;
-        case Type.LONG       -> LRETURN;
-        case Type.FLOAT      -> FRETURN;
-        case Type.DOUBLE     -> DRETURN;
+             Type.SHORT,
+             Type.INT,
+             Type.BOOLEAN -> IRETURN;
+        case Type.LONG    -> LRETURN;
+        case Type.FLOAT   -> FRETURN;
+        case Type.DOUBLE  -> DRETURN;
         case Type.OBJECT,
-                Type.ARRAY   -> ARETURN;
-        default              -> RETURN;
+             Type.ARRAY   -> ARETURN;
+        default           -> RETURN;
     };
     
     static int loadOpcode(final Type type) = switch (type.getSort()) {
         case Type.BYTE,
-                Type.SHORT,
-                Type.INT,
-                Type.BOOLEAN -> ILOAD;
-        case Type.LONG       -> LLOAD;
-        case Type.FLOAT      -> FLOAD;
-        case Type.DOUBLE     -> DLOAD;
-        default              -> ALOAD;
+             Type.SHORT,
+             Type.INT,
+             Type.BOOLEAN -> ILOAD;
+        case Type.LONG    -> LLOAD;
+        case Type.FLOAT   -> FLOAD;
+        case Type.DOUBLE  -> DLOAD;
+        default           -> ALOAD;
     };
     
     static int storeOpcode(final Type type) = switch (type.getSort()) {
         case Type.BYTE,
-                Type.SHORT,
-                Type.INT,
-                Type.BOOLEAN -> ISTORE;
-        case Type.LONG       -> LSTORE;
-        case Type.FLOAT      -> FSTORE;
-        case Type.DOUBLE     -> DSTORE;
-        default              -> ASTORE;
+             Type.SHORT,
+             Type.INT,
+             Type.BOOLEAN -> ISTORE;
+        case Type.LONG    -> LSTORE;
+        case Type.FLOAT   -> FSTORE;
+        case Type.DOUBLE  -> DSTORE;
+        default           -> ASTORE;
     };
     
     static AbstractInsnNode intNode(final int value) {
@@ -229,11 +232,10 @@ public interface ASMHelper {
         return new LdcInsnNode(value);
     }
     
-    static int changeAccess(int srcAccess, final int newAccess) {
-        srcAccess &= ~ACC_PRIVATE;
-        srcAccess &= ~ACC_PROTECTED;
-        srcAccess &= ~ACC_PUBLIC;
-        return srcAccess | newAccess;
+    static int changeAccess(final int srcAccess, final int newAccess) {
+        int access = srcAccess;
+        access &= ~(ACC_PRIVATE | ACC_PROTECTED | ACC_PUBLIC);
+        return access | newAccess;
     }
     
     static boolean isAnonymousInnerClass(final String name) = name.matches(".*\\$\\d+");
@@ -242,13 +244,11 @@ public interface ASMHelper {
     
     static String className(final Class<?> clazz) = className(clazz.getName());
     
-    static String className(final String clazz) = clazz.indexOf('L') == 0 && clazz.indexOf(';') == clazz.length() - 1 ?
-            clazz.replaceFirst("L", "").replace(";", "") :
-            clazz.replace('.', '/');
+    static String className(final String clazz) = clazz.indexOf('L') == 0 && clazz.indexOf(';') == clazz.length() - 1 ? clazz.replaceFirst("L", "").replace(";", "") : clazz.replace('.', '/');
     
     static String classDesc(final Class<?> clazz) = Type.getDescriptor(clazz);
     
-    static String classDesc(final String name) = "L" + className(name) + ";";
+    static String classDesc(final String name) = STR."L\{className(name)};";
     
     static @Nullable String sourceName(final @Nullable String name) = name == null ? null : className(name).replace('/', '.');
     
@@ -265,10 +265,10 @@ public interface ASMHelper {
     
     static int varSize(final int opcode) = switch (opcode) {
         case DLOAD,
-                DSTORE,
-                LLOAD,
-                LSTORE -> 2;
-        default        -> 1;
+             DSTORE,
+             LLOAD,
+             LSTORE -> 2;
+        default     -> 1;
     };
     
     static MethodNode computeMethodNode(final ClassNode node, final String name, final String desc, final BiFunction<String, String, MethodNode> mapping)
@@ -277,18 +277,17 @@ public interface ASMHelper {
     static FieldNode computeField(final ClassNode node, final String name, final String desc, final BiFunction<String, String, FieldNode> mapping)
             = lookupFieldNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.fields::add));
     
-    static Optional<MethodNode> lookupMethodNode(final ClassNode node, final String name, final String desc) = node.methods.stream()
-            .filter(methodNode -> methodNode.name.equals(name) && methodNode.desc.equals(desc))
-            .findAny();
+    static Optional<MethodNode> lookupMethodNode(final ClassNode node, final String name, final String desc)
+            = node.methods.stream().filter(methodNode -> methodNode.name.equals(name) && methodNode.desc.equals(desc)).findAny();
     
-    static Optional<FieldNode> lookupFieldNode(final ClassNode node, final String name, final String desc) = node.fields.stream()
-            .filter(fieldNode -> fieldNode.name.equals(name) && fieldNode.desc.equals(desc))
-            .findAny();
+    static Optional<FieldNode> lookupFieldNode(final ClassNode node, final String name, final String desc)
+            = node.fields.stream().filter(fieldNode -> fieldNode.name.equals(name) && fieldNode.desc.equals(desc)).findAny();
     
-    static void injectInsnList(final MethodNode methodNode,
-            final Consumer<MethodGenerator> consumer) = methodNode.instructions.insert(new InsnList().let(it -> consumer.accept(MethodGenerator.fromShadowMethodNode(methodNode, it))));
+    static void injectInsnList(final MethodNode methodNode, final Consumer<MethodGenerator> consumer)
+            = methodNode.instructions.insert(new InsnList().let(it -> consumer.accept(MethodGenerator.fromShadowMethodNode(methodNode, it))));
     
-    static void injectInsnList(final MethodNode methodNode, final Predicate<AbstractInsnNode> predicate, final boolean before, final Consumer<MethodGenerator> consumer) = StreamHelper.fromIterable(methodNode.instructions)
+    static void injectInsnList(final MethodNode methodNode, final Predicate<AbstractInsnNode> predicate, final boolean before, final Consumer<MethodGenerator> consumer)
+            = StreamHelper.fromIterable(methodNode.instructions)
             .filter(predicate)
             .forEach(insn -> {
                 final InsnList injectList = { };
@@ -299,8 +298,8 @@ public interface ASMHelper {
                     methodNode.instructions.insert(insn, injectList);
             });
     
-    static void injectInsnListByBytecodes(final MethodNode methodNode, final IntPredicate predicate, final boolean before,
-            final Consumer<MethodGenerator> consumer) = injectInsnList(methodNode, insn -> predicate.test(insn.getOpcode()), before, consumer);
+    static void injectInsnListByBytecodes(final MethodNode methodNode, final IntPredicate predicate, final boolean before, final Consumer<MethodGenerator> consumer)
+            = injectInsnList(methodNode, insn -> predicate.test(insn.getOpcode()), before, consumer);
     
     static void delAllAnnotation(final ClassNode node, final Set<Class<? extends Annotation>> annotationTypes) {
         delAnnotation(node, annotationTypes);
@@ -345,7 +344,7 @@ public interface ASMHelper {
             if (repeatable != null) {
                 final Class<?> containerType = repeatable.value();
                 if (!Annotation.class.isAssignableFrom(annotationType))
-                    throw new IncompatibleClassChangeError(annotationType + " is not an annotation target");
+                    throw new IncompatibleClassChangeError(STR."\{annotationType} is not an annotation target");
                 final String containerDesc = classDesc(containerType);
                 annotationNodes.removeIf(annotationNode -> annotationNode.desc.equals(containerDesc));
             } else {
@@ -355,32 +354,44 @@ public interface ASMHelper {
         }
     }
     
-    static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final ClassNode node, final Class<? extends Annotation> annotationType) = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
+    static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final ClassNode node, final Class<? extends Annotation> annotationType)
+            = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
     
-    static boolean hasAnnotation(final ClassNode node, final Class<? extends Annotation> annotationType) = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
+    static boolean hasAnnotation(final ClassNode node, final Class<? extends Annotation> annotationType)
+            = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
     
-    static <T extends Annotation> @Nullable T findAnnotation(final ClassNode node, final Class<T> annotationType, final @Nullable ClassLoader loader) = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+    static <T extends Annotation> @Nullable T findAnnotation(final ClassNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
+            = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
-    static <T extends Annotation> @Nullable T[] findAnnotations(final ClassNode node, final Class<T> annotationType, final @Nullable ClassLoader loader) = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+    static <T extends Annotation> @Nullable T[] findAnnotations(final ClassNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
+            = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
-    static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final FieldNode node, final Class<? extends Annotation> annotationType) = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
+    static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final FieldNode node, final Class<? extends Annotation> annotationType)
+            = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
     
-    static boolean hasAnnotation(final FieldNode node, final Class<? extends Annotation> annotationType) = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
+    static boolean hasAnnotation(final FieldNode node, final Class<? extends Annotation> annotationType)
+            = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
     
-    static <T extends Annotation> @Nullable T findAnnotation(final FieldNode node, final Class<T> annotationType, final @Nullable ClassLoader loader) = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+    static <T extends Annotation> @Nullable T findAnnotation(final FieldNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
+            = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
-    static <T extends Annotation> @Nullable T[] findAnnotations(final FieldNode node, final Class<T> annotationType, final @Nullable ClassLoader loader) = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+    static <T extends Annotation> @Nullable T[] findAnnotations(final FieldNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
+            = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
-    static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final MethodNode node, final Class<? extends Annotation> annotationType) = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
+    static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final MethodNode node, final Class<? extends Annotation> annotationType)
+            = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
     
-    static boolean hasAnnotation(final MethodNode node, final Class<? extends Annotation> annotationType) = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
+    static boolean hasAnnotation(final MethodNode node, final Class<? extends Annotation> annotationType)
+            = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
     
-    static <T extends Annotation> @Nullable T findAnnotation(final MethodNode node, final Class<T> annotationType, final @Nullable ClassLoader loader) = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+    static <T extends Annotation> @Nullable T findAnnotation(final MethodNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
+            = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
-    static <T extends Annotation> @Nullable T[] findAnnotations(final MethodNode node, final Class<T> annotationType,
-            final @Nullable ClassLoader loader) = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+    static <T extends Annotation> @Nullable T[] findAnnotations(final MethodNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
+            = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
-    static boolean hasAnnotation(final @Nullable List<? extends AnnotationNode> annotationNodes, final Class<? extends Annotation> annotationType) = findAnnotationNode(annotationNodes, annotationType) != null;
+    static boolean hasAnnotation(final @Nullable List<? extends AnnotationNode> annotationNodes, final Class<? extends Annotation> annotationType)
+            = findAnnotationNode(annotationNodes, annotationType) != null;
     
     static @Nullable AnnotationNode findAnnotationNode(final @Nullable List<? extends AnnotationNode> targetAnnotationNodes, final Class<? extends Annotation> annotationType) {
         if (targetAnnotationNodes == null)
@@ -401,7 +412,7 @@ public interface ASMHelper {
             return null;
         final Class<? extends Annotation> containerType = repeatable.value();
         if (!Annotation.class.isAssignableFrom(annotationType))
-            throw new IncompatibleClassChangeError(annotationType + " is not an annotation target");
+            throw new IncompatibleClassChangeError(STR."\{annotationType} is not an annotation target");
         final String containerDesc = classDesc(containerType);
         for (final AnnotationNode annotationNode : annotationNodes)
             if (annotationNode.desc.equals(containerDesc)) {
@@ -410,14 +421,14 @@ public interface ASMHelper {
                 if (value == null)
                     throw new IllegalArgumentException(new IncompleteAnnotationException(containerType, "value"));
                 if (!List.class.isAssignableFrom(value.getClass()))
-                    throw new IllegalArgumentException(new ClassCastException("@" + containerType.getName() + ".value() is not an instance of " + containerType.getName() + "[]"));
+                    throw new IllegalArgumentException(new ClassCastException(STR."@\{containerType.getName()}.value() is not an instance of \{containerType.getName()}[]"));
                 final List<AnnotationNode> values = (List<AnnotationNode>) value;
-                if (values.size() == 0)
+                if (values.isEmpty())
                     return { };
                 final String annotationDesc = classDesc(annotationType);
                 for (final AnnotationNode subAnnotationNode : values)
                     if (!subAnnotationNode.desc.equals(annotationDesc))
-                        throw new IllegalArgumentException(new ClassCastException("@" + containerType.getName() + ".value() is not an instance of " + containerType.getName() + "[]"));
+                        throw new IllegalArgumentException(new ClassCastException(STR."@\{containerType.getName()}.value() is not an instance of \{containerType.getName()}[]"));
                 return values.toArray(AnnotationNode[]::new);
             }
         return null;
@@ -451,7 +462,7 @@ public interface ASMHelper {
                 .collect(HashMap::new, (map, annotationNode) -> {
                     final Class<?> annotationType = loadType(Type.getType(annotationNode.desc), false, loader);
                     if (!Annotation.class.isAssignableFrom(annotationType))
-                        throw new IncompatibleClassChangeError(annotationType + " is not an annotation target");
+                        throw new IncompatibleClassChangeError(STR."\{annotationType} is not an annotation target");
                     final Annotation annotation = AnnotationHandler.make((Class<? extends Annotation>) annotationType, loader, annotationNode.values);
                     map.put((Class<? extends Annotation>) annotationType, annotation);
                 }, Map::putAll);
@@ -471,7 +482,7 @@ public interface ASMHelper {
         final Type fieldType = Type.getType(field.desc);
         access = follow(field.access, access, ACC_STATIC);
         final MethodGenerator generator = MethodGenerator.visitMethod(node, access, name == null ? field.name : name,
-                Type.getMethodDescriptor(fieldType), field.signature == null ? null : "()%s".formatted(field.signature), null);
+                Type.getMethodDescriptor(fieldType), field.signature == null ? null : STR."()\{field.signature}", null);
         if (isStatic)
             generator.getStatic(Type.getObjectType(owner), field.name, fieldType);
         else {
@@ -487,7 +498,7 @@ public interface ASMHelper {
         final Type fieldType = Type.getType(field.desc);
         access = follow(field.access, access, ACC_STATIC);
         final MethodGenerator generator = MethodGenerator.visitMethod(node, access, name == null ? field.name : name,
-                Type.getMethodDescriptor(Type.VOID_TYPE, fieldType), field.signature == null ? null : "(%s)V".formatted(field.signature), null);
+                Type.getMethodDescriptor(Type.VOID_TYPE, fieldType), field.signature == null ? null : STR."(\{field.signature})V", null);
         if (isStatic) {
             generator.loadArg(0);
             generator.putStatic(Type.getObjectType(owner), field.name, fieldType);
@@ -513,7 +524,7 @@ public interface ASMHelper {
         access = follow(field.access, access, ACC_STATIC);
         final MethodGenerator generator = MethodGenerator.visitMethod(node, access, name == null ? field.name : name,
                 Type.getMethodDescriptor(fieldType, isStatic ? new Type[0] : new Type[]{ Type.getObjectType(owner) }),
-                field.signature == null ? null : "(%s)%s".formatted(isStatic ? "" : className(node.name), field.signature), null);
+                field.signature == null ? null : STR."(\{isStatic ? "" : className(node.name)})\{field.signature}", null);
         if (isStatic)
             generator.getStatic(Type.getObjectType(owner), field.name, fieldType);
         else {
@@ -530,7 +541,7 @@ public interface ASMHelper {
         access = follow(field.access, access, ACC_STATIC);
         final MethodGenerator generator = MethodGenerator.visitMethod(node, access, name == null ? field.name : name,
                 Type.getMethodDescriptor(Type.VOID_TYPE, isStatic ? new Type[]{ fieldType } : new Type[]{ Type.getObjectType(owner), fieldType }),
-                field.signature == null ? null : "(%s%s)V".formatted(isStatic ? "" : className(node.name), field.signature), null);
+                field.signature == null ? null : STR."(\{isStatic ? "" : className(node.name)}\{field.signature})V", null);
         if (isStatic) {
             generator.loadArg(0);
             generator.putStatic(Type.getObjectType(owner), field.name, fieldType);
@@ -659,42 +670,42 @@ public interface ASMHelper {
         return false;
     }
     
-    static boolean isGhostContextCall(final AbstractInsnNode insn) = insn instanceof MethodInsnNode && ((MethodInsnNode) insn).owner.equals(TYPE_GHOST_CONTEXT.getInternalName());
+    static boolean isGhostContextCall(final AbstractInsnNode insn) = insn instanceof MethodInsnNode methodInsnNode && methodInsnNode.owner.equals(TYPE_GHOST_CONTEXT.getInternalName());
     
     static boolean corresponding(final FieldNode field, final FieldNode target) = ObjectHelper.equals(field.name, target.name)
-            && ObjectHelper.equals(field.desc, target.desc);
+                                                                                  && ObjectHelper.equals(field.desc, target.desc);
     
     static boolean corresponding(final FieldNode field, final String owner, final FieldInsnNode fieldInsn) = ObjectHelper.equals(field.name, fieldInsn.name)
-            && ObjectHelper.equals(owner, fieldInsn.owner)
-            && ObjectHelper.equals(field.desc, fieldInsn.desc);
+                                                                                                             && ObjectHelper.equals(owner, fieldInsn.owner)
+                                                                                                             && ObjectHelper.equals(field.desc, fieldInsn.desc);
     
     static boolean corresponding(final FieldNode field, final Field target) = ObjectHelper.equals(field.name, target.getName())
-            && ObjectHelper.equals(field.desc, Type.getDescriptor(target.getType()));
+                                                                              && ObjectHelper.equals(field.desc, Type.getDescriptor(target.getType()));
     
     static boolean corresponding(final FieldNode field, final String owner, final Field target) = ObjectHelper.equals(field.name, target.getName())
-            && ObjectHelper.equals(owner, className(target.getDeclaringClass().getName()))
-            && ObjectHelper.equals(field.desc, Type.getDescriptor(target.getType()));
+                                                                                                  && ObjectHelper.equals(owner, className(target.getDeclaringClass().getName()))
+                                                                                                  && ObjectHelper.equals(field.desc, Type.getDescriptor(target.getType()));
     
     static boolean corresponding(final MethodNode method, final MethodNode target) = ObjectHelper.equals(method.name, target.name)
-            && ObjectHelper.equals(method.desc, target.desc);
+                                                                                     && ObjectHelper.equals(method.desc, target.desc);
     
     static boolean corresponding(final MethodNode method, final String owner, final MethodInsnNode methodInsn) = ObjectHelper.equals(method.name, methodInsn.name)
-            && ObjectHelper.equals(owner, methodInsn.owner)
-            && ObjectHelper.equals(method.desc, methodInsn.desc);
+                                                                                                                 && ObjectHelper.equals(owner, methodInsn.owner)
+                                                                                                                 && ObjectHelper.equals(method.desc, methodInsn.desc);
     
     static boolean corresponding(final Method method, final String owner, final MethodInsnNode methodInsn) = ObjectHelper.equals(method.getName(), methodInsn.name)
-            && ObjectHelper.equals(owner, methodInsn.owner)
-            && ObjectHelper.equals(method.getDescriptor(), methodInsn.desc);
+                                                                                                             && ObjectHelper.equals(owner, methodInsn.owner)
+                                                                                                             && ObjectHelper.equals(method.getDescriptor(), methodInsn.desc);
     
     static boolean corresponding(final MethodNode method, final Method target) = ObjectHelper.equals(method.name, target.getName())
-            && ObjectHelper.equals(method.desc, target.getDescriptor());
+                                                                                 && ObjectHelper.equals(method.desc, target.getDescriptor());
     
     static boolean corresponding(final FieldNode field, final java.lang.reflect.Method target) = ObjectHelper.equals(field.name, target.getName())
-            && ObjectHelper.equals(field.desc, Type.getMethodDescriptor(target));
+                                                                                                 && ObjectHelper.equals(field.desc, Type.getMethodDescriptor(target));
     
     static boolean corresponding(final FieldNode field, final String owner, final java.lang.reflect.Method target) = ObjectHelper.equals(field.name, target.getName())
-            && ObjectHelper.equals(owner, className(target.getDeclaringClass().getName()))
-            && ObjectHelper.equals(field.desc, Type.getMethodDescriptor(target));
+                                                                                                                     && ObjectHelper.equals(owner, className(target.getDeclaringClass().getName()))
+                                                                                                                     && ObjectHelper.equals(field.desc, Type.getMethodDescriptor(target));
     
     static AbstractInsnNode defaultLdcNode(final Type type) = switch (type.getSort()) {
         case Type.INT     -> intNode(0);
@@ -753,8 +764,8 @@ public interface ASMHelper {
     static int stackEffectOf(final AbstractInsnNode insn, final boolean calcReturn = true) {
         final int opcode = insn.getOpcode();
         return switch (opcode) {
-            case -1                 -> 0;
-            case LDC                -> {
+            case -1              -> 0;
+            case LDC             -> {
                 final Object cst = ((LdcInsnNode) insn).cst;
                 if (cst instanceof ConstantDynamic dynamic)
                     yield Type.getType(dynamic.getDescriptor()).getSize();
@@ -763,15 +774,15 @@ public interface ASMHelper {
                 yield 1;
             }
             case INVOKEVIRTUAL,
-                    INVOKESPECIAL,
-                    INVOKESTATIC,
-                    INVOKEINTERFACE -> argumentsAndReturnStackEffect(((MethodInsnNode) insn).desc, calcReturn) + Bytecodes.stackEffectOf(opcode);
-            case INVOKEDYNAMIC      -> argumentsAndReturnStackEffect(((InvokeDynamicInsnNode) insn).desc, calcReturn);
-            case GETSTATIC          -> Type.getType(((FieldInsnNode) insn).desc).getSize();
-            case PUTSTATIC          -> -Type.getType(((FieldInsnNode) insn).desc).getSize();
-            case GETFIELD           -> Type.getType(((FieldInsnNode) insn).desc).getSize() - 1;
-            case PUTFIELD           -> -Type.getType(((FieldInsnNode) insn).desc).getSize() - 1;
-            default                 -> Bytecodes.stackEffectOf(opcode);
+                 INVOKESPECIAL,
+                 INVOKESTATIC,
+                 INVOKEINTERFACE -> argumentsAndReturnStackEffect(((MethodInsnNode) insn).desc, calcReturn) + Bytecodes.stackEffectOf(opcode);
+            case INVOKEDYNAMIC   -> argumentsAndReturnStackEffect(((InvokeDynamicInsnNode) insn).desc, calcReturn);
+            case GETSTATIC       -> Type.getType(((FieldInsnNode) insn).desc).getSize();
+            case PUTSTATIC       -> -Type.getType(((FieldInsnNode) insn).desc).getSize();
+            case GETFIELD        -> Type.getType(((FieldInsnNode) insn).desc).getSize() - 1;
+            case PUTFIELD        -> -Type.getType(((FieldInsnNode) insn).desc).getSize() - 1;
+            default              -> Bytecodes.stackEffectOf(opcode);
         };
     }
     
@@ -793,9 +804,10 @@ public interface ASMHelper {
             ch = methodDescriptor.charAt(offset);
         }
         return calcReturn ? result + switch (methodDescriptor.charAt(offset + 1)) {
-            case 'V'      -> 0;
-            case 'J', 'D' -> 2;
-            default       -> 1;
+            case 'V' -> 0;
+            case 'J',
+                 'D' -> 2;
+            default  -> 1;
         } : result;
     }
     
@@ -881,10 +893,10 @@ public interface ASMHelper {
     
     static ClassNode newClassNode(final String name) = newClassNode(name, 0);
     
-    static void addBytecodeInfo(final Throwable target, final byte bytecode[]) = target.addSuppressed(new ExtraInformationThrowable("bytecode: \n%s".formatted(dumpBytecode(new ClassReader(bytecode)))));
+    static void addBytecodeInfo(final Throwable target, final byte bytecode[]) = target.addSuppressed(new ExtraInformationThrowable(STR."bytecode: \n\{dumpBytecode(new ClassReader(bytecode))}"));
     
     @SneakyThrows
-    static Class<?> loadType(final Type type, final boolean initialize, final @Nullable ClassLoader loader) = switch (type.getSort()) {
+    static Class<?> loadType(final Type type, final boolean initialize = false, final @Nullable ClassLoader loader) = switch (type.getSort()) {
         case Type.VOID    -> void.class;
         case Type.BOOLEAN -> boolean.class;
         case Type.BYTE    -> byte.class;
@@ -897,14 +909,14 @@ public interface ASMHelper {
         default           -> Class.forName(type.getSort() == Type.ARRAY ? type.getDescriptor().replace('/', '.') : type.getClassName(), initialize, loader);
     };
     
-    static Class<?>[] loadTypes(final Stream<Type> types, final boolean initialize, final @Nullable ClassLoader loader) = types.map(type -> loadType(type, false, loader)).toArray(Class<?>[]::new);
+    static Class<?>[] loadTypes(final Stream<Type> types, final boolean initialize = false, final @Nullable ClassLoader loader) = types.map(type -> loadType(type, false, loader)).toArray(Class<?>[]::new);
     
-    static MethodType loadMethodType(final String desc, final boolean initialize, final @Nullable ClassLoader loader) = MethodType.methodType(loadType(Type.getReturnType(desc), false, loader),
-            loadTypes(Stream.of(Type.getArgumentTypes(desc)), initialize, loader));
+    static MethodType loadMethodType(final String desc, final @Nullable ClassLoader loader)
+            = MethodType.methodType(loadType(Type.getReturnType(desc), false, loader), loadTypes(Stream.of(Type.getArgumentTypes(desc)), loader));
     
-    static MethodType loadMethodType(final Type methodType, final boolean initialize, final @Nullable ClassLoader loader) = loadMethodType(methodType.getDescriptor(), initialize, loader);
-    
-    static MethodType loadMethodType(final MethodNode methodNode, final boolean initialize, final @Nullable ClassLoader loader) = loadMethodType(methodNode.desc, initialize, loader);
+    @SneakyThrows
+    static java.lang.reflect.Method loadMethod(final Type owner, final String name, final String desc, final @Nullable ClassLoader loader)
+            = loadType(owner, loader).getDeclaredMethod(name, loadTypes(Stream.of(Type.getArgumentTypes(desc)), loader));
     
     static String forName(final Type type) = type.getSort() == Type.ARRAY ? type.getDescriptor().replace('/', '.') : type.getClassName();
     

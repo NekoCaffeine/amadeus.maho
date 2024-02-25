@@ -566,6 +566,8 @@ public class MethodGenerator extends MethodVisitor {
     
     public void invokeObject(final Method method) = invokeVirtual(ASMHelper.TYPE_OBJECT, method);
     
+    public void invokeUnsafe(final Method method) = invokeVirtual(ASMHelper.TYPE_UNSAFE, method);
+    
     public void invokeTarget(final java.lang.reflect.Method method, final boolean special = false) {
         final Type targetType = Type.getType(method.getDeclaringClass());
         final Method targetMethod = Method.getMethod(method);

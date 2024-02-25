@@ -150,7 +150,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     Environment environment = Environment.local();
     
     @Getter
-    final Sampler<String> sampler = MahoProfile.sampler(getClass().getCanonicalName() + "#" + name());
+    final Sampler<String> sampler = MahoProfile.sampler(STR."\{getClass().getCanonicalName()}#\{name()}");
     
     final ConcurrentLinkedQueue<RemapHandler> remapHandlers = { };
     
@@ -190,7 +190,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 return FieldTransformer.class;
             return BaseTransformer.class;
         }
-        throw new IllegalArgumentException(type + " is not assignable from " + BaseTransformer.class.getName());
+        throw new IllegalArgumentException(STR."\{type} is not assignable from \{BaseTransformer.class.getName()}");
     }
     
     public Class<? extends BaseTransformer> lookupTransformerType(final Member member) {
@@ -198,7 +198,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             return MethodTransformer.class;
         if (member instanceof Field)
             return FieldTransformer.class;
-        throw new IllegalArgumentException("Unknown type: " + member.getClass());
+        throw new IllegalArgumentException(STR."Unknown type: \{member.getClass()}");
     }
     
     public Stream<ClassTransformer> lookupTransformer(final @Nullable Class<?> clazz, final @Nullable ClassLoader loader, final String name) {
@@ -267,10 +267,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         private void logAddTransformer(final ClassTransformer transformer) {
             final String info;
             if (transformer instanceof Enum e)
-                info = e.getClass().getCanonicalName() + "#" + e.name();
+                info = STR."\{e.getClass().getCanonicalName()}#\{e.name()}";
             else
                 info = transformer.toString();
-            Maho.debug("AddTransform -> " + info);
+            Maho.trace(STR."AddTransform -> \{info}");
         }
         
         public <T extends BaseTransformer<?>> void addTransformerBase(final T transformer, final @Nullable ClassLoader loader) {
@@ -346,7 +346,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                     MethodType.methodType(void.class, TransformerManager.class, annotation.annotationType(), ClassNode.class, subNode.getClass()) :
                     MethodType.methodType(void.class, TransformerManager.class, annotation.annotationType(), ClassNode.class));
             return subNode != null ? (T) constructor.invoke(manager, annotation, node, subNode) : (T) constructor.invoke(manager, annotation, node);
-        }, subNode != null ? "%s#%s".formatted(node.name, subNode instanceof MethodNode methodNode ? methodNode.name + methodNode.desc : ((FieldNode) subNode).name) : node.name);
+        }, subNode != null ? STR."\{node.name}#\{subNode instanceof MethodNode methodNode ? methodNode.name + methodNode.desc : ((FieldNode) subNode).name}" : node.name);
         
         private static <T> T debugCall(final Supplier<T> supplier, final Function<Throwable, T> handler) { try { return supplier.get(); } catch (final Throwable throwable) { return handler.apply(throwable); } }
         
@@ -366,7 +366,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 final Class<? extends Annotation> annotationType = (Class<? extends Annotation>) info.load(false, loader);
                 for (final Class<? extends BaseTransformer<?>> handlerType : mark.value()) {
                     if (!BaseTransformer.class.isAssignableFrom(handlerType))
-                        throw new IncompatibleClassChangeError(handlerType + " is not an instance of " + BaseTransformer.class.getName());
+                        throw new IncompatibleClassChangeError(STR."\{handlerType} is not an instance of \{BaseTransformer.class.getName()}");
                     // Avoid the default values of these annotations from being loaded while the transformer is working and thus failing.
                     // Recursively triggering the transform when the transformer is working will result in not getting the target class bytecode(pass in a null pointer).
                     AnnotationHandler.initDefaultValue(annotationType);
@@ -477,7 +477,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         final boolean aot = this != runtime();
         if (!aot)
             addToInstrumentation();
-        Maho.debug("Setup start: " + debugInfo);
+        Maho.debug(STR."Setup start: \{debugInfo}");
         final Context context = { this, loader };
         try {
             final ResourcePath scanPath = path.sub(resourceTree -> {
@@ -491,10 +491,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             context.scan(scanPath, filter);
             context.setup(path, level, aot);
         } catch (final Throwable t) {
-            Maho.debug("Setup failed: " + debugInfo);
+            Maho.debug(STR."Setup failed: \{debugInfo}");
             t.printStackTrace();
             throw DebugHelper.breakpointBeforeThrow(t);
-        } finally { Maho.debug("Setup end: " + debugInfo); }
+        } finally { Maho.debug(STR."Setup end: \{debugInfo}"); }
     }
     
     public synchronized Context setupRuntimeClass(final Class<?> clazz, final ClassNode node = Maho.getClassNodeFromClass(clazz)) {
@@ -506,7 +506,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     }
     
     public List<ClassTransformer> debugClassTransformer(final int count = 0) {
-        final Map<String, Class> classes = Stream.of(Maho.instrumentation().getAllLoadedClasses()).collect(Collectors.toMap(Class::getName, Function.identity(), (a, b) -> a));
+        final Map<String, Class> classes = Stream.of(Maho.instrumentation().getAllLoadedClasses()).collect(Collectors.toMap(Class::getName, Function.identity(), (a, _) -> a));
         final ArrayList<ClassTransformer> result = { };
         final ClassNode fakeNode = { };
         write.lock();
@@ -551,10 +551,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             return result;
         } catch (final Throwable throwable) {
             transformers.stream()
-                    .map(transformer -> transformer instanceof Enum<?> e ? e.getClass().getCanonicalName() + "#" + e.name() : ObjectHelper.toString(transformer))
+                    .map(transformer -> transformer instanceof Enum<?> e ? STR."\{e.getClass().getCanonicalName()}#\{e.name()}" : ObjectHelper.toString(transformer))
                     .map(ExtraInformationThrowable::new)
                     .forEach(throwable::addSuppressed);
-            throwable.addSuppressed(new ExtraInformationThrowable("loader: %s, name: %s".formatted(loader, srcName)));
+            throwable.addSuppressed(new ExtraInformationThrowable(STR."loader: \{loader}, name: \{srcName}"));
             throwable.printStackTrace();
             throw TransformException.of(throwable).let(Maho::fatal);
         }
@@ -589,9 +589,9 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final @Nullable ClassNode result = transformer.transform(context, node, loader, clazz, domain);
             return result == null ? node : result;
         } catch (final Throwable throwable) {
-            Maho.error("Throwable in transform " + ASMHelper.sourceName(node.name) + " : " + transformer);
-            throwable.addSuppressed(new ExtraInformationThrowable("Class: " + ASMHelper.sourceName(node.name)));
-            throwable.addSuppressed(new ExtraInformationThrowable("Transformer: " + transformer.toString()));
+            Maho.error(STR."Throwable in transform \{ASMHelper.sourceName(node.name)} : \{transformer}");
+            throwable.addSuppressed(new ExtraInformationThrowable(STR."Class: \{ASMHelper.sourceName(node.name)}"));
+            throwable.addSuppressed(new ExtraInformationThrowable(STR."Transformer: \{transformer.toString()}"));
             throw DebugHelper.breakpointBeforeThrow(TransformException.of(throwable));
         }
     }
@@ -604,10 +604,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final AnnotationNode annotationNode = { Type.getDescriptor(Transformed.class) };
             node.visibleAnnotations == null ? node.visibleAnnotations = new LinkedList<>() : node.visibleAnnotations += annotationNode;
         }
-        try (final var handle = sampler().handle("MahoCompute")) { return context.compute().writer().toBytecode(node); }
+        try (final var _ = sampler()["MahoCompute"]) { return context.compute().writer().toBytecode(node); }
     }
     
-    public static void transform(final String name, final String text) = Maho.debug("Transform: <" + name + "> " + text);
+    public static void transform(final String name, final String text) = Maho.debug(STR."Transform: <\{name}> \{text}");
     
     public static final class DebugDumper {
         
@@ -649,12 +649,12 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 try {
                     ~dumpTargetPath;
                     final String stdName = (index == -1 ? name : name.substring(index + 1)).replace('/', '.');
-                    Files.write(dumpTargetPath / (stdName + ".class"), bytecode, options);
+                    Files.write(dumpTargetPath / STR."\{stdName}.class", bytecode, options);
                     final ByteArrayOutputStream output = { 1024 * 16 };
                     try {
                         ASMHelper.printBytecode(new ClassReader(bytecode), output);
                     } catch (final Throwable throwable) { DebugHelper.breakpoint(); }
-                    Files.write(dumpTargetPath / (stdName + ".bytecode"), output.toByteArray(), options);
+                    Files.write(dumpTargetPath / STR."\{stdName}.bytecode", output.toByteArray(), options);
                 } catch (final IOException e) { e.printStackTrace(); }
             }
         }

@@ -12,7 +12,7 @@ import com.sun.tools.javac.util.List;
 
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.javac.JavacContext;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.TransformProvider;
 
@@ -24,11 +24,11 @@ public class SneakyThrowsHandler {
     // Does not check for unsafe method calls in the domains marked by @SneakyThrows.
     @Hook
     private static Hook.Result markThrown(final Flow.FlowAnalyzer $this, final JCTree tree, final Type exc)
-        = Hook.Result.falseToVoid(tree instanceof JCTree.JCMethodInvocation || inSneakyThrowsMarkDomains(HandlerMarker.flowContext().stream()));
+        = Hook.Result.falseToVoid(tree instanceof JCTree.JCMethodInvocation || inSneakyThrowsMarkDomains(HandlerSupport.flowContext().stream()));
     
     // When in the domains marked by @SneakyThrows, the method reference is not thrown for type checking.
     @Hook
     private static Hook.Result checkExConstraints(final Attr $this, final List<Type> expr, final List<Type> type, final InferenceContext context)
-        = Hook.Result.falseToVoid(inSneakyThrowsMarkDomains(new ArrayList<>(HandlerMarker.attrContext()).stream()));
+        = Hook.Result.falseToVoid(inSneakyThrowsMarkDomains(new ArrayList<>(HandlerSupport.attrContext()).stream()));
     
 }

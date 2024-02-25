@@ -3,6 +3,7 @@ package amadeus.maho.util.link;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ClosedSelectorException;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -42,7 +43,7 @@ public class LinkEndpoint {
     @Setter
     transient boolean keepRunning;
     
-    transient @Nullable AbstractSelectableChannel channel;
+    transient @Nullable SelectableChannel channel;
     
     transient @Nullable CompletableFuture<Void> future;
     
@@ -56,6 +57,7 @@ public class LinkEndpoint {
         else
             protocol().link((channel = SocketChannel.open(address))
                     .configureBlocking(false)
+                    
                     .register(selector(), 0), endpoint);
         future = async(this::runLoop, newThreadExecutor(threadName));
     }

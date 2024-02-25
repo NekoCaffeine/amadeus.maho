@@ -26,17 +26,21 @@ import com.sun.tools.javac.util.Position;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.Default;
+import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
+import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
-import amadeus.maho.lang.javac.handler.base.HandlerMarker;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.function.FunctionHelper;
+import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.runtime.StreamHelper;
 
 import static com.sun.tools.javac.code.Flags.*;
@@ -112,47 +116,56 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
     @NoArgsConstructor
     public static class SyntheticConstructor extends JCTree.JCMethodDecl { }
     
+    @TransformProvider
+    @NoArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class DefaultInitExprNormalizer extends JavacContext {
+        
+        @Nullable List<JCTree.JCExpression> expressions;
+        
+        @Hook
+        private static void normalizeDefs_$Enter(final Gen $this, final List<JCTree> def, final Symbol.ClassSymbol symbol)
+                = instance(DefaultInitExprNormalizer.class).expressions
+                = def.stream().cast(JCTree.JCVariableDecl.class).filter(decl -> decl.init != null && hasAnnotation(decl.sym, Default.class)).map(decl -> decl.init).collect(List.collector());
+        
+        @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
+        private static void normalizeDefs_$Exit(final Gen $this, final List<JCTree> def, final Symbol.ClassSymbol symbol)
+                = instance(DefaultInitExprNormalizer.class).expressions
+                = null;
+        
+        private static List<JCTree.JCStatement> dropDefaultInitAssignment(final List<JCTree.JCStatement> initCode, final List<JCTree.JCExpression> expressions) = initCode.stream()
+                .filter(statement -> !(statement instanceof JCTree.JCExpressionStatement expr) || !(expr.expr instanceof JCTree.JCAssign assign) || expressions.stream().noneMatch(init -> init == assign.rhs))
+                .collect(List.collector());
+        
+        // Place the code of the code block after the automatically generated constructor.
+        @Hook
+        private static Hook.Result normalizeMethod(final Gen $this, final JCTree.JCMethodDecl methodDecl, final List<JCTree.JCStatement> initCode, final List<Attribute.TypeCompound> initTAs) {
+            if (methodDecl instanceof SyntheticConstructor) {
+                final ListBuffer<JCTree.JCStatement> buffer = { };
+                buffer.appendList(methodDecl.body.stats);
+                buffer.appendList(dropDefaultInitAssignment(initCode, ObjectHelper.requireNonNull(instance(DefaultInitExprNormalizer.class).expressions)));
+                methodDecl.body.stats = buffer.toList();
+                if (methodDecl.body.endpos == Position.NOPOS)
+                    methodDecl.body.endpos = TreeInfo.endPos(methodDecl.body.stats.last());
+                methodDecl.sym.appendUniqueTypeAttributes(initTAs);
+                return Hook.Result.NULL;
+            }
+            return Hook.Result.VOID;
+        }
+        
+    }
+    
     @Hook
     private static void visitAssign(final Gen $this, final JCTree.JCAssign assign) {
         if (symbol(TreeInfo.skipParens(assign.lhs)) instanceof Symbol.VarSymbol varSymbol && varSymbol.getConstValue() != null)
             varSymbol.setData(null);
     }
     
-    private static final ThreadLocal<List<JCTree.JCExpression>> defaultInitExpr = { };
-    
-    @Hook
-    private static void normalizeDefs_$Enter(final Gen $this, final List<JCTree> def, final Symbol.ClassSymbol symbol)
-            = defaultInitExpr.set(def.stream().cast(JCTree.JCVariableDecl.class).filter(decl -> decl.init != null && hasAnnotation(decl.sym, Default.class)).map(decl -> decl.init).collect(List.collector()));
-    
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
-    private static void normalizeDefs_$Exit(final Gen $this, final List<JCTree> def, final Symbol.ClassSymbol symbol) = defaultInitExpr.set(null);
-    
-    private static List<JCTree.JCStatement> dropDefaultInitAssignment(final List<JCTree.JCStatement> initCode) = initCode.stream()
-            .filter(statement -> !(statement instanceof JCTree.JCExpressionStatement expr) || !(expr.expr instanceof JCTree.JCAssign assign) || defaultInitExpr.get().stream().noneMatch(init -> init == assign.rhs))
-            .collect(List.collector());
-    
-    // Place the code of the code block after the automatically generated constructor.
-    @Hook
-    private static Hook.Result normalizeMethod(final Gen $this, final JCTree.JCMethodDecl methodDecl, final List<JCTree.JCStatement> initCode, final List<Attribute.TypeCompound> initTAs) {
-        if (methodDecl instanceof SyntheticConstructor) {
-            methodDecl.body.stats = new ListBuffer<JCTree.JCStatement>().let(it -> {
-                it.appendList(methodDecl.body.stats);
-                it.appendList(dropDefaultInitAssignment(initCode));
-            }).toList();
-            if (methodDecl.body.endpos == Position.NOPOS)
-                methodDecl.body.endpos = TreeInfo.endPos(methodDecl.body.stats.last());
-            methodDecl.sym.appendUniqueTypeAttributes(initTAs);
-            return Hook.Result.NULL;
-        }
-        return Hook.Result.VOID;
-    }
-    
     // Solve the misjudgment that may occur after the last hook.
     @Hook
     private static Hook.Result checkInit(final Flow.AssignAnalyzer $this, final JCDiagnostic.DiagnosticPosition pos, final Symbol.VarSymbol symbol)
-    = Hook.Result.falseToVoid(symbol.owner instanceof Symbol.ClassSymbol && noneMatch(symbol.flags_field, STATIC) && instance(HandlerMarker.class).baseHandlers().stream()
-            .filter(ConstructorHandler.class::isInstance)
-            .map(ConstructorHandler.class::cast)
+    = Hook.Result.falseToVoid(symbol.owner instanceof Symbol.ClassSymbol && noneMatch(symbol.flags_field, STATIC) && instance(HandlerSupport.class).baseHandlers().stream()
+            .cast(ConstructorHandler.class)
             .filter(handler -> handler.include(symbol))
             .allMatch(handler -> handler.initializedField(symbol)));
     
@@ -172,7 +185,7 @@ public abstract class ConstructorHandler<A extends Annotation> extends BaseHandl
     public boolean initializedField(final Symbol.VarSymbol symbol) = true;
     
     public boolean include(final Symbol.VarSymbol symbol) {
-        final Env<AttrContext> env = typeEnvs().get(symbol.owner);
+        final Env<AttrContext> env = (Privilege) typeEnvs.get((Symbol.TypeSymbol) symbol.owner);
         return env != null && marker.hasAnnotation(env.enclClass.mods, env, handler().value());
     }
     

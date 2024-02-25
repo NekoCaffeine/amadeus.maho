@@ -81,7 +81,7 @@ public interface ReferenceCollector {
     default <K, V> ConcurrentWeakIdentityHashMap.Managed<K, V> makeManagedConcurrentWeakIdentityHashMap(final int initialCapacity = 1, final float loadFactor = 0.75F, final int concurrencyLevel = 1)
             = manage(new ConcurrentWeakIdentityHashMap.Managed<>(initialCapacity, loadFactor, concurrencyLevel));
     
-    default <K> ConcurrentWeakIdentityHashSet<K> makeManagedConcurrentWeakIdentityHashSet(final int initialCapacity = 1, final float loadFactor = 0.75F, final int concurrencyLevel = 1)
+    default <K> ConcurrentWeakIdentityHashSet.Managed<K> makeManagedConcurrentWeakIdentityHashSet(final int initialCapacity = 1, final float loadFactor = 0.75F, final int concurrencyLevel = 1)
             = { makeManagedConcurrentWeakIdentityHashMap(initialCapacity, loadFactor, concurrencyLevel) };
     
     static <T> void collect(final ReferenceQueue<T> referenceQueue, final Consumer<? super Reference<? extends T>> consumer) {

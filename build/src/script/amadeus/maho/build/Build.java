@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import jdk.internal.loader.BuiltinClassLoader;
@@ -75,7 +74,7 @@ public interface Build {
             }
         } : _ -> { });
         final Map<String, Jar.Result> pack = Jar.pack(workspace, module, Jar.manifest(Main.class.getCanonicalName(), new Jar.Agent(Maho.class.getCanonicalName())));
-        final Path modulesDir = workspace.output(Jar.MODULES_DIR, module), targetDir = aot ? ~workspace.output("aot-" + Jar.MODULES_DIR, module) : modulesDir;
+        final Path modulesDir = workspace.output(Jar.MODULES_DIR, module), targetDir = aot ? ~workspace.output(STR."aot-\{Jar.MODULES_DIR}", module) : modulesDir;
         if (aot)
             AOTTransformer.transform(modulesDir, targetDir);
         return Distributive.zip(workspace, module, root -> {
@@ -95,12 +94,13 @@ public interface Build {
     static Path aotBuild() = build(true);
     
     static void push(final Path build = build()) {
-        System.out.println("Push: %s".formatted(build.toAbsolutePath() | "/"));
+        System.out.println(STR."Push: \{build.toAbsolutePath() | "/"}");
         final Path path = Maho.jar(), home = Files.isRegularFile(path) ? -+-path :
                 Optional.ofNullable(System.getenv("MAHO_HOME")).map(Path::of).orElseThrow(() -> new IllegalStateException("Environment variable 'MAHO_HOME' is missing"));
         Shell.Context.standardJavaFileManager().close();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             ((Privilege) ((BuiltinClassLoader) Maho.class.getClassLoader()).moduleToReader).values().forEach(ModuleReader::close); // Unlock 'modules'
+            // Class loading is disabled from here
             FileHelper.retryWhenIOE(() -> {
                 if (Files.isRegularFile(path) && !Files.isDirectory(home / "modules"))
                     build | root -> root / "modules" >> --+-path;
@@ -143,12 +143,19 @@ public interface Build {
                 map.put(pair[0].trim(), pair[1].trim());
         });
         map[type] = build.getFileName().toString();
-        Files.writeString(mark, map.entrySet().stream().map(entry -> "%s: %s".formatted(entry.getKey(), entry.getValue())).collect(Collectors.joining("\n")));
+        Files.writeString(mark, map.entrySet().stream().map(entry -> STR."\{entry.getKey()}: \{entry.getValue()}").collect(Collectors.joining("\n")));
         push(build);
     }
     
     int debugPort = 36768;
     
-    static Process debug(final List<String> args = List.of()) = workspace.run(module, debugPort, args);
+    List<String> defaultArgs = List.of("-XX:+EnableDynamicAgentLoading", STR."-XX:CICompilerCount=\{Runtime.getRuntime().availableProcessors()}", "-XX:CompileThresholdScaling=0.05");
+    
+    static Process debug(final List<String> args = defaultArgs) = workspace.run(module, debugPort, args);
+    
+    static void bootstrap(final boolean aot = true) {
+        build(aot);
+        debug();
+    }
     
 }
