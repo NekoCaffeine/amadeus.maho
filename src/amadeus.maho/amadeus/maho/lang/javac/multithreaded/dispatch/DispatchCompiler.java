@@ -273,8 +273,8 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     public synchronized void close() {
         super.close();
         if (!shutdown) {
-            shutdown = true;
             barrier(null);
+            shutdown = true;
         }
     }
     
