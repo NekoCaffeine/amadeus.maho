@@ -25,6 +25,7 @@ import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.function.FunctionHelper;
+import amadeus.maho.util.runtime.DebugHelper;
 
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.Kind.*;
@@ -236,6 +237,8 @@ public class ConcurrentSymtab extends Symtab {
                             return retry;
                         final Symbol.ClassSymbol loadingClassSymbol = defineClass(Convert.shortName(flatname), packageSymbol);
                         final ClassLoading loading = ClassLoading.instance(JavacContext.instance().context);
+                        if (loading.flatName != null)
+                            DebugHelper.breakpoint();
                         loading.moduleSymbol = moduleSymbol;
                         loading.flatName = flatname;
                         loading.loadingClassSymbol = loadingClassSymbol;

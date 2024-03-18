@@ -36,11 +36,11 @@ public interface ClassHelper {
         } catch (final Throwable ex) { return (T) lookup.findConstructor($this, MethodType.methodType(void.class)).invoke(); }
     }
     
-    static @Nullable Class<?> tryLoad(final String name, final boolean initialize = true, final ClassLoader loader = CallerContext.caller().getClassLoader()) {
+    static @Nullable Class<?> tryLoad(final ClassLoader loader = CallerContext.caller().getClassLoader(), final String name, final boolean initialize = true) {
         try { return Class.forName(name, initialize, loader); } catch (final ClassNotFoundException e) { return null; }
     }
     
-    static @Nullable Class<?> fastLookup(final @Nullable ClassLoader loader, final String name) = fastLookupLocal[loader].computeIfAbsent(name, it -> tryLoad(name, true, loader));
+    static @Nullable Class<?> fastLookup(final @Nullable ClassLoader loader, final String name) = fastLookupLocal[loader].computeIfAbsent(name, it -> tryLoad(loader, name, true));
     
     @Getter
     @SneakyThrows

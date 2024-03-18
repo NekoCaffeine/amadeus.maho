@@ -53,16 +53,16 @@ public interface Github extends HttpApi {
         @Default
         String tag_name;
         
-        @Default
         // Specifies the commitish value that determines where the Git tag is created from. Can be any branch or commit SHA. Unused if the Git tag already exists. Default: the repository's default branch (usually master).
+        @Default
         String target_commitish;
         
-        @Default
         // The name of the release.
+        @Default
         String name;
         
-        @Default
         // Text describing the contents of the tag.
+        @Default
         String body;
         
         // true to create a draft (unpublished) release, false to create a published one. Default: false
@@ -107,7 +107,7 @@ public interface Github extends HttpApi {
     default Owner owner(final String owner) = { this, owner };
     
     static HttpSetting authorization(final String token = Environment.local().lookup("amadeus.maho.github.token", DebugHelper.breakpointWhenDebug("<missing>")))
-            = { HttpSetting.withBaseHeaders(Map.of(HttpHelper.Header.Authorization, "Bearer " + token)) };
+            = { HttpSetting.withBaseHeaders(Map.of(HttpHelper.Header.Authorization, STR."Bearer \{token}")) };
     
     static Github make(final HttpSetting setting = authorization()) = HttpApi.make(setting, adapter);
     

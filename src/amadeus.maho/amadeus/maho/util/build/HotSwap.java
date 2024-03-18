@@ -3,20 +3,37 @@ package amadeus.maho.util.build;
 import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Member;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.ProtectionDomain;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
+
 import amadeus.maho.core.Maho;
 import amadeus.maho.core.MahoExport;
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.transform.TransformerManager;
+import amadeus.maho.util.bytecode.ASMHelper;
+import amadeus.maho.util.bytecode.ClassWriter;
 import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.logging.LogLevel;
 import amadeus.maho.vm.JDWP;
@@ -28,7 +45,8 @@ public interface HotSwap {
     
     interface Logger {
         
-        @Nullable BiConsumer<LogLevel, String> logger = MahoExport.logger()?.namedLogger("HotSwap") ?? null;
+        @Nullable
+        BiConsumer<LogLevel, String> logger = MahoExport.logger()?.namedLogger("HotSwap") ?? null;
         
     }
     
@@ -40,6 +58,43 @@ public interface HotSwap {
                 Logger.logger.accept(LogLevel.TRACE, STR."HotSwap: \{(last[0] = clazz).getName()} \{STR."(\{loader})"}");
             return null;
         }
+        
+    }
+    
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+    class ClassModifiersFixer extends ClassVisitor {
+        
+        Class<?> source;
+        
+        Map<String, Member> memberMap = Stream.of(source.getDeclaredFields(), source.getDeclaredConstructors(), source.getDeclaredMethods())
+                .flatMap(Stream::of)
+                .collect(Collectors.toMap(member -> switch (member) {
+                    case Field field                -> field.getName();
+                    case Constructor<?> constructor -> ASMHelper.METHOD_INIT_ + Type.getConstructorDescriptor(constructor);
+                    case Method method              -> method.getName() + Type.getMethodDescriptor(method);
+                    default                         -> throw new IllegalStateException(STR."Unexpected value: \{member}");
+                }, Function.identity()));
+        
+        @Override
+        public void visit(final int version, final int access, final String name, final String signature, final String superName, final String[] interfaces)
+                = super.visit(version, ASMHelper.changeAccess(access, source.getModifiers()), name, signature, superName, interfaces);
+        
+        @Override
+        public FieldVisitor visitField(final int access, final String name, final String descriptor, final String signature, final Object value)
+                = super.visitField(fixAccessModifiers(name, access), name, descriptor, signature, value);
+        
+        @Override
+        public MethodVisitor visitMethod(final int access, final String name, final String descriptor, final String signature, final String[] exceptions)
+                = super.visitMethod(fixAccessModifiers(name + descriptor, access), name, descriptor, signature, exceptions);
+        
+        private int fixAccessModifiers(final String identity, final int access) {
+            final @Nullable Member member = memberMap[identity];
+            return member == null ? access : ASMHelper.changeAccess(access, member.getModifiers());
+        }
+        
+        public static byte[] fixModifiers(final Class<?> target, final byte bytecode[])
+                = ClassWriter.toBytecode(writer -> ASMHelper.newClassReader(bytecode).accept(new ClassModifiersFixer(MahoExport.asmAPIVersion(), writer, target), 0));
         
     }
     
@@ -100,7 +155,8 @@ public interface HotSwap {
                                                     final String name = loadedClass.getName();
                                                     final @Nullable Path path = map[name];
                                                     if (path != null) {
-                                                        final ClassDefinition definition = { loadedClass, Files.readAllBytes(path) };
+                                                        // avoid `java.lang.UnsupportedOperationException: class redefinition failed: attempted to change the class modifiers`
+                                                        final ClassDefinition definition = { loadedClass, ClassModifiersFixer.fixModifiers(loadedClass, Files.readAllBytes(path)) };
                                                         return definition;
                                                     }
                                                     return null;
@@ -111,8 +167,16 @@ public interface HotSwap {
                                         instrumentation.addTransformer(spy, true);
                                         try {
                                             instrumentation.redefineClasses(definitions);
-                                            final JDWP.IDECommand.Notification notification = { INFORMATION, "HotSwap successful", STR."reloaded \{definitions.length} classes" };
-                                            JDWP.MessageQueue.notify(notification, Logger.logger);
+                                            {
+                                                final JDWP.IDECommand.Notification notification = { INFORMATION, "HotSwap successful", STR."reloaded \{definitions.length} classes" };
+                                                JDWP.MessageQueue.notify(notification, Logger.logger);
+                                            }
+                                            try {
+                                                TransformerManager.runtime().redefine(definitions);
+                                            } catch (final Throwable throwable) {
+                                                final JDWP.IDECommand.Notification notification = { WARNING, "HotSwap retransform failed", STR."\{throwable.getClass().getName()}: \{throwable.getMessage()}" };
+                                                JDWP.MessageQueue.notify(notification, Logger.logger);
+                                            }
                                         } catch (final Throwable throwable) {
                                             final JDWP.IDECommand.Notification notification = { WARNING, "HotSwap redefine failed", STR."\{throwable.getClass().getName()}: \{throwable.getMessage()}, class: \{spy.last()[0]}" };
                                             JDWP.MessageQueue.notify(notification, Logger.logger);

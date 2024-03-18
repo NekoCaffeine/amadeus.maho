@@ -39,6 +39,8 @@ import static amadeus.maho.util.build.Javac.*;
 
 public class Main {
     
+    public static final String COMPILED_SCRIPT_DIR = "compiled-script";
+    
     private static final Map<String, String> inlineArgMapping = Map.of(".", "/exit");
     
     private static void init() {
@@ -62,7 +64,7 @@ public class Main {
         final int exitCode;
         final Path scriptDir = Path.of("build", "src", "script");
         if (Files.isDirectory(scriptDir)) {
-            final Path scriptOutputPath = ~--Path.of("build", "compiled-script");
+            final Path scriptOutputPath = ~--Path.of("build", COMPILED_SCRIPT_DIR);
             final String scriptOutputDir = scriptOutputPath.toRealPath().toString();
             final List<Path> paths = Files.walk(scriptDir).filter(javaFileMatcher()::matches).toList();
             final List<String> options = new ArrayList<>(runtimeOptions(false)).let(list -> {

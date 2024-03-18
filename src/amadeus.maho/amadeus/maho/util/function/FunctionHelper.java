@@ -11,7 +11,11 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.Default;
 import amadeus.maho.lang.Extension;
+import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 
@@ -66,6 +70,31 @@ public interface FunctionHelper {
         
     }
     
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    class LazySupplier<T> implements Supplier<T> {
+        
+        /* non-volatile */ @Nullable T instance;
+        
+        @Default
+        volatile @Nullable Supplier<T> supplier;
+        
+        @Override
+        public T get() {
+            if (supplier != null) // acquire
+                synchronized (this) {
+                    if (supplier != null) {
+                        instance = supplier.get(); // happen-before
+                        supplier = null; // release
+                    }
+                }
+            return instance;
+        }
+        
+    }
+    
+    static <T> LazySupplier<T> lazy(final Supplier<T> supplier) = { supplier };
+    
     @SafeVarargs
     static <T> void always(final Consumer<T> consumer, final T... ts) = Stream.of(ts).forEach(consumer);
     
@@ -103,18 +132,6 @@ public interface FunctionHelper {
     static <T> Consumer<T> abandon() = _ -> { };
     
     static <T, R> Function<T, R> cast() = (Function<T, R>) Function.identity();
-    
-    static <T> Supplier<T> lazy(final Supplier<T> supplier) {
-        final boolean p_flag[] = { false };
-        final Object p_value[] = { null };
-        return () -> {
-            if (!p_flag[0]) {
-                p_value[0] = supplier.get();
-                p_flag[0] = true;
-            }
-            return (T) p_value[0];
-        };
-    }
     
     static <T> Predicate<T> count(final int count) {
         final int p_count[] = { count };

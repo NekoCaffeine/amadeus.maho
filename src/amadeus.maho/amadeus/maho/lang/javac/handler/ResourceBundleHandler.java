@@ -51,7 +51,9 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     @Override
     public void processClass(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final JCTree owner, final ResourceBundle annotation, final JCTree.JCAnnotation annotationTree, final boolean advance)
-            = instance(DelayedContext.class).todos() += () -> {
+            = instance(DelayedContext.class).todos() += _ -> instance(ResourceBundleHandler.class).process(env, tree, annotation, annotationTree, advance);
+    
+    private void process(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final ResourceBundle annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
         final Path location = location(annotation);
         if (Files.isDirectory(location)) {
             final FieldDefaultsHandler fieldDefaultsHandler = instance(FieldDefaultsHandler.class);
@@ -119,7 +121,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
                 log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "resource.bundle.ioe", e.getMessage()));
             }
         }
-    };
+    }
     
     protected boolean shouldHandle(final Path path, final ResourceAgent agentAnnotation) = ArrayHelper.contains(agentAnnotation.types(), Files.isDirectory(path) ? ResourceAgent.Type.DIRECTORY : ResourceAgent.Type.FILE);
     

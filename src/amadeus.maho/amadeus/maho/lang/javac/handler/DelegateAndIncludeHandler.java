@@ -244,14 +244,14 @@ public class DelegateAndIncludeHandler extends BaseSyntaxHandler {
     private static void importAll(final Scope.StarImportScope $this, final Types types, final Scope origin, final Scope.ImportFilter filter, final JCTree.JCImport imp,
             final BiConsumer<JCTree.JCImport, Symbol.CompletionFailure> cfHandler) {
         if (origin.owner instanceof Symbol.ClassSymbol)
-            instance(DelayedContext.class).todos() += () -> includeTypes(origin).forEach(include -> $this.prependSubScope(new Scope.FilterImportScope(types, include, null, filter, imp, cfHandler)));
+            instance(DelayedContext.class).todos() += _ -> includeTypes(origin).forEach(include -> { synchronized ($this) { $this.prependSubScope(new Scope.FilterImportScope(types, include, null, filter, imp, cfHandler)); }});
     }
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void importByName(final Scope.NamedImportScope $this, final Types types, final Scope origin, final Name name, final Scope.ImportFilter filter, final JCTree.JCImport imp,
-            final BiConsumer<JCTree.JCImport, Symbol.CompletionFailure> cfHandler) = instance(DelayedContext.class).todos() += () -> includeTypes(origin)
+            final BiConsumer<JCTree.JCImport, Symbol.CompletionFailure> cfHandler) = instance(DelayedContext.class).todos() += _ -> includeTypes(origin)
                     .map(include -> new Scope.FilterImportScope(types, include, name, filter, imp, cfHandler))
-                    .forEach(scope -> (Privilege) $this.appendScope(scope, name));
+                    .forEach(scope -> { synchronized ($this) { (Privilege) $this.appendScope(scope, name); }});
     
     @Hook(at = @At(insn = @At.Insn(opcode = IRETURN), offset = 1, ordinal = 0), before = false)
     private static Hook.Result checkTypeContainsImportableElement(final Check $this, final Symbol.TypeSymbol symbol, final Symbol.TypeSymbol origin, final Symbol.PackageSymbol pkg, final Name name, final Set<Symbol> processed)

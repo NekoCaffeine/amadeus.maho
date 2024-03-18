@@ -21,6 +21,7 @@ import amadeus.maho.util.depend.Project;
 import amadeus.maho.util.depend.Repository;
 import amadeus.maho.util.depend.maven.MavenRepository;
 import amadeus.maho.util.link.http.HttpSetting;
+import amadeus.maho.util.shell.Main;
 import amadeus.maho.util.tuple.Tuple2;
 
 import static amadeus.maho.util.concurrent.AsyncHelper.*;
@@ -32,9 +33,9 @@ public interface IDEA {
         
         String
                 JetBrains           = "https://www.jetbrains.com/",
-                INTELLIJ_REPOSITORY = JetBrains + "intellij-repository/",
-                SNAPSHOTS           = INTELLIJ_REPOSITORY + "snapshots/",
-                RELEASES            = INTELLIJ_REPOSITORY + "releases/";
+                INTELLIJ_REPOSITORY = STR."\{JetBrains}intellij-repository/",
+                SNAPSHOTS           = STR."\{INTELLIJ_REPOSITORY}snapshots/",
+                RELEASES            = STR."\{INTELLIJ_REPOSITORY}releases/";
         
         static Repository.Combined repository(final Path cacheDir = Repository.defaultCachePath() / "intellij", final HttpSetting setting = HttpSetting.defaultInstance())
                 = { new Repository[] { new MavenRepository(cacheDir, SNAPSHOTS, setting, true, true), new MavenRepository(cacheDir, RELEASES, setting, true, false) } };
@@ -42,7 +43,7 @@ public interface IDEA {
         @SneakyThrows
         static LinkedHashSet<Module.Dependency> attachLocalInstance(final Path instanceHome, final Set<String> plugins = Set.of(), final Predicate<Path> shouldInCompile = path -> true,
                 final Tuple2<String, String> metadata = inferInstanceMetadata(instanceHome), final Path sources = resolveSources(repository(), metadata)) = Stream.concat(
-                        Stream.of(new Module.DependencySet("IntelliJ IDEA %s-%s".formatted(metadata.v1, metadata.v2), Files.list(instanceHome / "lib")
+                        Stream.of(new Module.DependencySet(STR."IntelliJ IDEA \{metadata.v1}-\{metadata.v2}", Files.list(instanceHome / "lib")
                                 .filter(Files::isRegularFile)
                                 .filter(path -> path.getFileName().toString().endsWith(Jar.SUFFIX))
                                 .map(path -> new Module.SingleDependency(path, sources, null, shouldInCompile.test(path)))
@@ -55,7 +56,7 @@ public interface IDEA {
                                 .flatMap(predicate -> Files.list(instanceHome / "plugins")
                                         .filter(Files::isDirectory)
                                         .filter(path -> predicate.test(path.getFileName().toString()))
-                                        .map(pluginDir -> new Module.DependencySet("IntelliJ IDEA Built-in Plugin [%s]".formatted(pluginDir.getFileName()), Files.list(pluginDir / "lib")
+                                        .map(pluginDir -> new Module.DependencySet(STR."IntelliJ IDEA Built-in Plugin [\{pluginDir.getFileName()}]", Files.list(pluginDir / "lib")
                                                 .filter(Files::isRegularFile)
                                                 .filter(path -> path.getFileName().toString().endsWith(Jar.SUFFIX))
                                                 .map(path -> new Module.SingleDependency(path, sources, null, shouldInCompile.test(path)))
@@ -77,8 +78,8 @@ public interface IDEA {
         static Path resolveSources(final Repository repository, final Tuple2<String, String> metadata, final LinkedHashSet<String> record = { }, final String... suffix = { "-EAP-CANDIDATE-SNAPSHOT", "-EAP-SNAPSHOT", "" })
                 = (record.add(metadata.v2) ? Stream.of(suffix).map(it -> tryResolveSources(repository, metadata, it)).nonnull().findFirst()
                 .or(() -> Optional.ofNullable(resolveSources(repository, lowAdaptive(metadata), record, suffix))) : Optional.<Path>empty())
-                .orElseThrow(() -> new IOException("Cannot be resolved from the following archives." + record.stream().map(
-                        it -> "com.jetbrains.intellij.idea:idea%s:%s:sources".formatted(metadata.v1, it)).collect(Collectors.joining("\n    ", "\n    ", ""))));
+                .orElseThrow(() -> new IOException(STR."Cannot be resolved from the following archives.\{record.stream().map(
+                        it -> STR."com.jetbrains.intellij.idea:idea\{metadata.v1}:\{it}:sources").collect(Collectors.joining("\n    ", "\n    ", ""))}"));
         
         static Tuple2<String, String> lowAdaptive(final Tuple2<String, String> metadata) {
             final String args[] = metadata.v2.split("\\.");
@@ -89,7 +90,7 @@ public interface IDEA {
         
         static @Nullable Path tryResolveSources(final Repository repository, final Tuple2<String, String> metadata, final String suffix) {
             try {
-                final Project.Dependency dependency = { Project.of("com.jetbrains.intellij.idea:idea%s:%s%s:sources".formatted(metadata.v1, metadata.v2, suffix)) };
+                final Project.Dependency dependency = { Project.of(STR."com.jetbrains.intellij.idea:idea\{metadata.v1}:\{metadata.v2}\{suffix}:sources") };
                 final Module.SingleDependency result = repository.resolveModuleDependency(dependency, JarRequirements.ONLY_CLASSES);
                 return result.classes();
             } catch (final IOException e) { return null; }
@@ -113,14 +114,14 @@ public interface IDEA {
         
     }
     
-    record ModuleMetadata(String jdkVersion, boolean preview = true, String languageLevel = "JDK_" + jdkVersion, String jdkType = SDK_JAVA) { }
+    record ModuleMetadata(String jdkVersion, boolean preview = true, String languageLevel = STR."JDK_\{jdkVersion}", String jdkType = SDK_JAVA) { }
     
     String
             IDEA               = ".idea",
             LIBRARIES          = "libraries",
             IML                = ".iml",
-            MODULES_XML        = "modules" + SUFFIX,
-            MISC_XML           = "misc" + SUFFIX,
+            MODULES_XML        = STR."modules\{SUFFIX}",
+            MISC_XML           = STR."misc\{SUFFIX}",
             NAME_URL           = "url",
             NAME_TYPE          = "type",
             NAME_NAME          = "name",
@@ -167,8 +168,11 @@ public interface IDEA {
             writer.visitTag(TAG_CONTENT, () -> {
                 writer.visitEmptyTag(TAG_SOURCE_FOLDER, Map.of(NAME_URL, FILE + MODULE_DIR + (location | "/"), "isTestSource", "false"));
                 if (module.path().toString().isEmpty()) {
-                    writer.visitEmptyTag(TAG_EXCLUDE_FOLDER, Map.of(NAME_URL, FILE + MODULE_DIR + IDEA));
-                    writer.visitEmptyTag(TAG_EXCLUDE_FOLDER, Map.of(NAME_URL, FILE + MODULE_DIR + IDEA + "/" + (workspace.outputDir() | "/")));
+                    writer.visitEmptyTag(TAG_EXCLUDE_FOLDER, Map.of(NAME_URL, STR."\{FILE}\{MODULE_DIR}\{IDEA}"));
+                    writer.visitEmptyTag(TAG_EXCLUDE_FOLDER, Map.of(NAME_URL, STR."\{FILE}\{MODULE_DIR}\{workspace.buildOutputDir() | "/"}"));
+                    writer.visitEmptyTag(TAG_EXCLUDE_FOLDER, Map.of(NAME_URL, STR."\{FILE}\{MODULE_DIR}\{workspace.buildDir() / Main.COMPILED_SCRIPT_DIR | "/"}"));
+                    writer.visitEmptyTag(TAG_EXCLUDE_FOLDER, Map.of(NAME_URL, STR."\{FILE}\{MODULE_DIR}\{workspace.buildDir() / Distributive.DISTRIBUTIVE_DIR | "/"}"));
+                    Gitignore.listDir(workspace.root()).forEach(dir -> writer.visitEmptyTag(TAG_EXCLUDE_FOLDER, Map.of(NAME_URL, STR."\{FILE}\{MODULE_DIR}\{dir | "/"}")));
                 }
             }, ATTR_CONTENT);
             writer.visitEmptyTag(TAG_ORDER_ENTRY, metadata == null ? ATTR_INHERITED_JDK : Map.of(NAME_TYPE, "inheritedJdk", "jdkName", metadata.jdkVersion, "jdkType", metadata.jdkType));
@@ -181,7 +185,7 @@ public interface IDEA {
             });
             module.dependencyModules().forEach(dependencyModule -> writer.visitEmptyTag(TAG_ORDER_ENTRY, Map.of(NAME_TYPE, TAG_MODULE, "module-name", dependencyModule.name(), "exported", "")));
         }, metadata == null ? ATTR_NEW_MODULE_ROOT_MANAGER : Map.of(NAME_NAME, "NewModuleRootManager", "LANGUAGE_LEVEL", metadata.preview ?
-                metadata.languageLevel + "_PREVIEW" : metadata.languageLevel, "inherit-compiler-output", "true")), ATTR_MODULE);
+                STR."\{metadata.languageLevel}_PREVIEW" : metadata.languageLevel, "inherit-compiler-output", "true")), ATTR_MODULE);
         writer >> ~(workspace.root() / module.path()) / (name + IML);
     });
     
@@ -199,7 +203,7 @@ public interface IDEA {
     
     private static void writeLibrary(final Writer writer, final String tag, final Path path) = writer.visitTag(tag, () -> writeRoot(writer, path));
     
-    private static void writeRoot(final Writer writer, final Path path, final @Nullable String next = null) = writer.visitEmptyTag(TAG_ROOT, Map.of(NAME_URL, "jar://%s!/%s".formatted(path | "/", next != null ? next + "/" : "")));
+    private static void writeRoot(final Writer writer, final Path path, final @Nullable String next = null) = writer.visitEmptyTag(TAG_ROOT, Map.of(NAME_URL, STR."jar://\{path | "/"}!/\{next != null ? STR."\{next}/" : ""}"));
     
     private static void writeLibraries(final Writer writer, final String tag, final Stream<Path> paths, final @Nullable String next = null) = writer.visitTag(tag, () -> paths.forEach(path -> writeRoot(writer, path, next)));
     
@@ -213,14 +217,14 @@ public interface IDEA {
         writer >> ~(workspace.root() / IDEA) / MODULES_XML;
     }
     
-    static void generateMisc(final Workspace workspace, final String jdkVersion, final boolean preview = false, final String languageLevel = "JDK_" + jdkVersion, final String jdkType = SDK_JAVA) {
+    static void generateMisc(final Workspace workspace, final String jdkVersion, final boolean preview = false, final String languageLevel = STR."JDK_\{jdkVersion}", final String jdkType = SDK_JAVA) {
         final Writer writer = { };
         writer.visitDeclaration();
         writer.visitTag(TAG_PROJECT, () -> writer.visitTag(TAG_COMPONENT, () -> writer.visitEmptyTag(TAG_OUTPUT, Map.of(NAME_URL, FILE + PROJECT_DIR + (workspace.output("classes") | "/"))),
                 Map.of(
                         NAME_NAME, "ProjectRootManager",
                         NAME_VERSION, "2",
-                        "languageLevel", preview ? languageLevel + "_PREVIEW" : languageLevel,
+                        "languageLevel", preview ? STR."\{languageLevel}_PREVIEW" : languageLevel,
                         "default", "false",
                         "project-jdk-name", jdkVersion,
                         "project-jdk-type", jdkType
@@ -247,7 +251,7 @@ public interface IDEA {
     }
     
     static void generateAll(final Workspace workspace, final String jdkVersion, final boolean preview = false, final Collection<Module> modules, final Map<Module, ModuleMetadata> metadataMap = Map.of(),
-            final String languageLevel = "JDK_" + jdkVersion, final String jdkType = SDK_JAVA)
+            final String languageLevel = STR."JDK_\{jdkVersion}", final String jdkType = SDK_JAVA)
             = await(Stream.concat(Stream.of(
                     async(() -> generateModules(workspace, modules)),
                     async(() -> generateMisc(workspace, jdkVersion, preview, languageLevel, jdkType)),

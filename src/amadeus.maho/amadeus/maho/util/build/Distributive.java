@@ -15,10 +15,12 @@ import amadeus.maho.util.runtime.DebugHelper;
 import static amadeus.maho.util.concurrent.AsyncHelper.*;
 
 public interface Distributive {
+    
+    String DISTRIBUTIVE_DIR = "distributive";
 
     static Path zip(final Workspace workspace, final Module module, final Consumer<Path> collect, final String name = module.name(), final DateTimeFormatter formatter = LoggerHelper.LOG_FILE_NAME_FORMATTER) {
         final Module.Metadata metadata = workspace.config().load(new Module.Metadata(), module.name());
-        final Path distributive = ~(workspace.root() / workspace.buildDir() / "distributive") / (LocalDateTime.now().format(formatter) + "-%s-%s.zip".formatted(name, metadata.version));
+        final Path distributive = ~(workspace.root() / workspace.buildDir() / DISTRIBUTIVE_DIR) / (LocalDateTime.now().format(formatter) + STR."-\{name}-\{metadata.version}.zip");
         distributive | collect;
         return distributive;
     }

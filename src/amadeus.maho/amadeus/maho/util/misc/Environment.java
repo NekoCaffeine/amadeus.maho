@@ -32,59 +32,63 @@ import amadeus.maho.vm.JDWP;
 
 @FunctionalInterface
 public interface Environment {
-
+    
     @Getter
     Environment local = System::getProperties;
-
+    
     Map<Object, Object> mapping();
-
+    
     @Extension.Operator("GET")
     default @Nullable String lookup(final String key) {
-        @Nullable String result = mapping().get(key)?.toString() ?? null;
-        if (result == null) {
-            result = System.getenv(key);
-            if (result != null)
-                value(key, result);
+        synchronized (this) {
+            @Nullable String result = mapping().get(key)?.toString() ?? null;
+            if (result == null) {
+                result = System.getenv(key);
+                if (result != null)
+                    value(key, result);
+            }
+            return result;
         }
-        return result;
     }
-
+    
     default String lookup(final String key, final String defaultValue) {
-        @Nullable String result = mapping().get(key)?.toString() ?? null;
-        if (result == null) {
-            result = System.getenv(key);
-            if (result != null)
-                value(key, result);
-            else
-                value(key, result = defaultValue);
+        synchronized (this) {
+            @Nullable String result = mapping().get(key)?.toString() ?? null;
+            if (result == null) {
+                result = System.getenv(key);
+                if (result != null)
+                    value(key, result);
+                else
+                    value(key, result = defaultValue);
+            }
+            return result;
         }
-        return result;
     }
-
+    
     default boolean lookup(final String key, final boolean defaultValue) = Boolean.parseBoolean(lookup(key, String.valueOf(defaultValue)));
-
+    
     default int lookup(final String key, final int defaultValue) = Integer.parseInt(lookup(key, String.valueOf(defaultValue)));
-
+    
     default long lookup(final String key, final long defaultValue) = Long.parseLong(lookup(key, String.valueOf(defaultValue)));
-
+    
     default float lookup(final String key, final float defaultValue) = Float.parseFloat(lookup(key, String.valueOf(defaultValue)));
     
     @Extension.Operator("PUT")
     default void value(final String key, final Object value) = mapping().put(key, value.toString());
-
+    
     default void enable(final String key) = value(key, Boolean.TRUE);
-
+    
     default void disable(final String key) = value(key, Boolean.FALSE);
-
+    
     static boolean assertState() {
         boolean state = false;
         // noinspection AssertWithSideEffects
         assert state = true;
         return state;
     }
-
+    
     String UNSUPPORTED = "<Unsupported>", UNKNOWN = "<Unknown>";
-
+    
     default void dump(final List<String> list, final String subHead) {
         final String subHead2 = subHead + subHead, subHead3 = subHead2 + subHead, subHead4 = subHead3 + subHead;
         final OperatingSystemMXBean os = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
@@ -96,43 +100,43 @@ public interface Environment {
         final ThreadMXBean thread = (ThreadMXBean) ManagementFactory.getThreadMXBean();
         final ThreadInfo threadInfos[] = thread.dumpAllThreads(true, true);
         final List<GarbageCollectorMXBean> gcs = ManagementFactory.getPlatformMXBeans(GarbageCollectorMXBean.class);
-        list += "Java Runtime VersionInfo: %s".formatted(Runtime.version());
-        list += "Operating System: %s(%s) %s".formatted(os.getName(), os.getVersion(), os.getArch());
+        list += STR."Java Runtime VersionInfo: \{Runtime.version()}";
+        list += STR."Operating System: \{os.getName()}(\{os.getVersion()}) \{os.getArch()}";
         list += "Available Processors: %d".formatted(os.getAvailableProcessors());
         final long usedMemory = os.getTotalMemorySize() - os.getFreeMemorySize();
-        list += "Memory: %s / %s (%s)".formatted(memoryString(usedMemory), memoryString(os.getTotalMemorySize()), usedMemory < 0L || os.getTotalMemorySize() < 1L ? UNKNOWN :
+        list += STR."Memory: \{memoryString(usedMemory)} / \{memoryString(os.getTotalMemorySize())} (\{usedMemory < 0L || os.getTotalMemorySize() < 1L ? UNKNOWN :
                 "%.2f%%".formatted(BigDecimal.valueOf(usedMemory)
                         .divide(BigDecimal.valueOf(os.getTotalMemorySize()), MathContext.DECIMAL32)
-                        .multiply(BigDecimal.valueOf(100L)).doubleValue()));
-        list += "Committed Virtual Memory: %s".formatted(memoryString(os.getCommittedVirtualMemorySize()));
+                        .multiply(BigDecimal.valueOf(100L)).doubleValue())})";
+        list += STR."Committed Virtual Memory: \{memoryString(os.getCommittedVirtualMemorySize())}";
         final long usedSwap = os.getTotalSwapSpaceSize() - os.getFreeSwapSpaceSize();
-        list += "Swap Space: %s / %s (%s)".formatted(memoryString(usedSwap), memoryString(os.getTotalSwapSpaceSize()), usedSwap < 0L || os.getTotalSwapSpaceSize() < 1L ? UNKNOWN :
+        list += STR."Swap Space: \{memoryString(usedSwap)} / \{memoryString(os.getTotalSwapSpaceSize())} (\{usedSwap < 0L || os.getTotalSwapSpaceSize() < 1L ? UNKNOWN :
                 "%.2f%%".formatted(BigDecimal.valueOf(usedSwap)
                         .divide(BigDecimal.valueOf(os.getTotalSwapSpaceSize()), MathContext.DECIMAL32)
-                        .multiply(BigDecimal.valueOf(100L)).doubleValue()));
+                        .multiply(BigDecimal.valueOf(100L)).doubleValue())})";
         if (os instanceof UnixOperatingSystemMXBean unix)
             list += "Unix Open File Descriptor Count: %d/%d".formatted(unix.getOpenFileDescriptorCount(), unix.getMaxFileDescriptorCount());
-        list += "Management Specification VersionInfo: %s".formatted(rt.getManagementSpecVersion());
-        list += "Java Specification: %s(%s) %s".formatted(rt.getSpecName(), rt.getSpecVersion(), rt.getSpecVendor());
-        list += "Java Virtual Machine: %s(%s) %s".formatted(rt.getVmName(), rt.getVmVersion(), rt.getVmVendor());
-        list += "JIT Compiler: %s".formatted(jitc.getName());
-        list += "Assert State: %s".formatted(booleanString(assertState()));
-        list += "JDWP Debugger State: %s".formatted(booleanString(JDWP.isJDWPEnable()));
+        list += STR."Management Specification VersionInfo: \{rt.getManagementSpecVersion()}";
+        list += STR."Java Specification: \{rt.getSpecName()}(\{rt.getSpecVersion()}) \{rt.getSpecVendor()}";
+        list += STR."Java Virtual Machine: \{rt.getVmName()}(\{rt.getVmVersion()}) \{rt.getVmVendor()}";
+        list += STR."JIT Compiler: \{jitc.getName()}";
+        list += STR."Assert State: \{booleanString(assertState())}";
+        list += STR."JDWP Debugger State: \{booleanString(JDWP.isJDWPEnable())}";
         list += "Heap Memory Usage:";
         dump(list, subHead, heapUsage);
         list += "Non-heap Memory Usage:";
         dump(list, subHead, directUsage);
         list += "Memory Usage:";
         memoryPools.forEach(memoryPool -> {
-            list += "%s%s (%s) [Valid: %s, UsageThreshold: %s, CollectionUsageThreshold: %s]".formatted(subHead, memoryPool.getName(), memoryPool.getType(), memoryPool.isValid(), memoryPool.isUsageThresholdSupported() ?
-                    "%s(%d)".formatted(memoryPool.isUsageThresholdExceeded(), memoryPool.getUsageThresholdCount()) : UNSUPPORTED, memoryPool.isCollectionUsageThresholdSupported() ?
-                    "%s(%d)".formatted(memoryPool.isCollectionUsageThresholdExceeded(), memoryPool.getCollectionUsageThresholdCount()) : UNSUPPORTED);
-            list += "%sMemoryManagerNames: %s".formatted(subHead2, Arrays.toString(memoryPool.getMemoryManagerNames()));
-            list += "%s%s".formatted(subHead2, "Usage:");
+            list += STR."\{subHead}\{memoryPool.getName()} (\{memoryPool.getType()}) [Valid: \{memoryPool.isValid()}, UsageThreshold: \{memoryPool.isUsageThresholdSupported() ?
+                    "%s(%d)".formatted(memoryPool.isUsageThresholdExceeded(), memoryPool.getUsageThresholdCount()) : UNSUPPORTED}, CollectionUsageThreshold: \{memoryPool.isCollectionUsageThresholdSupported() ?
+                    "%s(%d)".formatted(memoryPool.isCollectionUsageThresholdExceeded(), memoryPool.getCollectionUsageThresholdCount()) : UNSUPPORTED}]";
+            list += STR."\{subHead2}MemoryManagerNames: \{Arrays.toString(memoryPool.getMemoryManagerNames())}";
+            list += STR."\{subHead2}Usage:";
             dump(list, subHead3, memoryPool.getUsage());
-            list += "%s%s".formatted(subHead2, "PeakUsage:");
+            list += STR."\{subHead2}PeakUsage:";
             dump(list, subHead3, memoryPool.getPeakUsage());
-            list += "%s%s".formatted(subHead2, "CollectionUsage:");
+            list += STR."\{subHead2}CollectionUsage:";
             dump(list, subHead3, memoryPool.getCollectionUsage());
         });
         list += "GC Info:";
@@ -145,20 +149,20 @@ public interface Environment {
                 before.forEach((name, beforeUsage) -> {
                     if (beforeUsage.getMax() != 0) {
                         final MemoryUsage afterUsage = after.get(name);
-                        list += "%s%s:".formatted(subHead2, name);
+                        list += STR."\{subHead2}\{name}:";
                         if (beforeUsage.getUsed() != afterUsage.getUsed() ||
-                                beforeUsage.getCommitted() != afterUsage.getCommitted() ||
-                                beforeUsage.getMax() != afterUsage.getMax()) {
-                            list += "%sBefore:".formatted(subHead3);
+                            beforeUsage.getCommitted() != afterUsage.getCommitted() ||
+                            beforeUsage.getMax() != afterUsage.getMax()) {
+                            list += STR."\{subHead3}Before:";
                             dump(list, subHead4, afterUsage);
-                            list += "%sAfter:".formatted(subHead3);
+                            list += STR."\{subHead3}After:";
                         } else
-                            list += "%sUnchanged:".formatted(subHead3);
+                            list += STR."\{subHead3}Unchanged:";
                         dump(list, subHead4, beforeUsage);
                     }
                 });
             } else
-                list += "%s%s [Valid: %s, Duration: %s]".formatted(subHead, gc.getName(), gc.isValid(), UNKNOWN);
+                list += STR."\{subHead}\{gc.getName()} [Valid: \{gc.isValid()}, Duration: \{UNKNOWN}]";
         });
         list += "Thread Info:";
         Stream.of(threadInfos).forEach(threadInfo -> {
@@ -175,31 +179,32 @@ public interface Environment {
                 builder.append(" (suspended)");
             if (threadInfo.isInNative())
                 builder.append(" (in native)");
-            list += "%s%s".formatted(subHead, builder);
+            list += STR."\{subHead}\{builder}";
             final StackTraceElement stackTrace[] = threadInfo.getStackTrace();
             final int MAX_FRAMES = 64;
             int i = 0;
             for (; i < stackTrace.length && i < MAX_FRAMES; i++) {
                 final StackTraceElement element = stackTrace[i];
-                list += "%sat %s".formatted(subHead2, element);
+                list += STR."\{subHead2}at \{element}";
                 if (i == 0 && threadInfo.getLockInfo() != null) {
                     switch (threadInfo.getThreadState()) {
-                        case BLOCKED                -> list += "%s-  blocked on %s".formatted(subHead2, threadInfo.getLockInfo());
-                        case WAITING, TIMED_WAITING -> list += "%s-  waiting on %s".formatted(subHead2, threadInfo.getLockInfo());
+                        case BLOCKED                -> list += STR."\{subHead2}-  blocked on \{threadInfo.getLockInfo()}";
+                        case WAITING,
+                             TIMED_WAITING -> list += STR."\{subHead2}-  waiting on \{threadInfo.getLockInfo()}";
                     }
                 }
                 for (final MonitorInfo monitorInfo : threadInfo.getLockedMonitors())
                     if (monitorInfo.getLockedStackDepth() == i)
-                        list += "%s-  locked on %s".formatted(subHead2, monitorInfo);
+                        list += STR."\{subHead2}-  locked on \{monitorInfo}";
             }
             if (i < stackTrace.length)
-                list += "%s...".formatted(subHead2);
+                list += STR."\{subHead2}...";
             final LockInfo[] locks = threadInfo.getLockedSynchronizers();
             if (locks.length > 0) {
                 list += subHead2;
                 list += "%sLocked synchronizers count: %d".formatted(subHead2, locks.length);
                 for (final LockInfo lockInfo : locks)
-                    list += "%s- %s".formatted(subHead3, lockInfo);
+                    list += STR."\{subHead3}- \{lockInfo}";
             }
         });
         list += "JVM Args:";
@@ -221,10 +226,10 @@ public interface Environment {
                 .sorted(Map.Entry.comparingByKey())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e, $) -> e, LinkedHashMap::new)));
     }
-
+    
     private static void dump(final List<String> list, final String subHead, final @Nullable Object object) {
         switch (object) {
-            case null                     -> list += "%s%s".formatted(subHead, UNSUPPORTED);
+            case null                     -> list += STR."\{subHead}\{UNSUPPORTED}";
             case String[] array           -> Stream.of(array)
                     .map(element -> subHead + element)
                     .forEach(list::add);
@@ -232,23 +237,22 @@ public interface Environment {
                     .map(element -> subHead + element)
                     .forEach(list::add);
             case Map<?, ?> map            -> map.entrySet().stream()
-                    .map(entry -> subHead + entry.getKey() + " = " + entry.getValue())
+                    .map(entry -> STR."\{subHead}\{entry.getKey()} = \{entry.getValue()}")
                     .forEach(list::add);
             case CharSequence c           -> Stream.of(c.toString().split(";"))
                     .map(element -> subHead + element)
                     .forEach(list::add);
-            case MemoryUsage memoryUsage  -> list += "%s%s / %s (%s), init: %s, committed: %s".formatted(subHead, memoryString(memoryUsage.getUsed()), memoryString(memoryUsage.getMax()),
-                    memoryUsage.getUsed() < 0L || memoryUsage.getMax() < 1L ? UNKNOWN :
-                            "%.2f%%".formatted(BigDecimal.valueOf(memoryUsage.getUsed())
-                                    .divide(BigDecimal.valueOf(memoryUsage.getMax()), MathContext.DECIMAL32)
-                                    .multiply(BigDecimal.valueOf(100L)).doubleValue()), memoryString(memoryUsage.getInit()), memoryString(memoryUsage.getCommitted()));
-            default                       -> throw new IllegalStateException("Unexpected value: " + object);
+            case MemoryUsage memoryUsage  -> list += STR."\{subHead}\{memoryString(memoryUsage.getUsed())} / \{memoryString(memoryUsage.getMax())} (\{memoryUsage.getUsed() < 0L || memoryUsage.getMax() < 1L ? UNKNOWN :
+                    "%.2f%%".formatted(BigDecimal.valueOf(memoryUsage.getUsed())
+                            .divide(BigDecimal.valueOf(memoryUsage.getMax()), MathContext.DECIMAL32)
+                            .multiply(BigDecimal.valueOf(100L)).doubleValue())}), init: \{memoryString(memoryUsage.getInit())}, committed: \{memoryString(memoryUsage.getCommitted())}";
+            default                       -> throw new IllegalStateException(STR."Unexpected value: \{object}");
         }
     }
-
+    
     int STORAGE_DECIMAL = 10, MASK = (1 << STORAGE_DECIMAL) - 1;
     String STORAGE_UNIT[] = { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "BB" };
-
+    
     static String memoryString(final long size) {
         if (size < 0L)
             return UNKNOWN;
@@ -261,7 +265,7 @@ public interface Environment {
         }
         return "%d %s (%.3f %s)".formatted(size, STORAGE_UNIT[0], top + surplus / (float) (1 << STORAGE_DECIMAL), STORAGE_UNIT[layer]);
     }
-
+    
     static String booleanString(final boolean value) = value ? "Enable" : "Disable";
-
+    
 }

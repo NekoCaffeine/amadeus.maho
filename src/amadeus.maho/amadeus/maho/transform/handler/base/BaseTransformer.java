@@ -180,10 +180,6 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
             expr = expr.substring(1);
         }
         final boolean flag = !opposite;
-        if (expr.startsWith("#")) {
-            final String name = expr.substring(1);
-            return node -> name.tryLoad(false) != null == flag;
-        }
         final String condition = expr;
         return node -> {
             final @Nullable String lookup = environment.lookup(condition);

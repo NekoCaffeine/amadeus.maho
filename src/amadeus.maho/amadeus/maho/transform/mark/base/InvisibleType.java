@@ -64,7 +64,8 @@ public @interface InvisibleType {
         
         public static String transformDescriptor(final RemapHandler.ASMRemapper remapper, final MethodNode node) = transformType(remapper, node).getDescriptor();
         
-        public static String transformDescriptor(final RemapHandler.ASMRemapper remapper, final List<TypeAnnotationNode> typeAnnotationNodes, final String methodDescriptor) = transformType(remapper, typeAnnotationNodes, Type.getMethodType(methodDescriptor)).getDescriptor();
+        public static String transformDescriptor(final RemapHandler.ASMRemapper remapper, final List<TypeAnnotationNode> typeAnnotationNodes, final String methodDescriptor)
+                = transformType(remapper, typeAnnotationNodes, Type.getMethodType(methodDescriptor)).getDescriptor();
     
     }
     

@@ -4,6 +4,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Modules;
+import com.sun.tools.javac.comp.TransTypes;
 import com.sun.tools.javac.jvm.ClassWriter;
 import com.sun.tools.javac.jvm.JNIWriter;
 import com.sun.tools.javac.util.Context;
@@ -14,6 +15,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
+import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentTransTypes;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchCompiler;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchContext;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCheck;
@@ -47,6 +49,8 @@ public class ParallelContext extends Context implements MultiThreadedContext {
     DispatchContext context;
     
     { put((Privilege) Check.checkKey, (Factory<Check>) ConcurrentCheck::new); }
+    
+    { put((Privilege) TransTypes.transTypesKey, (Factory<TransTypes>) ConcurrentTransTypes::new); }
     
     CompletableFuture<Void> initialization = { };
     

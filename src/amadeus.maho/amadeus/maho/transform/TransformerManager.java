@@ -3,6 +3,7 @@ package amadeus.maho.transform;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.lang.invoke.MethodHandle;
@@ -242,7 +243,8 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         
         TransformerManager manager;
         
-        @Nullable ClassLoader loader;
+        @Nullable
+        ClassLoader loader;
         
         ConcurrentHashMap<String, ConcurrentLinkedQueue<ClassTransformer>> transformerMap = { };
         
@@ -307,34 +309,36 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         public void scanProviders(final ResourcePath path, final Predicate<ResourcePath.ClassInfo> filter)
                 = await(scanMayCachedList(path, "transform-providers").filter(filter).map(info -> async(() -> scanProvider(info, ASMHelper.newClassNode(info.readAll())), Setup.executor())));
         
-        public void scanProvider(final ClassLoadable classLoadable, final ClassNode node) {
-            if (ASMHelper.hasAnnotation(node, Transformer.class))
-                if (classLoadable.load(false, loader).defaultInstance() instanceof ClassTransformer transformer)
-                    addTransformer(transformer);
-                else
-                    throw new IllegalArgumentException("The target marked by @Transformer can only be an implementation of ClassTransformer");
+        public void scanProvider(final ClassLoadable classLoadable, final ClassNode node, final boolean redefine = false) {
+            if (!redefine)
+                if (ASMHelper.hasAnnotation(node, Transformer.class))
+                    if (classLoadable.load(false, loader).defaultInstance() instanceof ClassTransformer transformer)
+                        addTransformer(transformer);
+                    else
+                        throw new IllegalArgumentException("The target marked by @Transformer can only be an implementation of ClassTransformer");
+            final @Nullable ClassLoader contextLoader = classLoadable instanceof ClassLoadable.Loaded loaded ? loaded.loadedClass().getClassLoader() : loader;
             final @Nullable Map<Class<? extends Annotation>, Class<? extends BaseTransformer>> base = manager.transformerTable[BaseTransformer.class];
             if (base != null && !ASMHelper.hasAnnotation(node, TransformProvider.Exception.class))
                 base.forEach((annotationType, handlerType) -> {
-                    final @Nullable Annotation annotation = ASMHelper.findAnnotation(node, annotationType, loader);
+                    final @Nullable Annotation annotation = ASMHelper.findAnnotation(node, annotationType, contextLoader);
                     if (annotation != null)
-                        addTransformerBase(newInstance(handlerType, annotation, node), loader);
+                        addTransformerBase(newInstance(handlerType, annotation, node), contextLoader);
                 });
             if (ASMHelper.hasAnnotation(node, TransformProvider.class)) {
                 manager.transformerTable[FieldTransformer.class]?.forEach((annotationType, handlerType) -> {
                     for (final FieldNode fieldNode : node.fields)
                         if (!ASMHelper.hasAnnotation(fieldNode, TransformProvider.Exception.class)) {
-                            final @Nullable Annotation annotation = ASMHelper.findAnnotation(fieldNode, annotationType, loader);
+                            final @Nullable Annotation annotation = ASMHelper.findAnnotation(fieldNode, annotationType, contextLoader);
                             if (annotation != null)
-                                addTransformerBase(newInstance(handlerType, annotation, node, fieldNode), loader);
+                                addTransformerBase(newInstance(handlerType, annotation, node, fieldNode), contextLoader);
                         }
                 });
                 manager.transformerTable[MethodTransformer.class]?.forEach((annotationType, handlerType) -> {
                     for (final MethodNode methodNode : node.methods)
                         if (!ASMHelper.hasAnnotation(methodNode, TransformProvider.Exception.class)) {
-                            final @Nullable Annotation annotation = ASMHelper.findAnnotation(methodNode, annotationType, loader);
+                            final @Nullable Annotation annotation = ASMHelper.findAnnotation(methodNode, annotationType, contextLoader);
                             if (annotation != null)
-                                addTransformerBase(newInstance(handlerType, annotation, node, methodNode), loader);
+                                addTransformerBase(newInstance(handlerType, annotation, node, methodNode), contextLoader);
                         }
                 });
             }
@@ -435,15 +439,15 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             patch();
         }
         
-        public void patch() = Patcher.patch(transformerMap.values().stream().flatMap(Collection::stream).toList());
+        public void patch(final Collection<? extends ClassTransformer> rollbackTransformers = List.of()) = Patcher.patch(Stream.concat(transformerMap.values().stream().flatMap(Collection::stream), rollbackTransformers.stream()).toList());
         
-        public void setup(final @Nullable ResourcePath path, final AOTTransformer.Level level, final boolean aot) {
+        public void setup(final @Nullable ResourcePath path, final AOTTransformer.Level level, final boolean aot, final Collection<? extends ClassTransformer> rollbackTransformers = List.of()) {
             mergeTransformers();
             if (!aot)
                 runMarker(true);
             asyncTasks.forEach(AsyncHelper::await);
             if (!aot) {
-                patch();
+                patch(rollbackTransformers);
                 runMarker(false);
             } else {
                 final ReentrantReadWriteLock.WriteLock lock = manager.write;
@@ -495,6 +499,32 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             t.printStackTrace();
             throw DebugHelper.breakpointBeforeThrow(t);
         } finally { Maho.debug(STR."Setup end: \{debugInfo}"); }
+    }
+    
+    public synchronized void redefine(final ClassDefinition... definitions) {
+        if (this != runtime())
+            throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("redefine non-runtime TransformerManger"));
+        final List<ClassDefinition> providers = Stream.of(definitions).filter(definition -> definition.getDefinitionClass().isAnnotationPresent(TransformProvider.class)).toList();
+        final Set<String> names = providers.stream().map(definition -> definition.getDefinitionClass().getName()).map(ASMHelper::className).collect(Collectors.toSet());
+        final ReentrantReadWriteLock.WriteLock lock = write;
+        lock.lock();
+        try {
+            final ArrayList<BaseTransformer<?>> rollbackTransformers = { };
+            transformerMap.values().forEach(list -> list.removeIf(transformer -> {
+                if (transformer instanceof BaseTransformer<?> baseTransformer && names[baseTransformer.sourceClass.name]) {
+                    rollbackTransformers += baseTransformer;
+                    return true;
+                }
+                return false;
+            }));
+            final Context context = { this, TransformerManager.class.getClassLoader() };
+            providers.forEach(definition -> {
+                final ClassLoadable.Loaded loaded = { definition.getDefinitionClass() };
+                final ClassNode node = ASMHelper.newClassNode(definition.getDefinitionClassFile());
+                context.scanProvider(loaded, node, true);
+            });
+            context.setup(null, AOTTransformer.Level.RUNTIME, false, rollbackTransformers);
+        } finally { lock.unlock(); }
     }
     
     public synchronized Context setupRuntimeClass(final Class<?> clazz, final ClassNode node = Maho.getClassNodeFromClass(clazz)) {

@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
 import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.misc.Environment;
-import amadeus.maho.util.runtime.ClassHelper;
+import amadeus.maho.util.runtime.UnsafeHelper;
 
 import static java.lang.Boolean.TRUE;
 
@@ -78,7 +79,7 @@ public enum JIT {
             if (classBeingRedefined != null)
                 consumer.accept(() -> classBeingRedefined);
             else if (className != null)
-                consumer.accept(() -> ClassHelper.tryLoad(className.replace('/', '.'), false, loader));
+                consumer.accept(() -> loader.tryLoad(className.replace('/', '.'), false));
             return null;
         }
         
@@ -88,6 +89,38 @@ public enum JIT {
     @RequiredArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static final class Scheduler {
+        
+        @Getter
+        @RequiredArgsConstructor
+        @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+        public static final class AsyncRunner extends Thread {
+            
+            Scheduler scheduler;
+            
+            Runnable beforeLoop;
+            
+            @Default
+            long sleep = 50;
+            
+            { setName("JIT.Scheduler.AsyncRunner"); }
+            
+            { setDaemon(true); }
+            
+            { start(); }
+            
+            @Override
+            public void run() {
+                ~beforeLoop;
+                // noinspection InfiniteLoopStatement
+                while (true) {
+                    scheduler().enqueue();
+                    Interrupt.doInterruptible(() -> sleep(sleep));
+                }
+            }
+            
+        }
+        
+        private static final Predicate<Class<?>> onlyLoaded = Predicate.not(UnsafeHelper.unsafe()::shouldBeInitialized);
         
         LinkedBlockingQueue<Supplier<Class<?>>> pending = { };
         
@@ -100,10 +133,11 @@ public enum JIT {
         { Maho.instrumentation().addTransformer(spy(), true); }
         
         @SneakyThrows
-        public void enqueue() = Interrupt.doInterruptible(() -> Stream.generate(pending::poll)
+        public void enqueue(final Predicate<Class<?>> predicate = onlyLoaded()) = Interrupt.doInterruptible(() -> Stream.generate(pending::poll)
                 .nonnull()
                 .map(supplier -> !functions().isEmpty() ? supplier.get() : null)
                 .nonnull()
+                .filter(predicate)
                 .forEach(target -> functions.stream().anyMatch(function -> {
                     final @Nullable Level level = function.apply(target);
                     if (level != null) {
@@ -123,13 +157,15 @@ public enum JIT {
         
         public List<Method> measure(final Level target) = measure(level -> level < target);
         
+        public AsyncRunner runAsync(final Runnable beforeLoop = () -> { }, final long sleep = 50) = { this, beforeLoop, sleep };
+        
     }
     
     @Getter
-    Scheduler scheduler = { };
+    final Scheduler scheduler = { };
     
     @Getter
-    private static final Level defautLevel = Level.valueOf(Environment.local().lookup("amadeus.maho.jit.level.default", Level.FULL_OPTIMIZATION.name()));
+    private static final Level defautLevel = Level.valueOf(Environment.local().lookup("maho.jit.level.default", Level.FULL_PROFILE.name()));
     
     private volatile boolean isReady = false;
     

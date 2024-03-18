@@ -25,8 +25,10 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
 import amadeus.maho.lang.javac.multithreaded.SharedComponent;
+import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentDelayedContext;
 import amadeus.maho.lang.javac.multithreaded.parallel.ParallelContext;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCheck;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCompileStates;
@@ -81,6 +83,8 @@ public class DispatchContext extends Context implements MultiThreadedContext {
     }
     
     { put((Privilege) Check.checkKey, (Factory<Check>) ConcurrentCheck::new); }
+    
+    { put(key(DelayedContext.class), new ConcurrentDelayedContext()); }
     
     protected void initSharedKeys() = List.of(
             DispatchCompiler.dispatchCompilerKey,

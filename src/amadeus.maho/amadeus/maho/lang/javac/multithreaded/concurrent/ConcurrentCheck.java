@@ -18,7 +18,7 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
-import amadeus.maho.lang.javac.handler.ExtensionHandler;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.multithreaded.SharedComponent;
 
 import static com.sun.tools.javac.code.Flags.*;
@@ -71,7 +71,7 @@ public class ConcurrentCheck extends Check {
                         for (List<Type> l = clazz.interfaces_field; l.nonEmpty(); l = l.tail)
                             complete &= checkNonCyclicInternal(pos, l.head);
                     if (clazz.supertype_field != null) {
-                        Type st = clazz.supertype_field;
+                        final @Nullable Type st = clazz.supertype_field;
                         if (st != null && st.hasTag(CLASS))
                             complete &= checkNonCyclicInternal(pos, st);
                     }

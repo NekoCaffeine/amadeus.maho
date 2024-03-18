@@ -143,6 +143,8 @@ public interface ASMHelper {
             METHOD_INIT_   = { _INIT_, VOID_METHOD_DESC },
             METHOD_CLINIT_ = { _CLINIT_, VOID_METHOD_DESC };
     
+    int ACCESS_MODIFIERS = ACC_PUBLIC | ACC_PROTECTED | ACC_PRIVATE;
+    
     int asm_api_version = Environment.local().lookup("amadeus.maho.asm.api.version", ASM9);
     
     static boolean anyMatch(final int access, final int mask) = (access & mask) != 0;
@@ -232,11 +234,7 @@ public interface ASMHelper {
         return new LdcInsnNode(value);
     }
     
-    static int changeAccess(final int srcAccess, final int newAccess) {
-        int access = srcAccess;
-        access &= ~(ACC_PRIVATE | ACC_PROTECTED | ACC_PUBLIC);
-        return access | newAccess;
-    }
+    static int changeAccess(final int srcAccess, final int newAccess) = srcAccess & ~ACCESS_MODIFIERS | newAccess & ACCESS_MODIFIERS;
     
     static boolean isAnonymousInnerClass(final String name) = name.matches(".*\\$\\d+");
     

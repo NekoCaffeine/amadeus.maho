@@ -50,16 +50,18 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
         if (alias.length == 0 || Stream.of(alias).mapToInt(String::length).anyMatch(it -> it != length))
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.target.invalid.fields.alisa"));
         final Type componentType = recordFields[0].sym.type;
-        instance(DelayedContext.class).todos() += () -> {
-            if (recordFields.stream().skip(1L).anyMatch(field -> !types.isSameType(componentType, field.sym.type)))
-                log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.components.must.be.same"));
-            if (annotation.accessJavacTypes(Rearrange::adapters)
-                    .cast(Type.ClassType.class)
-                    .anyMatch(classType -> classType.tsym.members().getSymbols(symbol -> symbol instanceof Symbol.VarSymbol varSymbol && anyMatch(varSymbol.flags_field, RECORD), Scope.LookupKind.NON_RECURSIVE)
-                            .fromIterable()
-                            .anyMatch(fieldSymbol -> !types.isSameType(componentType, fieldSymbol.type))))
-                log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.adapters.components.must.be.same"));
-        };
+        instance(DelayedContext.class).todos() += _ -> instance(RearrangeHandler.class).process(annotation, annotationTree, recordFields, componentType);
+    }
+    
+    private void process(final Rearrange annotation, final JCTree.JCAnnotation annotationTree, final List<JCTree.JCVariableDecl> recordFields, final Type componentType) {
+        if (recordFields.stream().skip(1L).anyMatch(field -> !types.isSameType(componentType, field.sym.type)))
+            log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.components.must.be.same"));
+        if (annotation.accessJavacTypes(Rearrange::adapters)
+                .cast(Type.ClassType.class)
+                .anyMatch(classType -> classType.tsym.members().getSymbols(symbol -> symbol instanceof Symbol.VarSymbol varSymbol && anyMatch(varSymbol.flags_field, RECORD), Scope.LookupKind.NON_RECURSIVE)
+                        .fromIterable()
+                        .anyMatch(fieldSymbol -> !types.isSameType(componentType, fieldSymbol.type))))
+            log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.adapters.components.must.be.same"));
     }
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
