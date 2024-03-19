@@ -47,6 +47,7 @@ import com.sun.tools.javac.comp.TransPatterns;
 import com.sun.tools.javac.comp.TransTypes;
 import com.sun.tools.javac.comp.TypeEnter;
 import com.sun.tools.javac.comp.TypeEnvs;
+import com.sun.tools.javac.file.BaseFileManager;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.file.RelativePath;
 import com.sun.tools.javac.main.JavaCompiler;
@@ -209,6 +210,9 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         return queue;
     }
     
+    @SneakyThrows
+    private static final VarHandle contentCacheHandle = MethodHandleHelper.lookup().findVarHandle(BaseFileManager.class, "contentCache", Map.class);
+    
     protected void checkJavacFileManager() {
         if (fileManager instanceof JavacFileManager javacFileManager) {
             {
@@ -222,6 +226,12 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                         = (Privilege) javacFileManager.nonIndexingContainersByLocation;
                 if (nonIndexingContainersByLocation instanceof HashMap<JavaFileManager.Location, java.util.List<JavacFileManager.PathAndContainer>>)
                     (Privilege) (javacFileManager.nonIndexingContainersByLocation = new ConcurrentHashMap<>(nonIndexingContainersByLocation));
+            }
+            {
+                final Map<JavaFileObject, BaseFileManager.ContentCacheEntry> contentCache
+                        = (Privilege) javacFileManager.contentCache;
+                if (contentCache instanceof HashMap<JavaFileObject, BaseFileManager.ContentCacheEntry>)
+                    contentCacheHandle.set(javacFileManager, new ConcurrentHashMap<>(contentCache));
             }
         }
     }
