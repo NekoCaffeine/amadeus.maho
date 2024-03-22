@@ -10,6 +10,7 @@ import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.CompileStates;
 import com.sun.tools.javac.comp.Modules;
+import com.sun.tools.javac.comp.TransTypes;
 import com.sun.tools.javac.comp.TypeEnvs;
 import com.sun.tools.javac.jvm.Target;
 import com.sun.tools.javac.main.Arguments;
@@ -28,13 +29,14 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
 import amadeus.maho.lang.javac.multithreaded.SharedComponent;
-import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentDelayedContext;
-import amadeus.maho.lang.javac.multithreaded.parallel.ParallelContext;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCheck;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCompileStates;
+import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentDelayedContext;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentNames;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentSymtab;
+import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentTransTypes;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentTypeEnvs;
+import amadeus.maho.lang.javac.multithreaded.parallel.ParallelContext;
 
 import static amadeus.maho.util.concurrent.AsyncHelper.await;
 
@@ -82,7 +84,10 @@ public class DispatchContext extends Context implements MultiThreadedContext {
         put((Privilege) Symtab.symtabKey, (Factory<Symtab>) ConcurrentSymtab::new);
     }
     
-    { put((Privilege) Check.checkKey, (Factory<Check>) ConcurrentCheck::new); }
+    {
+        put((Privilege) Check.checkKey, (Factory<Check>) ConcurrentCheck::new);
+        put((Privilege) TransTypes.transTypesKey, (Factory<TransTypes>) ConcurrentTransTypes::new);
+    }
     
     { put(key(DelayedContext.class), new ConcurrentDelayedContext()); }
     

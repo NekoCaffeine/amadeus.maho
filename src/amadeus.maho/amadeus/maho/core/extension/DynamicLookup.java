@@ -36,7 +36,7 @@ interface DynamicLookup {
     
     int
             WEAK_LINKING = 1 << 31,
-            CONSTANT = 1 << 30;
+            CONSTANT     = 1 << 30;
     
     String
             DynamicLookupHelperName = "amadeus.maho.core.extension.DynamicLookupHelper",
@@ -101,17 +101,17 @@ interface DynamicLookup {
         MethodHandle handle;
         try {
             handle = switch (opcode & Bytecodes.MAX) {
-                case INVOKESTATIC       -> lookup.findStatic(owner, name, methodType);
+                case INVOKESTATIC    -> lookup.findStatic(owner, name, methodType);
                 case INVOKEVIRTUAL,
-                        INVOKEINTERFACE -> lookup.findVirtual(owner, name, methodType.dropParameterTypes(0, 1));
-                case INVOKESPECIAL      -> _new.equals(name) ? (MethodHandle) constructor.invokeExact(owner, methodType.dropParameterTypes(0, 1)) : lookup.findSpecial(owner, name, methodType.dropParameterTypes(0, 1), owner);
-                case NEW                -> lookupConstructor(lookup, owner, methodType.changeReturnType(void.class));
-                case GETSTATIC          -> lookup.findStaticGetter(owner, name, methodType.returnType());
-                case PUTSTATIC          -> putCatch(lookup.findStaticSetter(owner, name, methodType.parameterType(0)), methodType);
-                case GETFIELD           -> lookup.findGetter(owner, name, methodType.returnType());
-                case PUTFIELD           -> putCatch(lookup.findSetter(owner, name, methodType.parameterType(1)), methodType);
-                case INSTANCEOF         -> isInstance.bindTo(owner);
-                default                 -> throw new UnsupportedOperationException(STR."Unsupported opcode: \{opcode}");
+                     INVOKEINTERFACE -> lookup.findVirtual(owner, name, methodType.dropParameterTypes(0, 1));
+                case INVOKESPECIAL   -> _new.equals(name) ? (MethodHandle) constructor.invokeExact(owner, methodType.dropParameterTypes(0, 1)) : lookup.findSpecial(owner, name, methodType.dropParameterTypes(0, 1), owner);
+                case NEW             -> lookupConstructor(lookup, owner, methodType.changeReturnType(void.class));
+                case GETSTATIC       -> lookup.findStaticGetter(owner, name, methodType.returnType());
+                case PUTSTATIC       -> putCatch(lookup.findStaticSetter(owner, name, methodType.parameterType(0)), methodType);
+                case GETFIELD        -> lookup.findGetter(owner, name, methodType.returnType());
+                case PUTFIELD        -> putCatch(lookup.findSetter(owner, name, methodType.parameterType(1)), methodType);
+                case INSTANCEOF      -> isInstance.bindTo(owner);
+                default              -> throw new UnsupportedOperationException(STR."Unsupported opcode: \{opcode}");
             };
         } catch (final ReflectiveOperationException e) {
             if ((opcode & WEAK_LINKING) != 0 && (e instanceof NoSuchFieldException || e instanceof NoSuchMethodException))
@@ -148,16 +148,16 @@ interface DynamicLookup {
         lookup = lookup(); // privilege
         try {
             return new ConstantCallSite(MethodHandles.explicitCastArguments(switch (opcode & Bytecodes.MAX) {
-                case INVOKESTATIC       -> lookup.findStatic(owner, name, realType);
+                case INVOKESTATIC    -> lookup.findStatic(owner, name, realType);
                 case INVOKEVIRTUAL,
-                        INVOKEINTERFACE -> lookup.findVirtual(owner, name, realType.dropParameterTypes(0, 1));
-                case INVOKESPECIAL      -> _new.equals(name) ? (MethodHandle) constructor.invokeExact(owner, realType.dropParameterTypes(0, 1)) : lookup.findSpecial(owner, name, realType.dropParameterTypes(0, 1), owner);
-                case NEW                -> lookupConstructor(lookup, owner, realType.changeReturnType(void.class));
-                case GETSTATIC          -> lookup.findStaticGetter(owner, name, realType.returnType());
-                case PUTSTATIC          -> putCatch(lookup.findStaticSetter(owner, name, realType.parameterType(0)), realType);
-                case GETFIELD           -> lookup.findGetter(owner, name, realType.returnType());
-                case PUTFIELD           -> putCatch(lookup.findSetter(owner, name, realType.parameterType(1)), realType);
-                default                 -> throw new UnsupportedOperationException(STR."Unsupported opcode: \{opcode}");
+                     INVOKEINTERFACE -> lookup.findVirtual(owner, name, realType.dropParameterTypes(0, 1));
+                case INVOKESPECIAL   -> _new.equals(name) ? (MethodHandle) constructor.invokeExact(owner, realType.dropParameterTypes(0, 1)) : lookup.findSpecial(owner, name, realType.dropParameterTypes(0, 1), owner);
+                case NEW             -> lookupConstructor(lookup, owner, realType.changeReturnType(void.class));
+                case GETSTATIC       -> lookup.findStaticGetter(owner, name, realType.returnType());
+                case PUTSTATIC       -> putCatch(lookup.findStaticSetter(owner, name, realType.parameterType(0)), realType);
+                case GETFIELD        -> lookup.findGetter(owner, name, realType.returnType());
+                case PUTFIELD        -> putCatch(lookup.findSetter(owner, name, realType.parameterType(1)), realType);
+                default              -> throw new UnsupportedOperationException(STR."Unsupported opcode: \{opcode}");
             }, methodType));
         } catch (final ReflectiveOperationException e) {
             if ((opcode & WEAK_LINKING) != 0 && (e instanceof NoSuchFieldException || e instanceof NoSuchMethodException))

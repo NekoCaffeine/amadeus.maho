@@ -34,6 +34,9 @@ public class ParallelCompiler extends JavaCompiler {
     protected boolean shouldStop(final CompileStates.CompileState cs) = false;
     
     @Override
+    public CharSequence readSource(final JavaFileObject filename) = parent.readSource(filename);
+    
+    @Override
     public Env<AttrContext> attribute(final Env<AttrContext> env) {
         if (compileStates.isDone(env, CompileStates.CompileState.ATTR))
             return env;

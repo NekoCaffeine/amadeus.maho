@@ -73,7 +73,7 @@ public class ResourcePath implements Closeable {
         }
         
         public @Nullable ClassInfo findClassInfo(final String name) {
-            final Path root = classesRedirect().apply(root()), path = root / (name.replace('.', '/') + ".class");
+            final Path root = classesRedirect().apply(root()), path = root / STR."\{name.replace('.', '/')}.class";
             return Files.isRegularFile(path) ? new ClassInfo(root, path) : null;
         }
         
@@ -100,7 +100,7 @@ public class ResourcePath implements Closeable {
         @Override
         public String toString() {
             final FileSystem domain = domain();
-            return "%s | %s".formatted(domain == null ? "default" : domain.toString(), root());
+            return STR."\{domain == null ? "default" : domain.toString()} | \{root()}";
         }
         
         @SneakyThrows
@@ -138,7 +138,7 @@ public class ResourcePath implements Closeable {
         @Override
         public String toString() {
             final FileSystem domain = path().getFileSystem();
-            return "%s | %s".formatted(domain == null ? "default" : domain.toString(), root() / path());
+            return STR."\{domain == null ? "default" : domain.toString()} | \{root() / path()}";
         }
         
     }

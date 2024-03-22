@@ -48,9 +48,10 @@ public class ParallelContext extends Context implements MultiThreadedContext {
     
     DispatchContext context;
     
-    { put((Privilege) Check.checkKey, (Factory<Check>) ConcurrentCheck::new); }
-    
-    { put((Privilege) TransTypes.transTypesKey, (Factory<TransTypes>) ConcurrentTransTypes::new); }
+    {
+        put((Privilege) Check.checkKey, (Factory<Check>) ConcurrentCheck::new);
+        put((Privilege) TransTypes.transTypesKey, (Factory<TransTypes>) ConcurrentTransTypes::new);
+    }
     
     CompletableFuture<Void> initialization = { };
     

@@ -185,8 +185,11 @@ public class ConcurrentSymtab extends Symtab {
         moduleSymbol.unnamedPackage = unnamedPackage;
     }
     
+    // @Override
+    // public Symbol.PackageSymbol enterPackage(final Symbol.ModuleSymbol moduleSymbol, final Name fullname) = enterPackage(moduleSymbol, fullname, false);
+    
     @Override
-    public Symbol.PackageSymbol enterPackage(final Symbol.ModuleSymbol moduleSymbol, final Name fullname) {
+    public Symbol.PackageSymbol enterPackage(final Symbol.ModuleSymbol moduleSymbol, final Name fullname/*, final boolean complete*/) {
         final Map<Symbol.ModuleSymbol, Symbol.PackageSymbol> map = packages().computeIfAbsent(fullname, _ -> new ConcurrentHashMap<>());
         final @Nullable Symbol.PackageSymbol definedPackageSymbol = map[moduleSymbol];
         if (definedPackageSymbol != null)
@@ -197,9 +200,59 @@ public class ConcurrentSymtab extends Symtab {
             final Symbol.PackageSymbol packageSymbol = { Convert.shortName(fullname), owner };
             packageSymbol.completer = (Privilege) this.initialCompleter;
             packageSymbol.modle = m;
+            // if (complete)
+            //     packageSymbol.complete();
             prependPackages(m, packageSymbol);
             return packageSymbol;
         });
+    }
+    
+    @Override
+    public Symbol.PackageSymbol lookupPackage(final Symbol.ModuleSymbol moduleSymbol, final Name flatName) {
+        if (flatName.isEmpty())
+            return moduleSymbol.unnamedPackage;
+        if (moduleSymbol == noModule)
+            return enterPackage(moduleSymbol, flatName);
+        moduleSymbol.complete();
+        final Map<Name, Symbol.PackageSymbol> packages = moduleSymbol.visiblePackages;
+        synchronized (packages) {
+            final @Nullable Symbol.PackageSymbol pkg = packages[flatName];
+            if (pkg != null)
+                return pkg;
+        }
+        {
+            final @Nullable Symbol.PackageSymbol pkg = getPackage(moduleSymbol, flatName);
+            if (pkg != null && pkg.exists())
+                return pkg;
+        }
+        final boolean dependsOnUnnamed = moduleSymbol.requires != null &&
+                                         moduleSymbol.requires.stream()
+                                                 .map(rd -> rd.module)
+                                                 .anyMatch(mod -> mod == unnamedModule);
+        if (dependsOnUnnamed) {
+            {
+                final @Nullable Symbol.PackageSymbol unnamedPkg = getPackage(unnamedModule, flatName);
+                if (unnamedPkg != null && unnamedPkg.exists()) {
+                    synchronized (packages) { packages[unnamedPkg.fullname] = unnamedPkg; }
+                    return unnamedPkg;
+                }
+            }
+            {
+                final Symbol.PackageSymbol pkg = enterPackage(moduleSymbol, flatName);
+                pkg.complete();
+                if (pkg.exists())
+                    return pkg;
+            }
+            {
+                final Symbol.PackageSymbol unnamedPkg = enterPackage(unnamedModule, flatName);
+                unnamedPkg.complete();
+                if (unnamedPkg.exists()) {
+                    synchronized (packages) { packages[unnamedPkg.fullname] = unnamedPkg; }
+                    return unnamedPkg;
+                }
+            }
+        }
+        return enterPackage(moduleSymbol, flatName);
     }
     
     @Override
@@ -218,6 +271,7 @@ public class ConcurrentSymtab extends Symtab {
     
     public Symbol.ClassSymbol tryLoadClass(final Symbol.ModuleSymbol moduleSymbol, final Name flatname) throws Symbol.CompletionFailure {
         final Symbol.PackageSymbol packageSymbol = lookupPackage(moduleSymbol, Convert.packagePart(flatname));
+        packageSymbol.complete();
         final @Nullable Symbol.ClassSymbol definedClassSymbol = getClass(packageSymbol.modle, flatname);
         if (definedClassSymbol != null) {
             if (definedClassSymbol.members_field == null) {

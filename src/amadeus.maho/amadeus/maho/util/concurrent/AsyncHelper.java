@@ -129,9 +129,9 @@ public interface AsyncHelper {
     static void await(final long timeout, final TimeUnit unit = TimeUnit.MILLISECONDS, final Stream<CompletableFuture<?>> futures) = await(timeout, unit, futures.toArray(CompletableFuture[]::new));
     
     static void awaitRecursion(final Consumer<ConcurrentLinkedQueue<CompletableFuture<Void>>> consumer) {
-        final ConcurrentLinkedQueue<CompletableFuture<Void>> futures = { };
-        consumer[futures];
-        await(Stream.generate(futures::poll).takeWhile(ObjectHelper::nonNull));
+        final ConcurrentLinkedQueue<CompletableFuture<Void>> asyncTasks = { };
+        consumer[asyncTasks];
+        asyncTasks.forEach(AsyncHelper::await);
     }
     
 }

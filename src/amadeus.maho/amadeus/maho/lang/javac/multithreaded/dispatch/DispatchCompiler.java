@@ -1,5 +1,6 @@
 package amadeus.maho.lang.javac.multithreaded.dispatch;
 
+import java.io.IOException;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,7 +50,10 @@ import com.sun.tools.javac.comp.TypeEnter;
 import com.sun.tools.javac.comp.TypeEnvs;
 import com.sun.tools.javac.file.BaseFileManager;
 import com.sun.tools.javac.file.JavacFileManager;
+import com.sun.tools.javac.file.PathFileObject;
 import com.sun.tools.javac.file.RelativePath;
+import com.sun.tools.javac.jvm.ClassWriter;
+import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.resources.CompilerProperties;
 import com.sun.tools.javac.tree.JCTree;
@@ -77,12 +81,16 @@ import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCompleter;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentSymtab;
+import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentTransTypes;
 import amadeus.maho.lang.javac.multithreaded.parallel.ParallelCompiler;
 import amadeus.maho.lang.javac.multithreaded.parallel.ParallelContext;
 import amadeus.maho.transform.mark.Hook;
+import amadeus.maho.transform.mark.Redirect;
 import amadeus.maho.transform.mark.base.At;
+import amadeus.maho.transform.mark.base.Slice;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.util.bytecode.Bytecodes;
 import amadeus.maho.util.concurrent.AsyncHelper;
 import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.dynamic.LookupHelper;
@@ -161,9 +169,14 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         super(context);
         this.context = context;
         context.put(dispatchCompilerKey, this);
+        inputFiles = ConcurrentHashMap.newKeySet();
     }
     
-    public static DispatchCompiler instance(final DispatchContext context) = (DispatchCompiler) context.get(compilerKey) ?? new DispatchCompiler(context);
+    public static DispatchCompiler instance(final DispatchContext context = switch (JavacContext.instance().context) {
+        case ParallelContext parallelContext -> parallelContext.context;
+        case DispatchContext dispatchContext -> dispatchContext;
+        default                              -> throw new IllegalStateException(STR."Unexpected value: \{JavacContext.instance().context}");
+    }) = (DispatchCompiler) context.get(compilerKey) ?? new DispatchCompiler(context);
     
     public boolean hasError() {
         if (hasError)
@@ -281,15 +294,30 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     
     @Override
     public synchronized void close() {
-        super.close();
         if (!shutdown) {
             barrier(null);
             shutdown = true;
+            context.parallelContexts().forEach(ParallelContext::interrupt);
+            super.close();
         }
     }
     
     @Override
-    public synchronized CharSequence readSource(final JavaFileObject filename) = super.readSource(filename); // TODO parallel
+    public @Nullable CharSequence readSource(final JavaFileObject filename) {
+        try {
+            inputFiles += filename;
+            return filename.getCharContent(false);
+        } catch (final IOException e) {
+            JavacContext.instance().log.error(CompilerProperties.Errors.ErrorReadingFile(filename, JavacFileManager.getMessage(e)));
+            return null;
+        }
+    }
+    
+    @Redirect(targetClass = BaseFileManager.class, selector = "decode", slice = @Slice(@At(field = @At.FieldInsn(name = "log"))))
+    private static Log contextLog_$BaseFileManager$decode(final BaseFileManager $this) = JavacContext.instance()?.log ?? $this.log;
+    
+    @Redirect(targetClass = PathFileObject.class, selector = "getCharContent", slice = @Slice(@At(field = @At.FieldInsn(name = "log"))))
+    private static Log contextLog_$PathFileObject$getCharContent(final BaseFileManager $this) = JavacContext.instance()?.log ?? $this.log;
     
     @Override
     public List<JCTree.JCCompilationUnit> parseFiles(final Iterable<JavaFileObject> fileObjects, final boolean force)
@@ -603,11 +631,11 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         final Env<AttrContext> env = enter.getEnv(symbol);
         final JavaFileObject prev = compiler.log.useSource(symbol.sourcefile != null ? symbol.sourcefile : env.toplevel.sourcefile);
         final TreeMaker localMake = ((Privilege) compiler.make).at(Position.FIRSTPOS).forToplevel(env.toplevel);
-        final TransTypes transTypes = TransTypes.instance(compiler.context);
+        final ConcurrentTransTypes transTypes = (ConcurrentTransTypes) TransTypes.instance(compiler.context);
         try {
             (Privilege) (transTypes.make = localMake);
             (Privilege) (transTypes.pt = null);
-            (Privilege) transTypes.translateClass(symbol);
+            transTypes.translateClass(symbol, env);
             compileStates[env] = CompileStates.CompileState.TRANSTYPES;
         } finally { compiler.log.useSource(prev); }
         final @Nullable Stream<Symbol.ClassSymbol> derived = derivedFunction[symbol];
@@ -731,6 +759,20 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         try {
             DebugHelper.logTimeConsuming(name, task);
         } finally { VarHandle.fullFence(); }
+    }
+    
+    // # debug
+    
+    @Hook
+    private static void fillIn(final ClassFinder $this, final Symbol.ClassSymbol c) {
+        if (c.classfile == null) {
+            final String name = c.fullname.toString();
+            if (!name.startsWith("org.") && !name.startsWith("com.google.")) {
+                final int indexOf = name.lastIndexOf(".");
+                if (indexOf != -1 && Character.isUpperCase(name.charAt(indexOf + 1)))
+                    DebugHelper.breakpoint();
+            }
+        }
     }
     
 }
