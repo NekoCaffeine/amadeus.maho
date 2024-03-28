@@ -52,8 +52,6 @@ import com.sun.tools.javac.file.BaseFileManager;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.file.PathFileObject;
 import com.sun.tools.javac.file.RelativePath;
-import com.sun.tools.javac.jvm.ClassWriter;
-import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.resources.CompilerProperties;
 import com.sun.tools.javac.tree.JCTree;
@@ -90,7 +88,6 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.Slice;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
-import amadeus.maho.util.bytecode.Bytecodes;
 import amadeus.maho.util.concurrent.AsyncHelper;
 import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.dynamic.LookupHelper;
@@ -759,20 +756,6 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         try {
             DebugHelper.logTimeConsuming(name, task);
         } finally { VarHandle.fullFence(); }
-    }
-    
-    // # debug
-    
-    @Hook
-    private static void fillIn(final ClassFinder $this, final Symbol.ClassSymbol c) {
-        if (c.classfile == null) {
-            final String name = c.fullname.toString();
-            if (!name.startsWith("org.") && !name.startsWith("com.google.")) {
-                final int indexOf = name.lastIndexOf(".");
-                if (indexOf != -1 && Character.isUpperCase(name.charAt(indexOf + 1)))
-                    DebugHelper.breakpoint();
-            }
-        }
     }
     
 }

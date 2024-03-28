@@ -80,7 +80,7 @@ public interface Converter {
         protected Type inferInnerType(final Type genericType) = switch (genericType) {
             case GenericArrayType genericArrayType   -> genericArrayType.getGenericComponentType();
             case ParameterizedType parameterizedType -> parameterizedType.getActualTypeArguments()[0];
-            default                                  -> throw new IllegalStateException("Unexpected value: " + genericType);
+            default                                  -> throw new IllegalStateException(STR."Unexpected value: \{genericType}");
         };
         
         public void append(final String value) = set(list, erasedInnerType, append, value);
@@ -107,7 +107,7 @@ public interface Converter {
     ClassLocal<Map<String, Tuple3<Field, MethodHandle, MethodHandle>>> handle = {
             it -> {
                 if (it.isPrimitive())
-                    throw new IllegalArgumentException("Class: " + it);
+                    throw new IllegalArgumentException(STR."Class: \{it}");
                 if (it == Object.class)
                     return Map.of();
                 final MethodHandles.Lookup lookup = MethodHandleHelper.lookup();
@@ -123,7 +123,7 @@ public interface Converter {
                         .filter(ReflectionHelper.noneMatch(Modifier.STATIC | Modifier.TRANSIENT))
                         .peek(field -> {
                             if (fieldHandles.containsKey(field.getName()))
-                                throw new UnsupportedOperationException("Duplicate key: " + field.getName());
+                                throw new UnsupportedOperationException(STR."Duplicate key: \{field.getName()}");
                         })
                         .forEach(field -> fieldHandles.putIfAbsent(field.getName(), Tuple.tuple(field, lookup.unreflectSetter(field), lookup.unreflectGetter(field))));
                 return Collections.unmodifiableMap(fieldHandles);
@@ -150,7 +150,7 @@ public interface Converter {
                 if (value.length() == 1)
                     setter.invoke(layer, value.charAt(0));
                 else
-                    throw new IllegalArgumentException("Try set invalid type: %s, to: %s".formatted(type, value));
+                    throw new IllegalArgumentException(STR."Try set invalid type: \{type}, to: \{value}");
             } else {
                 final String newValue = value.replace("_", "");
                 if (type == float.class || type == Float.class)
@@ -170,7 +170,7 @@ public interface Converter {
                     else if (type == short.class || type == Short.class)
                         setter.invoke(layer, Short.parseShort(newValue.substring(start), radix));
                     else
-                        throw new IllegalArgumentException("Try set invalid type: %s, to: %s".formatted(type, newValue));
+                        throw new IllegalArgumentException(STR."Try set invalid type: \{type}, to: \{newValue}");
                 }
             }
         }

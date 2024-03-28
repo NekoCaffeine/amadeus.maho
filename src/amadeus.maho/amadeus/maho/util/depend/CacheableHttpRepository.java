@@ -54,7 +54,7 @@ public abstract class CacheableHttpRepository implements Repository {
 
     public void onDownloadCompleted(final Path relative, final Path cache, final boolean completenessMetadata) { }
 
-    public Path relative(final Project project, final String extension) throws IOException = Path.of(uri(project, extension) + "." + extension);
+    public Path relative(final Project project, final String extension) throws IOException = Path.of(STR."\{uri(project, extension)}.\{extension}");
 
     public Path cache(final Path relative, final Path cache = cacheDir() / relative) throws IOException {
         if (Files.exists(cache))

@@ -281,12 +281,12 @@ public @interface At {
             return methodNode -> predicate.test(methodNode.name);
         }
         
-        public static Predicate<String> selector(final String selector, String name) = switch (selector) {
+        public static Predicate<String> selector(final String selector, final String name) = switch (selector) {
             case WILDCARD           -> _ -> true;
-            case StringHelper.EMPTY -> (switch (name = dropInvalidPart(name)) {
-                case "_init_"   -> ASMHelper._INIT_;
-                case "_clinit_" -> ASMHelper._CLINIT_;
-                default         -> name;
+            case StringHelper.EMPTY -> (switch (dropInvalidPart(name)) {
+                case "_init_"      -> ASMHelper._INIT_;
+                case "_clinit_"    -> ASMHelper._CLINIT_;
+                case String string -> string;
             })::equals;
             default                 -> selector.isJavaIdentifierPart() ? (Predicate<String>) selector::equals : selector.matchPredicate();
         };
@@ -372,7 +372,7 @@ public @interface At {
     @IgnoredDefaultValue(Lookup.MATCHING)
     Insn insn() default @Insn;
     
-        @interface JumpInsn {
+    @interface JumpInsn {
         
         int opcode() default Lookup.WILDCARD_INT;
         

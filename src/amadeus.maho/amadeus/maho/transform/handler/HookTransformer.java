@@ -4,6 +4,7 @@ import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -19,7 +20,6 @@ import org.objectweb.asm.commons.TableSwitchGenerator;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
@@ -30,11 +30,14 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.ClassTransformer;
+import amadeus.maho.transform.Metadata;
 import amadeus.maho.transform.TransformerManager;
 import amadeus.maho.transform.handler.base.DerivedTransformer;
 import amadeus.maho.transform.handler.base.MethodTransformer;
@@ -46,7 +49,6 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.Bytecodes;
 import amadeus.maho.util.bytecode.ComputeType;
-import amadeus.maho.util.bytecode.context.OffsetCalculator;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.bytecode.remap.RemapContext;
@@ -57,6 +59,7 @@ import amadeus.maho.util.tuple.Tuple2;
 import amadeus.maho.vm.JDWP;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.*;
+import static amadeus.maho.util.bytecode.ASMHelper.*;
 import static org.objectweb.asm.Opcodes.*;
 
 @SneakyThrows
@@ -73,7 +76,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
         @Override
         public @Nullable ClassNode transform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
             for (final MethodNode methodNode : node.methods)
-                if (methodNode.name.equals(sourceMethod.name) && methodNode.desc.equals(sourceMethod.desc)) {
+                if (methodNode.name.equals(sourceMethod.name) && methodNode.desc.equals(sourceMethod.desc) && Metadata.Guard.missing(methodNode.visibleAnnotations, ReferenceTransformer.class)) {
                     context.markModified().markCompute(methodNode, ComputeType.MAX);
                     TransformerManager.transform("hook.reference", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}");
                     for (final AbstractInsnNode insn : methodNode.instructions)
@@ -82,10 +85,9 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                             final MethodGenerator generator = MethodGenerator.fromShadowMethodNode(methodNode, shadowList);
                             generator.dup(ASMHelper.TYPE_OBJECT); // ..., Result
                             generator.invokeVirtual(TYPE_HOOK_RESULT, STACK_CONTEXT); // ..., Map
-                            final int offset = annotation.isStatic() ? 0 : -1;
                             for (final int index : referenceIndexMark) {
                                 generator.dup(ASMHelper.TYPE_OBJECT); // ..., Map, Map
-                                generator.push(index + offset); // ..., Map, Map, I
+                                generator.push(index); // ..., Map, Map, I
                                 generator.box(Type.INT_TYPE); // ..., Map, Map, Integer
                                 generator.loadArg(index); // ..., Map, Map, Integer, ?
                                 generator.box(generator.argumentTypes[index]); // ..., Map, Map, Integer, ?
@@ -100,6 +102,10 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
         }
         
     }
+    
+    @ToString
+    @EqualsAndHashCode
+    public record ReferenceArgumentInfo(boolean local, boolean store, int index, Type type) { }
     
     private static final Type
             TYPE_HOOK_RESULT             = Type.getObjectType(ASMHelper.className("amadeus.maho.transform.mark.Hook$Result")),
@@ -132,34 +138,54 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
     
     String target, desc;
     
-    Type captureType;
-    
-    List<Hook.LocalVar> localVars;
+    Type captureType, argumentTypes[];
     
     @Nullable int referenceIndexMark[];
+    
+    @Nullable LinkedHashMap<Integer, ReferenceArgumentInfo> referenceInfos;
     
     @Nullable ReferenceTransformer referenceTransformer;
     
     {
+        if (noneMatch(sourceMethod.access, ACC_STATIC))
+            throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("The hook method must be a static method"));
         final Tuple2<String, List<Hook.LocalVar>> separated = separateLocalVariables(sourceMethod);
-        localVars = separated.v2;
+        final List<Hook.LocalVar> localVars = separated.v2;
+        if (!localVars.isEmpty() && !annotation.exactMatch())
+            throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("Prohibit capturing local variables in the case of non-exact match"));
         if (annotation.capture()) {
             final Type args[] = Type.getArgumentTypes(separated.v1);
             if (args.length < 1)
-                throw new IllegalArgumentException("No parameters accepted for capture.");
+                throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("No parameters accepted for capture"));
             desc = Type.getMethodType(Type.getReturnType(separated.v1), Arrays.copyOfRange(args, 1, args.length)).getDescriptor();
             captureType = args[0];
         } else {
             desc = separated.v1;
             captureType = Type.VOID_TYPE;
         }
-        referenceTransformer = (referenceIndexMark = checkReferences()) == null ? null : new ReferenceTransformer();
-        stackFlag = shouldMarkStack();
+        argumentTypes = Type.getArgumentTypes(desc);
+        final Type sourceArgumentTypes[] = Type.getArgumentTypes(sourceMethod.desc);
+        stackFlag = (referenceTransformer = (referenceIndexMark = ASMHelper.findAnnotatedParameters(sourceMethod, Hook.Reference.class)) == null ? null : new ReferenceTransformer()) != null;
+        if (referenceIndexMark != null && referenceIndexMark[0] == 0 && annotation.capture())
+            throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("Ineffective capture"));
+        if (referenceIndexMark != null || !localVars.isEmpty()) {
+            final int startOffset = captureType.getSize(), localVarStartIndex = sourceArgumentTypes.length - localVars.size();
+            referenceInfos = { };
+            for (int index = 0, offset = 0; index < sourceArgumentTypes.length; index++) {
+                boolean reference = false;
+                final boolean argReference = index < localVarStartIndex;
+                if (!argReference || (reference = ArrayHelper.contains(referenceIndexMark, index))) {
+                    referenceInfos[index] = { !argReference, reference, argReference ? offset - startOffset : localVars[index - localVarStartIndex].index(), sourceArgumentTypes[index] };
+                }
+                offset += sourceArgumentTypes[index].getSize();
+            }
+        } else
+            referenceInfos = null;
         jumpFlag = annotation.jump().length > 0;
         if (handler.isNotDefault(Hook::value))
             target = handler.<Type>lookupSourceValue(Hook::value).getClassName();
         else
-            target = annotation.target().isEmpty() && !annotation.isStatic() && !desc.startsWith("()") ? checkNotPrimitiveType(Type.getArgumentTypes(desc)[0]).getClassName() : annotation.target();
+            target = annotation.target().isEmpty() && !annotation.isStatic() && !desc.startsWith("()") ? checkNotPrimitiveType(argumentTypes[0]).getClassName() : annotation.target();
         if (target.isEmpty())
             throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("Unable to determine target class, missing required fields('value' or 'target')."));
     }
@@ -227,8 +253,8 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
     private boolean hookMethod(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
         final Type returnType = Type.getReturnType(methodNode.desc);
         final int returnOpcode = ASMHelper.returnOpcode(returnType);
-        if (ASMHelper.anyMatch(methodNode.access, ACC_NATIVE)) {
-            final boolean isStatic = ASMHelper.anyMatch(methodNode.access, ACC_STATIC);
+        if (anyMatch(methodNode.access, ACC_NATIVE)) {
+            final boolean isStatic = anyMatch(methodNode.access, ACC_STATIC);
             methodNode.access &= ~ACC_NATIVE;
             methodNode.instructions = { };
             final MethodGenerator generator = MethodGenerator.fromMethodNode(methodNode);
@@ -236,7 +262,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
             if (!isStatic)
                 generator.loadThis();
             generator.loadArgs();
-            generator.invokeInsn(isStatic ? INVOKESTATIC : INVOKESPECIAL, Type.getObjectType(node.name), new Method(NATIVE_ROLLBACK + methodNode.name, methodNode.desc), ASMHelper.anyMatch(node.access, ACC_INTERFACE));
+            generator.invokeInsn(isStatic ? INVOKESTATIC : INVOKESPECIAL, Type.getObjectType(node.name), new Method(NATIVE_ROLLBACK + methodNode.name, methodNode.desc), anyMatch(node.access, ACC_INTERFACE));
             generator.returnValue();
         }
         final At.Endpoint.Type endpointType = annotation.at().endpoint().value();
@@ -274,7 +300,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
             final Type sourceArgs[] = Type.getArgumentTypes(sourceMethod.desc), targetArgs[] = Type.getArgumentTypes(methodNode.desc);
             final int offset = captureType != Type.VOID_TYPE ? 1 : 0;
             int length = sourceArgs.length - offset;
-            if (length > 0 && ASMHelper.noneMatch(methodNode.access, ACC_STATIC)) {
+            if (length > 0 && noneMatch(methodNode.access, ACC_STATIC)) {
                 generator.loadThis();
                 length--;
             }
@@ -287,7 +313,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                         generator.pushDefaultLdc(sourceArgs[i + offset]);
                 }
         }
-        localVars.forEach(localVar -> generator.visitVarInsn(localVar.opcode(), localVar.index()));
+        referenceInfos?.values().stream().filter(ReferenceArgumentInfo::local).forEach(info -> generator.visitVarInsn(info.type().getOpcode(ILOAD), info.index()));
         if (!annotation.direct()) {
             ASMHelper.requestMinVersion(node, V1_8);
             generator.invokeDynamic(
@@ -300,7 +326,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                     ""
             );
         } else {
-            final boolean itf = ASMHelper.anyMatch(sourceClass.access, ACC_INTERFACE);
+            final boolean itf = anyMatch(sourceClass.access, ACC_INTERFACE);
             if (itf)
                 ASMHelper.requestMinVersion(node, V1_8);
             generator.invokeStatic(Type.getObjectType(ASMHelper.className(sourceClass.name)), new Method(sourceMethod.name, sourceMethod.desc), itf);
@@ -324,8 +350,8 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                     generator.checkCast(ASMHelper.boxType(returnType));
                     generator.unbox(returnType);
                 }
-                case ARETURN                            -> generator.checkCast(returnType);
-                case RETURN                             -> generator.pop(ASMHelper.TYPE_OBJECT);
+                case ARETURN -> generator.checkCast(returnType);
+                case RETURN  -> generator.pop(ASMHelper.TYPE_OBJECT);
             }
             generator.returnValue();
             generator.mark(label); // Result
@@ -336,14 +362,10 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                 generator.getField(TYPE_HOOK_RESULT, "stackContext", ASMHelper.TYPE_MAP); // Map
                 generator.dup(ASMHelper.TYPE_MAP); // Map, Map
                 generator.ifNull(label); // Map
-                if (!annotation.isStatic())
-                    fillStack(generator, -1, Type.getObjectType(node.name));
-                for (final OffsetCalculator calculator = OffsetCalculator.fromMethodNode(methodNode); calculator.hasNext(); ) {
-                    calculator.next();
-                    final int index = calculator.nowIndex();
-                    final Type type = calculator.nowType();
-                    fillStack(generator, index, type);
-                }
+                referenceInfos.forEach((index, info) -> {
+                    if (info.store())
+                        fillStack(generator, index, info.index(), info.type());
+                });
                 generator.mark(label); // Map
                 generator.pop(ASMHelper.TYPE_MAP); // none
             }
@@ -426,27 +448,22 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
         }
     }
     
-    private void fillStack(final MethodGenerator generator, final int index, final Type type) {
-        if (ArrayHelper.contains(referenceIndexMark, annotation.isStatic() ? index : index + 1)) {
-            generator.dup(ASMHelper.TYPE_MAP); // Map, Map
-            generator.push(index); // Map, Map, I
-            generator.box(Type.INT_TYPE); // Map, Map, Integer
-            generator.invokeInterface(ASMHelper.TYPE_MAP, CONTAINS_KEY); // Map, Z
-            final Label next = generator.newLabel();
-            generator.ifZCmp(MethodGenerator.EQ, next); // Map
-            generator.dup(ASMHelper.TYPE_MAP); // Map, Map
-            generator.push(index); // Map, Map, I
-            generator.box(Type.INT_TYPE); // Map, Map, Integer
-            generator.invokeInterface(ASMHelper.TYPE_MAP, GET); // Map, Object
-            generator.checkCast(ASMHelper.boxType(type)); // Map, ?
-            if (ASMHelper.isUnboxType(type))
-                generator.unbox(type); // Map, ?
-            if (index != -1)
-                generator.storeArg(index); // Map
-            else
-                generator.storeInsn(type, 0); // Map
-            generator.mark(next); // Map
-        }
+    private void fillStack(final MethodGenerator generator, final int index, final int storeIndex, final Type type) {
+        generator.dup(ASMHelper.TYPE_MAP); // Map, Map
+        generator.push(index); // Map, Map, I
+        generator.box(Type.INT_TYPE); // Map, Map, Integer
+        generator.invokeInterface(ASMHelper.TYPE_MAP, CONTAINS_KEY); // Map, Z
+        final Label next = generator.newLabel();
+        generator.ifZCmp(MethodGenerator.EQ, next); // Map
+        generator.dup(ASMHelper.TYPE_MAP); // Map, Map
+        generator.push(index); // Map, Map, I
+        generator.box(Type.INT_TYPE); // Map, Map, Integer
+        generator.invokeInterface(ASMHelper.TYPE_MAP, GET); // Map, Object
+        generator.checkCast(ASMHelper.boxType(type)); // Map, ?
+        if (ASMHelper.isUnboxType(type))
+            generator.unbox(type); // Map, ?
+        generator.storeInsn(type, storeIndex); // Map
+        generator.mark(next); // Map
     }
     
     private Tuple2<String, List<Hook.LocalVar>> separateLocalVariables(final MethodNode methodNode) {
@@ -461,7 +478,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                 if (localVar == null)
                     flag = true;
                 else if (flag)
-                    Maho.warn("Invalid local variable at index: %d, which must be at the end of the method parameter list.".formatted(i));
+                    Maho.warn(STR."Invalid local variable at index: \{i}, which must be at the end of the method parameter list.");
                 else
                     localVars >> localVar;
             }
@@ -474,28 +491,15 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
     }
     
     private boolean checkMethodNode(final MethodNode methodNode) {
-        if (annotation.isStatic() != ASMHelper.anyMatch(methodNode.access, ACC_STATIC))
+        if (annotation.isStatic() != anyMatch(methodNode.access, ACC_STATIC))
             return false;
-        final Iterator<Type> sourceMethodTypes = List.of(Type.getArgumentTypes(desc)).iterator(), srcMethodTypes = List.of(Type.getArgumentTypes(methodNode.desc)).iterator();
+        final Iterator<Type> sourceMethodTypes = List.of(argumentTypes).iterator(), srcMethodTypes = List.of(Type.getArgumentTypes(methodNode.desc)).iterator();
         if (!annotation.isStatic())
             sourceMethodTypes.next();
         while (sourceMethodTypes.hasNext())
             if (!srcMethodTypes.hasNext() || !sourceMethodTypes.next().equals(srcMethodTypes.next()))
                 return false;
         return !srcMethodTypes.hasNext();
-    }
-    
-    public @Nullable int[] checkReferences() = ASMHelper.findAnnotatedParameters(sourceMethod, Hook.Reference.class);
-    
-    private boolean shouldMarkStack() {
-        if (referenceTransformer != null)
-            return true;
-        for (final AbstractInsnNode insn : sourceMethod.instructions)
-            if (insn instanceof FieldInsnNode field && field.getOpcode() == PUTFIELD && field.name.equals("stackContext") && field.owner.equals(TYPE_HOOK_RESULT.getInternalName()))
-                return true;
-            else if (insn instanceof MethodInsnNode method && method.name.equals("operationStack") && method.owner.equals(TYPE_HOOK_RESULT.getInternalName()))
-                return true;
-        return false;
     }
     
     @Override

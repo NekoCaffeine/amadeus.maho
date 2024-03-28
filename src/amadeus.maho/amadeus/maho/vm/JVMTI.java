@@ -1849,13 +1849,15 @@ public interface JVMTI extends Library {
         @SneakyThrows
         public void dump(final List<String> list, final String subHead) = Stream.of(Capabilities.class.getMethods())
                 .filter(method -> method.getName().startsWith("can_") && method.getReturnType() == boolean.class)
-                .forEach(method -> list += "%s%s: %s".formatted(subHead, method.getName(), method.invoke(this)));
+                .forEach(method -> list += STR."\{subHead}\{method.getName()}: \{method.invoke(this)}");
     
         @Override
         public String toString() {
             final ArrayList<String> list = { };
             dump(list, Dumper.head);
-            return super.toString() + "\n" + String.join("\n", list);
+            return STR."""
+\{super.toString()}
+\{String.join("\n", list)}""";
         }
     }
     
@@ -3808,7 +3810,7 @@ public interface JVMTI extends Library {
     
     static void checkJVMTIError(final int jvmtiReturnCode) throws LastErrorException {
         if (jvmtiReturnCode != JVMTI_ERROR_NONE)
-            throw new LastErrorException(jvmtiReturnCodeName(jvmtiReturnCode) + "(" + jvmtiReturnCode + ")");
+            throw new LastErrorException(STR."\{jvmtiReturnCodeName(jvmtiReturnCode)}(\{jvmtiReturnCode})");
     }
     
 }

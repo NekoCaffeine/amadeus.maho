@@ -81,7 +81,7 @@ public class Wrapper<T> {
         interfaceTypes = Stream.of(interfaceClasses()).map(Type::getType).toArray(Type[]::new);
         writer = { loader() };
         context = writer().context();
-        node(makeNode(prefix + "$" + suffix));
+        node(makeNode(STR."\{prefix}$\{suffix}"));
         wrapperType = Type.getObjectType(node().name);
     }
     
@@ -98,7 +98,7 @@ public class Wrapper<T> {
     
     protected ClassNode makeNode(final @Nullable String fullyQualifiedName) {
         final ClassNode result = { };
-        result.name = ASMHelper.className(fullyQualifiedName == null ? superClass().getName() + "$Anonymous$" + nextAnonymousCount() : fullyQualifiedName);
+        result.name = ASMHelper.className(fullyQualifiedName == null ? STR."\{superClass().getName()}$Anonymous$\{nextAnonymousCount()}" : fullyQualifiedName);
         result.superName = superType().getInternalName();
         Stream.of(interfaceTypes()).map(Type::getInternalName).forEach(result.interfaces::add);
         result.version = MahoExport.bytecodeVersion();
@@ -142,18 +142,18 @@ public class Wrapper<T> {
     
     public void assertionInheritable(final Class<?> type) {
         if (is(FINAL, type.getModifiers()))
-            throw new UnsupportedOperationException(type + " is finalized.");
+            throw new UnsupportedOperationException(STR."\{type} is finalized.");
     }
     
     public void assertionInterface(final Class<?> type) {
         if (!type.isInterface())
-            throw new UnsupportedOperationException(type + " is finalized.");
+            throw new UnsupportedOperationException(STR."\{type} is finalized.");
     }
     
     public void assertionRewritable(final Executable executable) {
         final int modifiers = executable.getModifiers();
         if (!is(STATIC, modifiers) && !is(BRIDGE, modifiers) && is(FINAL, modifiers))
-            throw new IllegalStateException(executable + " is finalized.");
+            throw new IllegalStateException(STR."\{executable} is finalized.");
     }
     
     public MethodGenerator wrap(final Executable executable, final FieldNode... fieldNodes) = MethodGenerator.fromExecutable(node(), executable, fieldNodes);

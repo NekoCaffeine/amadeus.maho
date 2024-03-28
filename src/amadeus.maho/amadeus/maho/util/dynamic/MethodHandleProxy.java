@@ -63,13 +63,13 @@ public class MethodHandleProxy<T> {
         return { wrapper.defineHiddenWrapperClass() };
     }
     
-    protected static String name(final String name, final Type methodType) = "$" + name + "_" + Stream.of(methodType.getArgumentTypes())
+    protected static String name(final String name, final Type methodType) = STR."$\{name}_\{Stream.of(methodType.getArgumentTypes())
             .map(Type::getInternalName)
             .map(internalName -> {
                 final int index = internalName.lastIndexOf('/');
                 return index == -1 ? internalName : internalName.substring(index + 1);
             })
-            .collect(Collectors.joining("_")).replace('[', 'A');
+            .collect(Collectors.joining("_")).replace('[', 'A')}";
     
     Class<? extends T> proxyClass;
     

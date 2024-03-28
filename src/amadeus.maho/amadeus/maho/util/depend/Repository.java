@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -47,13 +46,13 @@ public interface Repository {
     class DependencyConflictException extends IllegalArgumentException {
         
         public DependencyConflictException(final ConflictResolution resolution, final Project.Dependency a, final Project.Dependency b, final Collection<List<Project>> aPaths, final Collection<List<Project>> bPaths)
-                = super("""
-                ConflictResolution: %s
-                %s
-                  | %s
-                %s
-                  | %s
-                """.formatted(resolution, a.project(), pathToString(aPaths), b.project(), pathToString(bPaths)));
+                = super(STR."""
+                    ConflictResolution: \{resolution}
+                    \{a.project()}
+                      | \{pathToString(aPaths)}
+                    \{b.project()}
+                      | \{pathToString(bPaths)}
+                    """);
         
         private static String pathToString(final Collection<List<Project>> paths) = paths.stream().map(path -> path.stream().map(Project::toString).collect(Collectors.joining(" -> "))).collect(Collectors.joining("\n  | "));
         
@@ -108,7 +107,7 @@ public interface Repository {
         protected Throwable failed(final Project.Dependency dependency, final Collection<Throwable> throwables) {
             if (throwables.stream().map(AsyncHelper::resolveExecutionException).allMatch(RepositoryFileNotFoundException.class::isInstance))
                 return new RepositoryFileNotFoundException(dependency.toString(), this);
-            final Failed failed = { "Resolving failed: %s".formatted(dependency) };
+            final Failed failed = { STR."Resolving failed: \{dependency}" };
             throwables.forEach(failed::addSuppressed);
             return failed;
         }
@@ -127,17 +126,17 @@ public interface Repository {
     private void resolveDependenciesRecursive(final Project.Dependency dependency, final DependencyResolveContext drc, final ConcurrentHashMap<Project, CompletableFuture<?>> context, final Set<Project.Dependency> dependencies,
             final ConcurrentLinkedQueue<CompletableFuture<?>> futures, final Function<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPath, final List<Project> path)
             = context.computeIfAbsent(dependency.project(), _ -> async(() -> {
-                try {
-                    final Tuple2<Project.Dependency, Collection<Project.Dependency>> resolved = resolveDependency(dependency);
-                    dependencies += resolved.v1;
-                    return resolved.v2.stream().filter(subDependency -> !drc.exclude().test(subDependency.project())).toList();
-                } catch (final Throwable throwable) {
-                    if (resolveExecutionException(throwable) instanceof RepositoryFileNotFoundException)
-                        if (drc.allowMissing().test(dependency.project()))
-                            return List.<Project.Dependency>of();
-                    throw throwable;
-                }
-            })
+        try {
+            final Tuple2<Project.Dependency, Collection<Project.Dependency>> resolved = resolveDependency(dependency);
+            dependencies += resolved.v1;
+            return resolved.v2.stream().filter(subDependency -> !drc.exclude().test(subDependency.project())).toList();
+        } catch (final Throwable throwable) {
+            if (resolveExecutionException(throwable) instanceof RepositoryFileNotFoundException)
+                if (drc.allowMissing().test(dependency.project()))
+                    return List.<Project.Dependency>of();
+            throw throwable;
+        }
+    })
             .thenAcceptAsync(subDependencies -> subDependencies.stream()
                     .peek(subDependency -> dependenciesPath.apply(subDependency).add(path))
                     .filter(subDependency -> !context.containsKey(subDependency.project()))
@@ -200,7 +199,7 @@ public interface Repository {
     
     default void dropResolveCache() = recursiveResolveCache().clear();
     
-    static Path defaultCachePath() = ~(Path.of(Environment.local().lookup("MAHO_CACHE", System.getProperty("user.home") + "/Maho/cache")) / "maven");
+    static Path defaultCachePath() = ~(Path.of(Environment.local().lookup("MAHO_CACHE", STR."\{System.getProperty("user.home")}/Maho/cache")) / "maven");
     
     static Combined maven(final HttpSetting setting = HttpSetting.defaultInstance())
             = { MavenRepository.defaultRepositories().stream().map(it -> it.apply(setting)).collect(Collectors.toCollection(ArrayList::new)) };

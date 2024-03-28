@@ -169,6 +169,6 @@ public interface Protocol {
         }
     }
     
-    default String disconnectMessage(final Context context, final String message) throws IOException = "disconnect[" + context.socketChannel().getRemoteAddress() + "]: " + message;
+    default String disconnectMessage(final Context context, final String message) throws IOException = STR."disconnect[\{context.socketChannel().getRemoteAddress()}]: \{message}";
     
 }

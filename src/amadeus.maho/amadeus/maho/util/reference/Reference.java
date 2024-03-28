@@ -160,7 +160,7 @@ public interface Reference {
                     });
                     final String upper = tuple.v2.getName().upper(0);
                     applyTemplate(node, tuple.v3.writer(), Overwritable.Template.class, tuple.v2, Map.of(
-                            TYPE_OVERWRITER_ANY.getInternalName(), TYPE_OVERWRITER_ANY.getInternalName().replace("$$Any", tuple.v2 == Object.class ? "" : "$" + upper)
+                            TYPE_OVERWRITER_ANY.getInternalName(), TYPE_OVERWRITER_ANY.getInternalName().replace("$$Any", tuple.v2 == Object.class ? "" : STR."$\{upper}")
                     ));
                     return tuple.v1 == Overwritable.class;
                 }).orElse(Boolean.FALSE))
@@ -201,8 +201,8 @@ public interface Reference {
                     DynamicVarInsnNode.normalizationInsnList(setterMethodNode.instructions);
                     final String upper = tuple.v2.getName().upper(0);
                     applyTemplate(node, tuple.v3.writer(), Observable.Template.class, tuple.v2, Map.of(
-                            TYPE_OBSERVABLE_ANY.getInternalName(), TYPE_OBSERVABLE_ANY.getInternalName().replace("$$Any", tuple.v2 == Object.class ? "" : "$" + upper),
-                            TYPE_OBSERVER_ANY.getInternalName(), TYPE_OBSERVER_ANY.getInternalName().replace("$$Any", tuple.v2 == Object.class ? "" : "$" + upper)
+                            TYPE_OBSERVABLE_ANY.getInternalName(), TYPE_OBSERVABLE_ANY.getInternalName().replace("$$Any", tuple.v2 == Object.class ? "" : STR."$\{upper}"),
+                            TYPE_OBSERVER_ANY.getInternalName(), TYPE_OBSERVER_ANY.getInternalName().replace("$$Any", tuple.v2 == Object.class ? "" : STR."$\{upper}")
                     ));
                     return tuple.v1 == Observable.class;
                 }).orElse(Boolean.FALSE))

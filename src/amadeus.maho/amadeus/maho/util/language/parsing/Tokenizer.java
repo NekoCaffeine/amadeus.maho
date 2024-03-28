@@ -149,9 +149,9 @@ public class Tokenizer {
     
             public self checkEOF() { if (!hasNext()) throw eof(); }
     
-            public ParseException invalid(final boolean next = false) = { "Invalid character: '%s'".formatted(next ? nextChar() : nowChar()), debugInformation(), nowPos };
+            public ParseException invalid(final boolean next = false) = { STR."Invalid character: '\{next ? nextChar() : nowChar()}'", debugInformation(), nowPos };
     
-            public ParseException invalid(final String string) = { "Invalid string: '%s'".formatted(string), debugInformation(), nowPos };
+            public ParseException invalid(final String string) = { STR."Invalid string: '\{string}'", debugInformation(), nowPos };
     
             public void assertState(final boolean state) {
             if (!state)

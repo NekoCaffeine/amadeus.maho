@@ -120,6 +120,7 @@ public class HandlerSupport extends JavacContext {
             instance.process(env, tree, env.enclMethod, false);
     }
     
+    @SuppressWarnings("Hook")
     @Hook(at = @At(type = @At.TypeInsn(opcode = Bytecodes.NEW, type = AssertionError.class))) // throw new AssertionError("isSubtype " + t.getTag());
     private static Hook.Result visitType(final Types.@InvisibleType("com.sun.tools.javac.code.Types$4") TypeRelation $this, final Type t, final Type s) = Hook.Result.TRUE;
     

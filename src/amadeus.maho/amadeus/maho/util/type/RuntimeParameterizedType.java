@@ -34,7 +34,7 @@ public record RuntimeParameterizedType(Type actualTypeArguments[], Type rawType,
                 builder.append(ownerType);
             builder.append(".");
             if (ownerType instanceof ParameterizedType parameterizedType)
-                builder.append(rawType.getTypeName().replace(parameterizedType.getRawType().getTypeName() + "$", ""));
+                builder.append(rawType.getTypeName().replace(STR."\{parameterizedType.getRawType().getTypeName()}$", ""));
             else
                 builder.append(rawType.getTypeName());
         } else

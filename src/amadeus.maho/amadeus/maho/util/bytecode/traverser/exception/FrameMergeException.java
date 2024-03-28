@@ -16,14 +16,17 @@ public class FrameMergeException extends IllegalArgumentException {
     Frame a, b;
     
     public FrameMergeException(final String message, final Frame a, final Frame b) {
-        super(message + "\na: " + frame(a) + "\nb: " + frame(b));
+        super(STR."""
+\{message}
+a: \{frame(a)}
+b: \{frame(b)}""");
         this.a = a;
         this.b = b;
     }
     
-    public static String frame(final Frame frame) = """
-            \tlocal: %s
-            \tstack: %s""".formatted(objects(frame.locals()), objects(frame.stack()));
+    public static String frame(final Frame frame) = STR."""
+            \tlocal: \{objects(frame.locals())}
+            \tstack: \{objects(frame.stack())}""";
     
     public static String objects(final List<TypeOwner> list)
             = list == null ? "<empty>" : list.stream().map(TypeOwner::toString).collect(Collectors.joining(", ", "[", "]"));

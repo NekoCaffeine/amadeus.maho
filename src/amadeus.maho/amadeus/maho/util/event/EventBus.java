@@ -86,7 +86,9 @@ public class EventBus {
                 p_result[0] = true;
                 final Class<? extends Event> eventType = TypeInferer.infer(TypeToken.<T, Consumer<T>>locate(), listener.getClass()).erasedType();
                 if (!Event.class.isAssignableFrom(eventType))
-                    throw new IllegalArgumentException("The listener method can only and must have an argument of target Event.\n" + eventType);
+                    throw new IllegalArgumentException(STR."""
+The listener method can only and must have an argument of target Event.
+\{eventType}""");
                 MethodHandle handle = LambdaHelper.lookupFunctionalMethodHandleAndBind(it);
                 handle = MethodHandles.explicitCastArguments(handle, MethodType.methodType(void.class, eventType));
                 if (ignoreCanceled)
@@ -115,9 +117,13 @@ public class EventBus {
         if (listener == null)
             return null;
         if (method.getParameterCount() != 1 || !Event.class.isAssignableFrom(method.getParameterTypes()[0]))
-            throw new IllegalArgumentException("The listener method can only and must have an argument of target Event.\n" + method.getDeclaringClass() + method);
+            throw new IllegalArgumentException(STR."""
+The listener method can only and must have an argument of target Event.
+\{method.getDeclaringClass()}\{method}""");
         if (method.getReturnType() != void.class)
-            throw new IllegalArgumentException("The return target of the listener method must be void.\n" + method.getDeclaringClass() + method);
+            throw new IllegalArgumentException(STR."""
+The return target of the listener method must be void.
+\{method.getDeclaringClass()}\{method}""");
         MethodHandle handle = MethodHandleHelper.lookup().unreflect(method);
         if (ReflectionHelper.noneMatch(method, ReflectionHelper.STATIC))
             handle = handle.bindTo(instance);

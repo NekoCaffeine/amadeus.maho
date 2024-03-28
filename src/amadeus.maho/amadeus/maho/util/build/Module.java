@@ -57,7 +57,7 @@ public record Module(Path path = Path.of(""), String name, Map<String, Path> sub
                 .filter(Files::isRegularFile)
                 .filter(path -> path.getFileName().toString().endsWith(Jar.SUFFIX))
                 .map(path -> {
-                    final Path sources = -+-path / "sources" / path.getFileName().toString().replaceLast(Jar.SUFFIX, "-sources" + Jar.SUFFIX);
+                    final Path sources = -+-path / "sources" / path.getFileName().toString().replaceLast(Jar.SUFFIX, STR."-sources\{Jar.SUFFIX}");
                     return new SingleDependency(path, Files.isRegularFile(sources) ? sources : null);
                 })
                 .collect(Collectors.toSet());
@@ -72,10 +72,10 @@ public record Module(Path path = Path.of(""), String name, Map<String, Path> sub
         public Stream<SingleDependency> flat() = dependencies.stream();
         
         @SneakyThrows
-        public static DependencySet maho() throws FileNotFoundException = { "Maho %s".formatted(Maho.class.getModule().getDescriptor().rawVersion().orElse("SNAPSHOTS")), SingleDependency.maho() };
+        public static DependencySet maho() throws FileNotFoundException = { STR."Maho \{Maho.class.getModule().getDescriptor().rawVersion().orElse("SNAPSHOTS")}", SingleDependency.maho() };
         
         @SneakyThrows
-        public static DependencySet of(final Path home) throws FileNotFoundException = { "%s %s".formatted(home.fileName(), readVersion(home)), SingleDependency.allOf(home) };
+        public static DependencySet of(final Path home) throws FileNotFoundException = { STR."\{home.fileName()} \{readVersion(home)}", SingleDependency.allOf(home) };
         
         private static String readVersion(final Path home) {
             final Path version = home / "version";

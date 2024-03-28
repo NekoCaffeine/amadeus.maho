@@ -26,11 +26,11 @@ public interface JNI extends Library {
         final String key = "jna.library.path", home = System.getProperty("java.home");
         switch (Platform.getOSType()) {
             case Platform.WINDOWS, Platform.WINDOWSCE -> {
-                final String bin = home + separator + "bin";
+                final String bin = STR."\{home}\{separator}bin";
                 System.setProperty(key, bin + pathSeparator + System.getProperty(key, ""));
             }
             case Platform.MAC                         -> {
-                final String lib = home + separator + "lib", server = lib + separator + "server";
+                final String lib = STR."\{home}\{separator}lib", server = STR."\{lib}\{separator}server";
                 System.setProperty(key, lib + pathSeparator + server + pathSeparator + System.getProperty(key, ""));
             }
         }
@@ -226,7 +226,7 @@ public interface JNI extends Library {
     
     static void checkJNIError(final int jniReturnCode) throws LastErrorException {
         if (jniReturnCode != JNI_OK)
-            throw new LastErrorException(jniReturnCodeName(jniReturnCode) + "(" + jniReturnCode + ")");
+            throw new LastErrorException(STR."\{jniReturnCodeName(jniReturnCode)}(\{jniReturnCode})");
     }
     
     int JNI_GetDefaultJavaVMInitArgs(Pointer p_args);

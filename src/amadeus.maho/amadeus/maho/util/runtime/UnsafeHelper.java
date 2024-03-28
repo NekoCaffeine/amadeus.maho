@@ -29,7 +29,7 @@ public interface UnsafeHelper {
         return switch (OBJECT_POINTER_SIZE) {
             case x86    -> unsafe().getInt(array, Unsafe.ARRAY_OBJECT_BASE_OFFSET);
             case x86_64 -> unsafe().getLong(array, Unsafe.ARRAY_OBJECT_BASE_OFFSET);
-            default     -> throw new UnsupportedOperationException("OBJECT_POINTER_SIZE = " + OBJECT_POINTER_SIZE);
+            default     -> throw new UnsupportedOperationException(STR."OBJECT_POINTER_SIZE = \{OBJECT_POINTER_SIZE}");
         };
     }
     
@@ -39,7 +39,7 @@ public interface UnsafeHelper {
         switch (OBJECT_POINTER_SIZE) {
             case x86    -> unsafe().putInt(array, Unsafe.ARRAY_OBJECT_BASE_OFFSET, (int) address);
             case x86_64 -> unsafe().putLong(array, Unsafe.ARRAY_OBJECT_BASE_OFFSET, address);
-            default     -> throw new UnsupportedOperationException("OBJECT_POINTER_SIZE = " + OBJECT_POINTER_SIZE);
+            default     -> throw new UnsupportedOperationException(STR."OBJECT_POINTER_SIZE = \{OBJECT_POINTER_SIZE}");
         }
         return (T) array[0];
     }

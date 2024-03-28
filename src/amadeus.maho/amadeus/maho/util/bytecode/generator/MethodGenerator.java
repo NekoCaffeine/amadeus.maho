@@ -258,7 +258,7 @@ public class MethodGenerator extends MethodVisitor {
     
     public void loadArgs(final int arg, final int count, final Type castTypes[]) {
         if (count != castTypes.length)
-            throw new IllegalArgumentException("count(" + count + ") != types.length(" + castTypes.length + ")");
+            throw new IllegalArgumentException(STR."count(\{count}) != types.length(\{castTypes.length})");
         int index = getArgIndex(arg);
         for (int i = 0; i < count; i++) {
             final Type argumentType = argumentTypes[arg + i];
@@ -426,7 +426,7 @@ public class MethodGenerator extends MethodVisitor {
             switch (mode) {
                 case EQ -> mv.visitJumpInsn(IF_ACMPEQ, label);
                 case NE -> mv.visitJumpInsn(IF_ACMPNE, label);
-                default -> throw new IllegalArgumentException("Bad comparison for type " + type);
+                default -> throw new IllegalArgumentException(STR."Bad comparison for type \{type}");
             }
         else {
             switch (type.getSort()) {
@@ -440,7 +440,7 @@ public class MethodGenerator extends MethodVisitor {
                     case LT -> IF_ICMPLT;
                     case LE -> IF_ICMPLE;
                     case GT -> IF_ICMPGT;
-                    default -> throw new IllegalArgumentException("Bad comparison mode " + mode);
+                    default -> throw new IllegalArgumentException(STR."Bad comparison mode \{mode}");
                 }, label);
             }
             mv.visitJumpInsn(mode, label);
@@ -530,7 +530,7 @@ public class MethodGenerator extends MethodVisitor {
             case H_INVOKESPECIAL,
                     H_NEWINVOKESPECIAL -> INVOKESPECIAL;
             case H_INVOKEINTERFACE     -> INVOKEINTERFACE;
-            default                    -> throw new IllegalStateException("Unexpected value: " + handle.getTag());
+            default                    -> throw new IllegalStateException(STR."Unexpected value: \{handle.getTag()}");
         }, handle.getOwner(), handle.getName(), handle.getDesc(), handle.isInterface());
     };
     

@@ -68,7 +68,7 @@ public class Frame {
         }
         
         @Override
-        public String toString() = "Snapshot{locals=%s, stack=%s}".formatted(FrameNodeMergeException.objects(locals()), FrameNodeMergeException.objects(stack()));
+        public String toString() = STR."Snapshot{locals=\{FrameNodeMergeException.objects(locals())}, stack=\{FrameNodeMergeException.objects(stack())}}";
         
     }
     
@@ -103,7 +103,7 @@ public class Frame {
     
     public final void merge(final Frame target, final BinaryOperator<String> getCommonSuperClass) throws FrameMergeException {
         if (stack().size() != target.stack().size())
-            throw new FrameMergeException("Different lengths: " + stack().size() + " - " + target.stack().size(), this, target);
+            throw new FrameMergeException(STR."Different lengths: \{stack().size()} - \{target.stack().size()}", this, target);
         merge(getCommonSuperClass, stack(), target.stack());
         merge(getCommonSuperClass, locals(), target.locals());
     }

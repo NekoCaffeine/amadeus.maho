@@ -24,9 +24,9 @@ public class HotSpotField implements Comparable<HotSpotField> {
     @Override
     public String toString() {
         if (isStatic)
-            return "static " + typeName + ' ' + name + " @ 0x" + Long.toHexString(offset);
+            return STR."static \{typeName}\{' '}\{name} @ 0x\{Long.toHexString(offset)}";
         else
-            return typeName + ' ' + name + " @ " + offset;
+            return STR."\{typeName}\{' '}\{name} @ \{offset}";
     }
     
 }

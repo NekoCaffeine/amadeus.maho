@@ -110,7 +110,7 @@ public enum Cfg implements Converter {
                         deque << (layer = nextType == null ? null : switch (nextChar) {
                             case '[' -> ArrayAgent.agent(nextType).let(context::assertNonnull);
                             case '{' -> TypeHelper.erase(nextType).tryInstantiationOrAllocate();
-                            default  -> throw new IllegalStateException("Unexpected value: " + nextChar);
+                            default  -> throw new IllegalStateException(STR."Unexpected value: \{nextChar}");
                         });
                     }
                     default       -> throw context.invalid();

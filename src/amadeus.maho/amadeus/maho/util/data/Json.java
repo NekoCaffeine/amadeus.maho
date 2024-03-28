@@ -230,7 +230,7 @@ public interface Json {
             case BigDecimal decimal -> new DynamicObject.DecimalUnit(decimal);
             case Boolean bool       -> new DynamicObject.BooleanUnit(bool);
             case null               -> DynamicObject.NullUnit.instance();
-            default                 -> throw new IllegalStateException("Unexpected value: " + value);
+            default                 -> throw new IllegalStateException(STR."Unexpected value: \{value}");
         });
         
         protected void end(final DynamicObject object) {
@@ -290,7 +290,7 @@ public interface Json {
             }
             yield high;
         }
-        default             -> throw context.invalid("invalid escape codePoint: " + codePoint);
+        default             -> throw context.invalid(STR."invalid escape codePoint: \{codePoint}");
     };
     
     private static char scan4Hex(final Context context) {
@@ -362,7 +362,7 @@ public interface Json {
                 context.skip("null".substring(1));
                 visitor.visitValue(null);
             }
-            default                                                         -> throw context.invalid("invalid json value start with: " + context.nowChar());
+            default                                                         -> throw context.invalid(STR."invalid json value start with: \{context.nowChar()}");
         }
         context.skip(ws);
     }

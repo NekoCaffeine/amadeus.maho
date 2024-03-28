@@ -36,7 +36,7 @@ public class HotSpotType {
             if (field.name.equals(name))
                 return field;
         }
-        throw new NoSuchElementException("No such field: " + name);
+        throw new NoSuchElementException(STR."No such field: \{name}");
     }
     
     public long global(final String name) {
@@ -66,7 +66,7 @@ public class HotSpotType {
     
     public void dump(final List<String> list, final String subHead) {
         final String subHead2 = subHead + subHead, subHead3 = subHead2 + subHead;
-        list += "%s%s%s @ %d".formatted(subHead2, name, superName != null ? " : " + superName : "", size);
+        list += "%s%s%s @ %d".formatted(subHead2, name, superName != null ? STR." : \{superName}" : "", size);
         Stream.of(fields)
                 .map(ObjectHelper::toString)
                 .map(subHead3::concat)

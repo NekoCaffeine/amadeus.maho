@@ -66,7 +66,7 @@ public interface ReflectionHelper {
         Class<?> clazz = owner;
         while (clazz != null)
             try { return setAccessible(clazz.getDeclaredField(name)); } catch (final NoSuchFieldException e) { clazz = clazz.getSuperclass(); }
-        throw new NoSuchFieldException(owner.getName() + "." + name);
+        throw new NoSuchFieldException(STR."\{owner.getName()}.\{name}");
     }
     
     @SneakyThrows
@@ -80,7 +80,7 @@ public interface ReflectionHelper {
         Class<?> clazz = owner;
         while (clazz != null)
             try { return setAccessible(clazz.getDeclaredMethod(name, args)); } catch (final NoSuchMethodException e) { clazz = clazz.getSuperclass(); }
-        throw new NoSuchMethodException("%s::%s(%s)".formatted(owner.getName(), name, Stream.of(args).map(String::valueOf).reduce((a, b) -> a + ", " + b).orElse("")));
+        throw new NoSuchMethodException(STR."\{owner.getName()}::\{name}(\{Stream.of(args).map(String::valueOf).reduce((a, b) -> STR."\{a}, \{b}").orElse("")})");
     }
     
     @SneakyThrows

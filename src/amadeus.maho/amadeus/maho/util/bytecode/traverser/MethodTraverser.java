@@ -534,7 +534,7 @@ public interface MethodTraverser {
             case MONITORENTER,
                     MONITOREXIT   -> monitor(frame);
             case MULTIANEWARRAY   -> multiNewArray(frame);
-            default               -> throw new IllegalArgumentException("Unsupported opcode: " + frame.insn().getOpcode());
+            default               -> throw new IllegalArgumentException(STR."Unsupported opcode: \{frame.insn().getOpcode()}");
         }
     }
     
@@ -768,7 +768,7 @@ public interface MethodTraverser {
         return owner;
     }
     
-    private static IllegalArgumentException obsoleteOpcode(final int opcode) = { "Obsolete opcode: " + opcode };
+    private static IllegalArgumentException obsoleteOpcode(final int opcode) = { STR."Obsolete opcode: \{opcode}" };
     
     private static AssertionError unreachableArea() = { "Unreachable area!" };
     

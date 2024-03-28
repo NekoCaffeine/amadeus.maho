@@ -29,7 +29,7 @@ public record AnnotationType(
     private static final ClassLocal<AnnotationType> annotationTypeLocal = {
             annotationClass -> {
                 if (!annotationClass.isAnnotation())
-                    throw new IllegalArgumentException("Not an annotation type: " + annotationClass);
+                    throw new IllegalArgumentException(STR."Not an annotation type: \{annotationClass}");
                 final Method methods[] = annotationClass.getDeclaredMethods();
                 return new AnnotationType(
                         annotationClass,

@@ -23,15 +23,18 @@ public class FrameNodeMergeException extends IllegalArgumentException {
     FrameNode a, b;
     
     public FrameNodeMergeException(final String message, final FrameNode a, final FrameNode b) {
-        super(message + "\na: " + node(a) + "\nb: " + node(b));
+        super(STR."""
+            \{message}
+            a: \{node(a)}
+            b: \{node(b)}""");
         this.a = a;
         this.b = b;
     }
     
-    public static String node(final FrameNode frame) = """
-            type: %s
-            \tlocal: %s
-            \tstack: %s""".formatted(frameTypeLookup.lookupFieldName(frame.type), objects(frame.local), objects(frame.stack));
+    public static String node(final FrameNode frame) = STR."""
+            type: \{frameTypeLookup.lookupFieldName(frame.type)}
+            \tlocal: \{objects(frame.local)}
+            \tstack: \{objects(frame.stack)}""";
     
     public static String objects(final List<Object> list)
             = list == null ? "<empty>" : list.stream().map(object -> object == null ? "null" : valueTypeLookup.lookupFields(object).findFirst().map(Field::getName).orElse(object.toString())).collect(Collectors.joining(", ", "[", "]"));

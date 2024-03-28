@@ -176,7 +176,7 @@ public enum WhiteBox {
     }
     
     public static synchronized void openJVMFlag() {
-        Maho.debug("WhiteBox: Open JVM Flag -> " + Names.WhiteBoxAPI);
+        Maho.debug(STR."WhiteBox: Open JVM Flag -> \{Names.WhiteBoxAPI}");
         HotSpot.instance().flag(Names.WhiteBoxAPI).enable();
     }
     
@@ -567,7 +567,7 @@ public enum WhiteBox {
     public long allocateCodeBlob(final long size, final int type) {
         final int intSize = (int) size;
         if ((long) intSize != size || size < 0) throw new IllegalArgumentException(
-                "size argument has illegal value " + size);
+                STR."size argument has illegal value \{size}");
         return allocateCodeBlob(intSize, type);
     }
     
@@ -717,7 +717,7 @@ public enum WhiteBox {
         else if (concurrentGCRunTo0(breakpoint))
             return true;
         else if (errorIfFail)
-            throw new IllegalStateException("Missed requested breakpoint \"" + breakpoint + "\"");
+            throw new IllegalStateException(STR."Missed requested breakpoint \"\{breakpoint}\"");
         else
             return false;
     }
@@ -802,7 +802,7 @@ public enum WhiteBox {
     public int getCDSOffsetForName(final String name) throws Exception {
         final int offset = getCDSOffsetForName0(name);
         if (offset == -1)
-            throw new RuntimeException(name + " not found");
+            throw new RuntimeException(STR."\{name} not found");
         return offset;
     }
     
@@ -811,7 +811,7 @@ public enum WhiteBox {
     public int getCDSConstantForName(final String name) throws Exception {
         final int constant = getCDSConstantForName0(name);
         if (constant == -1)
-            throw new RuntimeException(name + " not found");
+            throw new RuntimeException(STR."\{name} not found");
         return constant;
     }
     

@@ -51,7 +51,7 @@ public class TypeToken<T> {
         return Reifier.make(CoreReflectionFactory.make(declaration, switch (declaration) {
             case Method method  -> MethodScope.make(method);
             case Class<?> clazz -> ClassScope.make(clazz);
-            default             -> throw new IllegalStateException("Unexpected value: " + declaration);
+            default             -> throw new IllegalStateException(STR."Unexpected value: \{declaration}");
         })).let(SignatureParser.make().parseTypeSig(signature)::accept).getResult();
     }
     

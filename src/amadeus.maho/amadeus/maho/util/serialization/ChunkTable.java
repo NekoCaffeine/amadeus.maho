@@ -143,7 +143,7 @@ public class ChunkTable<H extends BinaryMapper, V extends BinaryMapper> implemen
                         generator.endMethod();
                         return lambda.allocateInstance();
                     }
-                    throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("auto mapper: " + headerType));
+                    throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException(STR."auto mapper: \{headerType}"));
                 }, true
         };
         

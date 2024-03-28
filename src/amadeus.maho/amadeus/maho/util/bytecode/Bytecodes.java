@@ -503,14 +503,14 @@ public interface Bytecodes {
     
     static String nameOf(final int opcode) throws IllegalArgumentException {
         final @Nullable String name = nameArray[opcode];
-        return name == null ? "<illegal opcode: " + opcode + ">" : "<" + name + ">";
+        return name == null ? STR."<illegal opcode: \{opcode}>" : STR."<\{name}>";
     }
     
     static int valueOf(final String name) {
         for (int opcode = 0; opcode < nameArray.length; opcode++)
             if (name.equalsIgnoreCase(nameArray[opcode]))
                 return opcode;
-        throw new IllegalArgumentException("No opcode for " + name);
+        throw new IllegalArgumentException(STR."No opcode for \{name}");
     }
     
     static boolean valid(final int opcode) = opcode > -1 && opcode < BREAKPOINT;
@@ -847,7 +847,7 @@ public interface Bytecodes {
     };
     
     private static void def(final int opcode, final String name, final String format, final int stackEffect, final int flags = 0) {
-        assert nameArray[opcode] == null : "opcode " + opcode + " is already bound to name " + nameArray[opcode];
+        assert nameArray[opcode] == null : STR."opcode \{opcode} is already bound to name \{nameArray[opcode]}";
         nameArray[opcode] = name;
         lengthArray[opcode] = format.length();
         stackEffectArray[opcode] = stackEffect;

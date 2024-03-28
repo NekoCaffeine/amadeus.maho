@@ -84,9 +84,6 @@ public class MahoJavac {
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.TAIL)))
     private static void cleanup(final JavacTaskImpl $this) = JavacContext.drop();
     
-    @Redirect(targetClass = TypeMetadata.Annotations.class, selector = "combine", slice = @Slice(@At(method = @At.MethodInsn(name = "check"))))
-    private static void check(final boolean flag) { }
-    
     @Hook
     private static Hook.Result makeBootstrapEntry(final PoolWriter $this, final PoolConstant.Dynamic dynamic) {
         final PoolConstant.Dynamic.BsmKey bsmKey = dynamic.bsmKey((Privilege) $this.types);

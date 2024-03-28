@@ -42,7 +42,9 @@ public class IllegalVersionException extends IllegalArgumentException {
                         .append(number)
                         .append(')');
             });
-            throw new IllegalArgumentException("Unsupported version: " + version + "\n" + supportedVersions);
+            throw new IllegalArgumentException(STR."""
+Unsupported version: \{version}
+\{supportedVersions}""");
         }
     }
     

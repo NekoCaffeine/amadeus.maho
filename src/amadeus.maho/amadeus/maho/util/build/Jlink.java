@@ -176,7 +176,7 @@ public interface Jlink {
             final DefaultImageBuilder builder = { output, launchers };
             final PluginsConfiguration pluginsConfiguration = { plugins, builder, null };
             build(jlinkConfiguration, pluginsConfiguration);
-            launchers.keySet().forEach(prototype -> derive(output, prototype, name -> name + "dbg", List.of(
+            launchers.keySet().forEach(prototype -> derive(output, prototype, name -> STR."\{name}dbg", List.of(
                     "-XX:+UnlockDiagnosticVMOptions",
                     "-XX:+ShowHiddenFrames",
                     "-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:36768"
@@ -193,7 +193,7 @@ public interface Jlink {
         final Path bin = root / DefaultImageBuilder.BIN_DIRNAME;
         final String derivedName = nameAdder.apply(prototype);
         derive(bin / prototype, bin / derivedName, args);
-        derive(bin / (prototype + ".bat"), bin / (derivedName + ".bat"), args);
+        derive(bin / (STR."\{prototype}.bat"), bin / (STR."\{derivedName}.bat"), args);
     }
     
     String JLINK_VM_OPTIONS_PATTERN = "JLINK_VM_OPTIONS=";

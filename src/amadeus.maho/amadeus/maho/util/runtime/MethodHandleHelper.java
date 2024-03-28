@@ -41,7 +41,7 @@ public interface MethodHandleHelper {
         case PUTSTATIC       -> lookup().findStaticSetter(owner, name, (Class<?>) type);
         case GETFIELD        -> lookup().findGetter(owner, name, (Class<?>) type);
         case PUTFIELD        -> lookup().findSetter(owner, name, (Class<?>) type);
-        default              -> throw new RuntimeException("Unsupported set: " + opcode + "/" + ASMHelper.OPCODE_LOOKUP.lookupFieldName(opcode));
+        default              -> throw new RuntimeException(STR."Unsupported set: \{opcode}/\{ASMHelper.OPCODE_LOOKUP.lookupFieldName(opcode)}");
     };
     
     static int argsCount(final MethodHandle handle) = (int) Stream.of(handle.getClass().getDeclaredFields())

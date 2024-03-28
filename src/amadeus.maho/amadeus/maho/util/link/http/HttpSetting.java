@@ -17,7 +17,7 @@ public record HttpSetting(
         BiConsumer<LogLevel, String> logger = MahoExport.logger().namedLogger("HttpClient")
 ) {
     
-    public static final Map<String, String> baseHeaders = Map.of(HttpHelper.Header.User_Agent, "Maho/%s".formatted(MahoExport.VERSION));
+    public static final Map<String, String> baseHeaders = Map.of(HttpHelper.Header.User_Agent, STR."Maho/\{MahoExport.VERSION}");
     
     @Getter
     private static final HttpSetting defaultInstance = { };

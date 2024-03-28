@@ -372,7 +372,7 @@ public interface TypeHelper {
             yield bounds.length > 0 ? erase(bounds[0]) : Object.class;
         }
         case InferredGenericType inferredGenericType -> inferredGenericType.erasedType();
-        default                                      -> throw new IllegalStateException("Unexpected value: " + type);
+        default                                      -> throw new IllegalStateException(STR."Unexpected value: \{type}");
     };
     
 }

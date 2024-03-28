@@ -185,11 +185,8 @@ public class ConcurrentSymtab extends Symtab {
         moduleSymbol.unnamedPackage = unnamedPackage;
     }
     
-    // @Override
-    // public Symbol.PackageSymbol enterPackage(final Symbol.ModuleSymbol moduleSymbol, final Name fullname) = enterPackage(moduleSymbol, fullname, false);
-    
     @Override
-    public Symbol.PackageSymbol enterPackage(final Symbol.ModuleSymbol moduleSymbol, final Name fullname/*, final boolean complete*/) {
+    public Symbol.PackageSymbol enterPackage(final Symbol.ModuleSymbol moduleSymbol, final Name fullname) {
         final Map<Symbol.ModuleSymbol, Symbol.PackageSymbol> map = packages().computeIfAbsent(fullname, _ -> new ConcurrentHashMap<>());
         final @Nullable Symbol.PackageSymbol definedPackageSymbol = map[moduleSymbol];
         if (definedPackageSymbol != null)
@@ -200,8 +197,6 @@ public class ConcurrentSymtab extends Symtab {
             final Symbol.PackageSymbol packageSymbol = { Convert.shortName(fullname), owner };
             packageSymbol.completer = (Privilege) this.initialCompleter;
             packageSymbol.modle = m;
-            // if (complete)
-            //     packageSymbol.complete();
             prependPackages(m, packageSymbol);
             return packageSymbol;
         });

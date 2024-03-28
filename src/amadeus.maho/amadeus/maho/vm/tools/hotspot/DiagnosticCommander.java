@@ -43,19 +43,19 @@ public interface DiagnosticCommander {
             
             static String output() = execute("VM.log output");
             
-            static String output(final String value) = execute("VM.log output=" + value);
+            static String output(final String value) = execute(STR."VM.log output=\{value}");
             
             static String output_options() = execute("VM.log output_options");
             
-            static String output_options(final String value) = execute("VM.log output_options=" + value);
+            static String output_options(final String value) = execute(STR."VM.log output_options=\{value}");
             
             static String what() = execute("VM.log what");
             
-            static String what(final String value) = execute("VM.log what=" + value);
+            static String what(final String value) = execute(STR."VM.log what=\{value}");
             
             static String decorators() = execute("VM.log decorators");
             
-            static String decorators(final String value) = execute("VM.log decorators=" + value);
+            static String decorators(final String value) = execute(STR."VM.log decorators=\{value}");
             
             static String disable() = execute("VM.log disable");
             

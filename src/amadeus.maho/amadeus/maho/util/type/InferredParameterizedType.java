@@ -52,7 +52,7 @@ public record InferredParameterizedType(ParameterizedType sourceType, InferredGe
                 builder.append(ownerType);
             builder.append(".");
             if (ownerType instanceof ParameterizedType ownerParameterizedType)
-                builder.append(rawType.getTypeName().replace(ownerParameterizedType.getRawType().getTypeName() + "$", ""));
+                builder.append(rawType.getTypeName().replace(STR."\{ownerParameterizedType.getRawType().getTypeName()}$", ""));
             else
                 builder.append(rawType.getTypeName());
         } else

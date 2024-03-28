@@ -5,6 +5,7 @@ import java.lang.invoke.VarHandle;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -148,7 +149,7 @@ public class AnnotationHandler<T> {
             return Map.of();
         if (list.size() % 2 != 0)
             throw new RuntimeException("objects.size() % 2 != 0");
-        final HashMap<K, V> result = { };
+        final LinkedHashMap<K, V> result = { };
         K key = null;
         for (final Object obj : list)
             if (key == null)

@@ -39,7 +39,7 @@ public class ClassWriter extends org.objectweb.asm.ClassWriter {
     @SneakyThrows
     private static final FunctionChain<Tuple2<ClassLoader, String>, String> inheritanceChainMapper = new FunctionChain<Tuple2<ClassLoader, String>, String>()
             .add(target -> target.map(tuple -> {
-                final @Nullable InputStream resource = tuple.v1.getResourceAsStream(tuple.v2 + ".class");
+                final @Nullable InputStream resource = tuple.v1.getResourceAsStream(STR."\{tuple.v2}.class");
                 return resource == null ? null : ASMHelper.newClassReader(resource).getSuperName();
             }))
             .add(target -> defaultSuperName());

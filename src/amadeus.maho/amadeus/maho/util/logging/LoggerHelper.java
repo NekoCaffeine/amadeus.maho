@@ -132,7 +132,7 @@ public interface LoggerHelper {
     static BiConsumer<LogLevel, String> mergeContext(final AsyncLogger logger) = (level, message) -> {
         final @Nullable StackWalker.StackFrame caller = caller();
         if (caller != null && !ignoreContext(caller.getClassName()))
-            message = "[" + caller.getClassName() + "." + caller.getMethodName() + "#" + caller.getByteCodeIndex() + "(" + caller.getFileName() + ":" + caller.getLineNumber() + ")] : " + message;
+            message = STR."[\{caller.getClassName()}.\{caller.getMethodName()}#\{caller.getByteCodeIndex()}(\{caller.getFileName()}:\{caller.getLineNumber()})] : \{message}";
         logger.publish(new LogRecord(level == LogLevel.INFO ? "STDOUT" : "STDERR", level, message, Instant.now(), caller));
     };
     
@@ -172,9 +172,9 @@ public interface LoggerHelper {
             if (Files.isRegularFile(logPath)) {
                 final BasicFileAttributes attributes = Files.getFileAttributeView(logPath, BasicFileAttributeView.class).readAttributes();
                 final String rename = LocalDateTime.ofInstant(attributes.lastModifiedTime().toInstant(), ZoneId.systemDefault()).format(LOG_FILE_NAME_FORMATTER);
-                Path renameTarget = logPath < rename + ".log";
+                Path renameTarget = logPath < STR."\{rename}.log";
                 if (Files.exists(renameTarget))
-                    renameTarget = logPath < rename + "-" + System.currentTimeMillis() + ".log";
+                    renameTarget = logPath < STR."\{rename}-\{System.currentTimeMillis()}.log";
                 try { logPath >>> renameTarget; } catch (final IOException e) { e.printStackTrace(); }
             }
            return Files.newByteChannel(logPath, WRITE, CREATE_NEW);

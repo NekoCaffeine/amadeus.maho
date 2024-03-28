@@ -146,8 +146,6 @@ public @interface Hook {
     @Target(ElementType.PARAMETER)
     @Retention(RetentionPolicy.RUNTIME) @interface LocalVar {
         
-        int opcode() default Bytecodes.ALOAD;
-        
         int index();
         
     }

@@ -116,7 +116,7 @@ public class LinkEndpoint {
             if (key.channel() instanceof ServerSocketChannel) {
                 final SocketChannel channel = ((ServerSocketChannel) key.channel()).accept();
                 if (channel != null) {
-                    System.out.println("acceptSelectionKey: " + channel.getRemoteAddress());
+                    System.out.println(STR."acceptSelectionKey: \{channel.getRemoteAddress()}");
                     protocol().checkSocketChannel(channel);
                     protocol().link(channel.configureBlocking(false).register(key.selector(), 0), endpoint());
                 }

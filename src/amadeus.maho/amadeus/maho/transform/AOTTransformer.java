@@ -75,7 +75,7 @@ public class AOTTransformer implements ClassTransformer.Limited {
     
     String target;
     
-    Set<Class<? extends Annotation>> annotationTypes = new HashSet<>();
+    Set<Class<? extends Annotation>> annotationTypes = ConcurrentHashMap.newKeySet();
     
     Map<Tuple2<String, String>, Set<Class<? extends Annotation>>> fields = new ConcurrentHashMap<>(), methods = new ConcurrentHashMap<>();
     

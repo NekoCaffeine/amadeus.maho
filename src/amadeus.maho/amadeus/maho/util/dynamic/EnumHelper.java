@@ -56,7 +56,7 @@ public interface EnumHelper {
                         .filter(insn -> insn.getOpcode() == GETSTATIC) // Lookup instructions for the reading field
                         .map(insn -> target.getDeclaredField(((FieldInsnNode) insn).name))
                         .findFirst()
-                        .orElseThrow(() -> new UnsupportedOperationException("find enum class values field: " + target));
+                        .orElseThrow(() -> new UnsupportedOperationException(STR."find enum class values field: \{target}"));
             }
     };
     

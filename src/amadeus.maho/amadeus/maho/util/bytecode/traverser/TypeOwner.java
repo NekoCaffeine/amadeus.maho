@@ -57,7 +57,7 @@ public class TypeOwner {
     @Override
     public String toString() {
         final String name = type().getInternalName();
-        return flag() == Opcodes.UNINITIALIZED_THIS ? name + ":U" : flag() instanceof Label ? name + ":L" : name;
+        return flag() == Opcodes.UNINITIALIZED_THIS ? STR."\{name}:U" : flag() instanceof Label ? STR."\{name}:L" : name;
     }
     
     public static TypeOwner of(final Type type) = switch (type.getSort()) {

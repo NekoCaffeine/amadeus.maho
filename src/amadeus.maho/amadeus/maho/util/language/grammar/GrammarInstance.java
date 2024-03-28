@@ -90,7 +90,7 @@ public class GrammarInstance<T> implements Parser<T> {
             if (next.charAt(0) == '\\')
                 fragments() += next.charAt(1) != '\\' ? switch (next.charAt(1)) {
                     case 'A' -> new Fragment.Arg(type(), next.substring(2));
-                    default  -> throw new UnsupportedOperationException("Operation: " + next.charAt(1));
+                    default  -> throw new UnsupportedOperationException(STR."Operation: \{next.charAt(1)}");
                 } : new Fragment.ConstantText(next.substring(1));
             else
                 fragments() += new Fragment.ConstantText(next);

@@ -20,7 +20,7 @@ public class ComputeException extends RuntimeException {
         int   local;
         
         public Load(final Frame frame, final int local) {
-            super("at: " + local + ", in: " + frame.locals(), frame);
+            super(STR."at: \{local}, in: \{frame.locals()}", frame);
             this.frame = frame;
             this.local = local;
         }
@@ -35,7 +35,7 @@ public class ComputeException extends RuntimeException {
         TypeOwner owner;
         
         public TypeMismatch(final Frame frame, final Type expected, final TypeOwner owner) {
-            super("expected: " + expected + ", actual: " + owner.type(), frame);
+            super(STR."expected: \{expected}, actual: \{owner.type()}", frame);
             this.expected = expected;
             this.owner = owner;
         }
@@ -49,7 +49,7 @@ public class ComputeException extends RuntimeException {
         TypeOwner owner;
         
         public ArrayTypeMismatch(final Frame frame, final TypeOwner owner) {
-            super("expected: <any array>" + ", actual: " + owner.type(), frame);
+            super(STR."expected: <any array>, actual: \{owner.type()}", frame);
             this.owner = owner;
         }
         
@@ -70,7 +70,7 @@ public class ComputeException extends RuntimeException {
         int offset;
         
         public Fetch(final Frame frame, final int offset) {
-            super("fetch offset: " + offset, frame);
+            super(STR."fetch offset: \{offset}", frame);
             this.offset = offset;
         }
         
@@ -84,7 +84,7 @@ public class ComputeException extends RuntimeException {
         TypeOwner owner;
         
         public SizeMismatch(final Frame frame, final int expected, final TypeOwner owner) {
-            super("expected: " + expected + ", actual: " + owner.type(), frame);
+            super(STR."expected: \{expected}, actual: \{owner.type()}", frame);
             this.expected = expected;
             this.owner = owner;
         }
@@ -99,7 +99,7 @@ public class ComputeException extends RuntimeException {
         TypeOwner owner;
         
         public SizeRangeMismatch(final Frame frame, final int min, final int max, final TypeOwner owner) {
-            super("min: " + min + ", max: " + max + ", actual: " + owner.type(), frame);
+            super(STR."min: \{min}, max: \{max}, actual: \{owner.type()}", frame);
             this.min = min;
             this.max = max;
             this.owner = owner;
@@ -110,7 +110,9 @@ public class ComputeException extends RuntimeException {
     Frame frame;
     
     public ComputeException(final String message, final Frame frame) {
-        super(message + "\nframe: " + frame.snapshot());
+        super(STR."""
+            \{message}
+            frame: \{frame.snapshot()}""");
         this.frame = frame;
     }
     

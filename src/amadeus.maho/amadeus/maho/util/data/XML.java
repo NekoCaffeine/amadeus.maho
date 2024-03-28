@@ -249,20 +249,20 @@ public interface XML {
                         try {
                             context.offset("encoding=".length());
                             charset = Charset.forName(encoding = scanValue(context, encodingChecker()));
-                        } catch (final IllegalCharsetNameException | UnsupportedCharsetException e) { throw context.invalid("encoding='%s'".formatted(encoding)); }
+                        } catch (final IllegalCharsetNameException | UnsupportedCharsetException e) { throw context.invalid(STR."encoding='\{encoding}'"); }
                     if (context.skip(S) > 0) {
                         if (context.match("standalone=")) {
                             context.offset("standalone=".length());
                             standalone = scanValue(context, Tokenizer::isLowerLetter);
                             if (!standalone.equals("yes") && !standalone.equals("no"))
-                                throw context.invalid("standalone='%s'".formatted(standalone));
+                                throw context.invalid(STR."standalone='\{standalone}'");
                             context.skip(S);
                         }
                     }
                 }
                 context.skip("?>");
             }
-            default    -> throw new UnsupportedOperationException("version: " + version);
+            default    -> throw new UnsupportedOperationException(STR."version: \{version}");
         }
         visitor.visitDeclaration(version, encoding, standalone);
         return charset;
@@ -280,7 +280,7 @@ public interface XML {
                     case '?' -> {
                         final String target = context.scanString(nameChecker(), 1);
                         if (target.equalsIgnoreCase("xml"))
-                            throw context.invalid("target: " + target);
+                            throw context.invalid(STR."target: \{target}");
                         visitor.visitProcessingInstructions(target, context.scanString(it -> it != '?'));
                         context.skip("?>");
                     }
@@ -314,7 +314,7 @@ public interface XML {
                                 context.skip("=");
                                 final String attrValue = scanValue(context);
                                 if (attr.put(attrName, attrValue) != null)
-                                    throw context.invalid("Repeated attr: %s='%s'".formatted(attrName, attrValue));
+                                    throw context.invalid(STR."Repeated attr: \{attrName}='\{attrValue}'");
                             }
                         }
                         if (context.match("/>")) {
@@ -351,7 +351,7 @@ public interface XML {
                 final String entity = context.scanString(it -> it != ';');
                 final @Nullable Integer represented = predefined[entity];
                 if (represented == null)
-                    throw context.invalid("Entity: '%s'".formatted(entity));
+                    throw context.invalid(STR."Entity: '\{entity}'");
                 context.skip(";");
                 yield represented;
             }

@@ -46,7 +46,7 @@ public class StructureAnalyzer {
     public <T> Serializer<T> analysis(final Class<T> clazz) {
         final Type type = Type.getType(clazz);
         final ClassNode node = { };
-        node.name = ASMHelper.className(clazz.getName() + "$Serializer");
+        node.name = ASMHelper.className(STR."\{clazz.getName()}$Serializer");
         node.access = ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC;
         node.superName = MagicAccessor.Bridge;
         node.interfaces += TYPE_I_SERIALIZER.getInternalName();
@@ -290,7 +290,7 @@ public class StructureAnalyzer {
         if (boxType == Byte.class || boxType == Boolean.class)
             generator.invokeVirtual(TYPE_BYTE_BUFFER, new Method("put", Type.getMethodDescriptor(TYPE_BYTE_BUFFER, Type.BYTE_TYPE)));
         else
-            generator.invokeVirtual(TYPE_BYTE_BUFFER, new Method("put" + boxType.getSimpleName(), Type.getMethodDescriptor(TYPE_BYTE_BUFFER, Type.getType(TypeHelper.unboxType(type)))));
+            generator.invokeVirtual(TYPE_BYTE_BUFFER, new Method(STR."put\{boxType.getSimpleName()}", Type.getMethodDescriptor(TYPE_BYTE_BUFFER, Type.getType(TypeHelper.unboxType(type)))));
     }
     
     protected void get(final MethodGenerator generator, final Class<?> type) {
@@ -298,7 +298,7 @@ public class StructureAnalyzer {
         if (boxType == Byte.class || boxType == Boolean.class)
             generator.invokeVirtual(TYPE_BYTE_BUFFER, new Method("get", Type.getMethodDescriptor(TYPE_BYTE_BUFFER, Type.BYTE_TYPE)));
         else
-            generator.invokeVirtual(TYPE_BYTE_BUFFER, new Method("get" + boxType.getSimpleName(), Type.getMethodDescriptor(TYPE_BYTE_BUFFER, Type.getType(TypeHelper.unboxType(type)))));
+            generator.invokeVirtual(TYPE_BYTE_BUFFER, new Method(STR."get\{boxType.getSimpleName()}", Type.getMethodDescriptor(TYPE_BYTE_BUFFER, Type.getType(TypeHelper.unboxType(type)))));
         if (boxType == type)
             generator.box(Type.getType(type));
     }

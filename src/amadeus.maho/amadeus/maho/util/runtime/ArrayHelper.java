@@ -2121,7 +2121,7 @@ public interface ArrayHelper {
         } catch (final ArrayStoreException ase) {
             final Class<?> type2 = array2.getClass().getComponentType();
             if (!type1.isAssignableFrom(type2))
-                throw new IllegalArgumentException("Cannot store " + type2.getName() + " in an array of " + type1.getName(), ase);
+                throw new IllegalArgumentException(STR."Cannot store \{type2.getName()} in an array of \{type1.getName()}", ase);
             throw ase; // No, so rethrow original
         }
         return joinedArray;
@@ -2390,7 +2390,7 @@ public interface ArrayHelper {
         assert array.getClass().isArray();
         final int length = getLength(array);
         if (index < 0 || index >= length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{length}");
         final Object result = Array.newInstance(array.getClass().getComponentType(), length - 1);
         System.arraycopy(array, 0, result, 0, index);
         if (index < length - 1)
@@ -2430,7 +2430,7 @@ public interface ArrayHelper {
             while (--i >= 0) {
                 final int index = clonedIndices[i];
                 if (index < 0 || index >= length)
-                    throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + length);
+                    throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{length}");
                 if (index >= prevIndex)
                     continue;
                 diff++;
@@ -2724,7 +2724,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final boolean result[] = new boolean[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2740,7 +2740,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final byte result[] = new byte[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2756,7 +2756,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final char result[] = new char[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2772,7 +2772,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final double result[] = new double[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2788,7 +2788,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final float result[] = new float[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2804,7 +2804,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final int result[] = new int[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2820,7 +2820,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final long result[] = new long[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2836,7 +2836,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final short result[] = new short[array.length + values.length];
         System.arraycopy(values, 0, result, index, values.length);
         if (index > 0)
@@ -2853,7 +2853,7 @@ public interface ArrayHelper {
         if (isEmpty(values))
             return clone(array);
         if (index < 0 || index > array.length)
-            throw new IndexOutOfBoundsException("Index: " + index + ", Length: " + array.length);
+            throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final Class<?> type = array.getClass().getComponentType();
         final T result[] = (T[]) Array.newInstance(type, array.length + values.length);
         System.arraycopy(values, 0, result, index, values.length);

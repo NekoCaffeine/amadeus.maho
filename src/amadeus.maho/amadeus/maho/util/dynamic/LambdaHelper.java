@@ -28,12 +28,12 @@ public interface LambdaHelper {
     
     static Method lookupFunctionalMethodWithInterface(final Class<?> lambdaType) {
         if (!lambdaType.isInterface())
-            throw new IllegalArgumentException(lambdaType + " is not an interface");
+            throw new IllegalArgumentException(STR."\{lambdaType} is not an interface");
         final Method methods[] = Stream.of(lambdaType.getMethods())
                 .filter(ReflectionHelper.anyMatch(ReflectionHelper.ABSTRACT))
                 .toArray(Method[]::new);
         if (methods.length != 1)
-            throw new IllegalArgumentException(lambdaType + ".getMethods().length != 1");
+            throw new IllegalArgumentException(STR."\{lambdaType}.getMethods().length != 1");
         return methods[0];
     }
     
@@ -54,7 +54,7 @@ public interface LambdaHelper {
                 .filter(ReflectionHelper.noneMatch(ReflectionHelper.BRIDGE))
                 .toArray(Method[]::new);
         if (methods.length != 1)
-            throw new IllegalArgumentException(lambdaType + ".getMethods().length != 1");
+            throw new IllegalArgumentException(STR."\{lambdaType}.getMethods().length != 1");
         return methods[0];
     }
     

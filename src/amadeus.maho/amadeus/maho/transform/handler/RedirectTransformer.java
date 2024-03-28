@@ -27,6 +27,8 @@ import amadeus.maho.util.annotation.AnnotationHandler;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.RemapContext;
+import amadeus.maho.util.runtime.DebugHelper;
+import amadeus.maho.vm.JDWP;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.*;
 import static org.objectweb.asm.Opcodes.*;
@@ -55,15 +57,16 @@ public final class RedirectTransformer extends MethodTransformer<Redirect> imple
         final AnnotationHandler<Slice> sliceHandler = AnnotationHandler.asOneOfUs(slice);
         final At start = slice.value();
         final @Nullable At end = sliceHandler.lookupSourceValue(Slice::end);
+        boolean hit = false;
         for (final MethodNode methodNode : node.methods)
             if (methodChecker.test(methodNode)) {
-                TransformerManager.transform("redirect", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{annotation.target()}#\{sourceMethod.name}\{sourceMethod.desc}");
-                context.markModified();
                 final List<AbstractInsnNode> targets = At.Lookup.findTargets(start, manager.remapper(), methodNode.instructions);
+                if (targets.isEmpty())
+                    continue;
                 if (end != null) {
                     final List<AbstractInsnNode> endTarget = At.Lookup.findTargets(end, manager.remapper(), methodNode.instructions);
                     if (targets.size() != 1 || endTarget.size() != 1)
-                        throw new IllegalArgumentException("The result of slice matching is not unique, which is dangerous!!!");
+                        throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("The result of slice matching is not unique"));
                     final AbstractInsnNode startTargetNode = targets.getFirst(), endTargetNode = endTarget.getFirst();
                     boolean flag = false;
                     for (final ListIterator<AbstractInsnNode> iterator = methodNode.instructions.iterator(); iterator.hasNext(); ) {
@@ -74,31 +77,40 @@ public final class RedirectTransformer extends MethodTransformer<Redirect> imple
                                 break;
                         } else {
                             if (insn == endTargetNode)
-                                throw new IllegalArgumentException("The end of the slice appears before the start");
+                                throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("The end of the slice appears before the start"));
                             if (insn == startTargetNode)
                                 flag = true;
                         }
                     }
                 }
                 final boolean lookup = !annotation.direct();
-                At.Lookup.findTargets(start, manager.remapper(), methodNode.instructions)
-                        .forEach(insnNode -> methodNode.instructions.set(insnNode,
-                                lookup ?
-                                        new InvokeDynamicInsnNode(
-                                                sourceMethod.name,
-                                                sourceMethod.desc,
-                                                makeSiteByName,
-                                                INVOKESTATIC,
-                                                submit(contextClassLoader()),
-                                                ASMHelper.sourceName(sourceClass.name),
-                                                ""
-                                        ) :
-                                        new MethodInsnNode(
-                                                INVOKESTATIC, sourceClass.name, sourceMethod.name, sourceMethod.desc,
-                                                ASMHelper.anyMatch(sourceClass.access, ACC_INTERFACE)
-                                        )));
+                targets.forEach(insnNode -> methodNode.instructions.set(insnNode,
+                        lookup ?
+                                new InvokeDynamicInsnNode(
+                                        sourceMethod.name,
+                                        sourceMethod.desc,
+                                        makeSiteByName,
+                                        INVOKESTATIC,
+                                        submit(contextClassLoader()),
+                                        ASMHelper.sourceName(sourceClass.name),
+                                        ""
+                                ) :
+                                new MethodInsnNode(
+                                        INVOKESTATIC, sourceClass.name, sourceMethod.name, sourceMethod.desc,
+                                        ASMHelper.anyMatch(sourceClass.access, ACC_INTERFACE)
+                                )));
                 ASMHelper.requestMinVersion(node, V1_7);
+                context.markModified();
+                TransformerManager.transform("redirect", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{annotation.target()}#\{sourceMethod.name}\{sourceMethod.desc}");
+                hit = true;
             }
+        if (!hit && metadata.important()) {
+            final String debugInfo = STR."Missing: \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}";
+            TransformerManager.transform("redirect", debugInfo);
+            final JDWP.IDECommand.Notification notification = { JDWP.IDECommand.Notification.Type.WARNING, getClass().getSimpleName(), debugInfo };
+            JDWP.MessageQueue.send(notification);
+            DebugHelper.breakpoint();
+        }
         return node;
     }
     

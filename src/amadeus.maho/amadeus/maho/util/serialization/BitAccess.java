@@ -41,7 +41,7 @@ public class BitAccess {
         
         public long readNBits(final int length, final @Nullable boolean hasNext[] = null) throws IOException {
             if (length < 0 || length > MAX_SIZE)
-                throw new IllegalArgumentException("length: " + length);
+                throw new IllegalArgumentException(STR."length: \{length}");
             while (cachedLength < length && cachedLength < 7 * 8 + 1) {
                 final long next = in.read();
                 if (next < 0)
@@ -91,7 +91,7 @@ public class BitAccess {
         
         public void writeNBits(final long bits, final int length) throws IOException {
             if (length < 0 || length > MAX_SIZE)
-                throw new IllegalArgumentException("length: " + length);
+                throw new IllegalArgumentException(STR."length: \{length}");
             final int offset = Math.min(MAX_SIZE - cachedLength, length), overflow = length - offset;
             cache = cache << offset | bits & MASKS[offset];
             if ((cachedLength += offset) == MAX_SIZE) {
@@ -135,9 +135,9 @@ public class BitAccess {
     
     public static void writeNBits(final MemorySegment segment, final long offset, final int index, final long bits, final int length) {
         if (index < 0 || index > Byte.SIZE)
-            throw new IllegalArgumentException("index: " + index);
+            throw new IllegalArgumentException(STR."index: \{index}");
         if (length < 0 || length > MAX_SIZE)
-            throw new IllegalArgumentException("length: " + length);
+            throw new IllegalArgumentException(STR."length: \{length}");
         final int begin = index > 0 ? Byte.SIZE - index : 0, middle = length - begin >>> 3, end = length - begin & 0b111;
         if (begin > 0)
             segment.set(JAVA_BYTE, offset, mergeByte(segment.get(JAVA_BYTE, offset), (byte) (bits >>> length - begin & MASKS[begin]), index));
@@ -150,9 +150,9 @@ public class BitAccess {
     
     public static long readNBits(final MemorySegment segment, final long offset, final int index, final int length) {
         if (index < 0 || index > Byte.SIZE)
-            throw new IllegalArgumentException("index: " + index);
+            throw new IllegalArgumentException(STR."index: \{index}");
         if (length < 0 || length > MAX_SIZE)
-            throw new IllegalArgumentException("length: " + length);
+            throw new IllegalArgumentException(STR."length: \{length}");
         long result = 0L;
         final int begin = index > 0 ? Byte.SIZE - index : 0, middle = length - begin >>> 3, end = length - begin & 0b111;
         if (begin > 0)

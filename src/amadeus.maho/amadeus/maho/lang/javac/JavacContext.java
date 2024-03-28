@@ -451,7 +451,8 @@ public class JavacContext {
         
         @Redirect(slice = @Slice(@At(method = @At.MethodInsn(name = "get"))), target = TK)
         private static @InvisibleType(TK) Object tokenKindToTK(final EnumMap<Tokens.TokenKind, Object> map, final Tokens.TokenKind kind) {
-            if (TK_MAP == null)
+            if (TK_MAP == null) // jdk.jshell.CompletenessAnalyzer$TK#<clinit>
+                // noinspection UnreachableCode
                 return map.get(kind);
             final @Nullable @InvisibleType(TK) Enum result = TK_MAP[kind];
             return result == null ? map[kind] : result;

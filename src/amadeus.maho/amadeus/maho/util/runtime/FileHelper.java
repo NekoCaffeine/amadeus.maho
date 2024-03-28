@@ -139,7 +139,7 @@ public interface FileHelper {
     
     static String OR(final Path path, final String separator) = path.toString().replace(path.getFileSystem().getSeparator(), separator);
     
-    static String XOR(final Path path, final String separator) = "\"" + path.toString().replace(path.getFileSystem().getSeparator(), separator) + "\"";
+    static String XOR(final Path path, final String separator) = STR."\"\{path.toString().replace(path.getFileSystem().getSeparator(), separator)}\"";
     
     static Path DIV(final Path head, final Path tail) = head.resolve(tail);
     

@@ -16,7 +16,7 @@ public interface MathHelper {
     
     static int log2(final int value) {
         if(value < 1)
-            throw new IllegalArgumentException("value: " + value);
+            throw new IllegalArgumentException(STR."value: \{value}");
         return 31 - Integer.numberOfLeadingZeros(value);
     }
     

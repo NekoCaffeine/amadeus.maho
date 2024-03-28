@@ -18,9 +18,9 @@ public class PowerSetIterator<E> implements Iterator<LinkedList<E>> {
     
     public PowerSetIterator(final Collection<E> elements, final int minSize = 0, final int maxSize = elements.size()) {
         if (elements.size() > 63)
-            throw new UnsupportedOperationException("elements.size() = " + elements.size() + " > 63");
+            throw new UnsupportedOperationException(STR."elements.size() = \{elements.size()} > 63");
         if (minSize < 0)
-            throw new IllegalArgumentException("minSize = " + minSize + " < 0");
+            throw new IllegalArgumentException(STR."minSize = \{minSize} < 0");
         this.minSize = minSize;
         this.maxSize = min(maxSize, elements.size());
         this.elements = (E[]) elements.toArray();

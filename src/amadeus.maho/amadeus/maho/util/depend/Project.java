@@ -41,7 +41,7 @@ public record Project(String group, String artifact, String version, String... c
     }
     
     @Override
-    public String toString() = "%s:%s%s%s".formatted(group(), artifact(), classifiers().length > 0 || !version().equals("+") ? ":" + version() : "", classifiers().length > 0 ? ":" + String.join(":", classifiers()) : "");
+    public String toString() = STR."\{group()}:\{artifact()}\{classifiers().length > 0 || !version().equals("+") ? STR.":\{version()}" : ""}\{classifiers().length > 0 ? STR.":\{String.join(":", classifiers())}" : ""}";
     
     public Project dropClassifier() = classifiers().length == 0 ? this : new Project(group(), artifact(), version());
     
@@ -52,7 +52,7 @@ public record Project(String group, String artifact, String version, String... c
     public static Project of(final String project) {
         final String info[] = project.split(":");
         if (info.length < 2)
-            throw new IllegalArgumentException("Invalid project: '%s', At least 'group:artifact(:version)(:extend)', e.g. 'org.lwjgl:lwjgl-bgfx'".formatted(project));
+            throw new IllegalArgumentException(STR."Invalid project: '\{project}', At least 'group:artifact(:version)(:extend)', e.g. 'org.lwjgl:lwjgl-bgfx'");
         return { info[0], info[1], info.length > 2 ? info[2] : "+", ArrayHelper.sub(info, 3) };
     }
     

@@ -203,7 +203,7 @@ public interface HttpApi {
         
         {
             if (method.getParameterCount() > pathParameterCount + 1)
-                throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("Cannot be mapped to %s: %s".formatted(Callable.class.getCanonicalName(), method)));
+                throw DebugHelper.breakpointBeforeThrow(new IllegalStateException(STR."Cannot be mapped to \{Callable.class.getCanonicalName()}: \{method}"));
         }
         
         Type bodyType = method.getParameterCount() == pathParameterCount ? Void.class : method.getParameters()[pathParameterCount].getParameterizedType();
@@ -248,7 +248,7 @@ public interface HttpApi {
                 }
                 yield setting.client().send(copy.build(), ObjectHelper.requireNonNull(adapter.handler(this))).body();
             }
-            default                          -> throw new IllegalStateException("Unexpected value: " + cache);
+            default                          -> throw new IllegalStateException(STR."Unexpected value: \{cache}");
         };
         
     }
@@ -268,8 +268,8 @@ public interface HttpApi {
                 if (matcher.find()) {
                     final String queryParameters[] = matcher.group(1).split(",");
                     if (matcher.find())
-                        throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException("Invalid path with more than one optional query parameter list: " + path));
-                    withQueryPath = matcher.replaceFirst(Stream.of(queryParameters).map(it -> "%s={%s}".formatted(it, it)).collect(Collectors.joining("&", "?", "")));
+                        throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException(STR."Invalid path with more than one optional query parameter list: \{path}"));
+                    withQueryPath = matcher.replaceFirst(Stream.of(queryParameters).map(it -> STR."\{it}={\{it}}").collect(Collectors.joining("&", "?", "")));
                 }
             }
             final Matcher matcher = parameter.matcher(withQueryPath);
@@ -302,7 +302,7 @@ public interface HttpApi {
     static <T extends HttpApi> T make(final HttpSetting setting = HttpSetting.defaultInstance(), final Adapter adapter = Adapter.Default.instance(), final Class<T> apiInterface = CallerContext.caller()) {
         final @Nullable Endpoint endpoint = apiInterface.getAnnotation(Endpoint.class);
         if (endpoint == null)
-            throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("Class %s missing @Endpoint".formatted(apiInterface.getCanonicalName())));
+            throw DebugHelper.breakpointBeforeThrow(new IllegalStateException(STR."Class \{apiInterface.getCanonicalName()} missing @Endpoint"));
         final String root = endpoint.value();
         final Wrapper<T> wrapper = { apiInterface, "HttpApiInstance" };
         final org.objectweb.asm.Type wrapperType = wrapper.wrapperType();

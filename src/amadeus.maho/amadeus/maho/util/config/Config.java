@@ -35,7 +35,7 @@ public interface Config {
             @Override
             public Path locate(final Class<?> configType, final String name) = root() / name(configType, name);
             
-            protected String name(final Class<?> configType, final String name) = configType.getSimpleName().replace('$', '/') + "." + name + "." + suffix();
+            protected String name(final Class<?> configType, final String name) = STR."\{configType.getSimpleName().replace('$', '/')}.\{name}.\{suffix()}";
             
         }
         

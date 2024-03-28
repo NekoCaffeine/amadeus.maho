@@ -12,6 +12,6 @@ public record InferredGenericArrayType(GenericArrayType sourceType, Type generic
     public Type getGenericComponentType() = genericComponentType;
     
     @Override
-    public String toString() = getGenericComponentType().getTypeName() + "[]";
+    public String toString() = STR."\{getGenericComponentType().getTypeName()}[]";
     
 }

@@ -22,9 +22,9 @@ public record RuntimeWildcardType(Type upperBounds[], Type lowerBounds[]) implem
         if (lowerBounds.length == 0) {
             if (upperBounds.length == 0 || upperBounds[0] == Object.class)
                 return "?";
-            return "? extends " + toString(upperBounds);
+            return STR."? extends \{toString(upperBounds)}";
         }
-        return "? super " + toString(lowerBounds);
+        return STR."? super \{toString(lowerBounds)}";
     }
     
     private String toString(final Type bounds[]) = Stream.of(bounds).map(type -> type instanceof Class<?> clazz ? clazz.getName() : type.toString()).collect(Collectors.joining(" & "));

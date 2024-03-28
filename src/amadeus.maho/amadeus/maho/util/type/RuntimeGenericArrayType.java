@@ -9,7 +9,7 @@ public record RuntimeGenericArrayType(Type genericComponentType) implements Gene
     public Type getGenericComponentType() = genericComponentType;
     
     @Override
-    public String toString() = getGenericComponentType().getTypeName() + "[]";
+    public String toString() = STR."\{getGenericComponentType().getTypeName()}[]";
     
     @Override
     public boolean equals(final Object obj) = obj instanceof GenericArrayType genericArrayType && genericArrayType.equals(genericArrayType.getGenericComponentType());
