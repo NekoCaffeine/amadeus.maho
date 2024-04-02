@@ -9,12 +9,10 @@ import javax.tools.JavaFileObject;
 import jdk.jshell.ExpressionToTypeInfo;
 import jdk.jshell.SourceCodeAnalysisImpl;
 
-import com.sun.tools.javac.api.BasicJavacTask;
 import com.sun.tools.javac.api.JavacTaskImpl;
 import com.sun.tools.javac.code.Lint;
 import com.sun.tools.javac.code.Preview;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.TypeMetadata;
 import com.sun.tools.javac.comp.Annotate;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
@@ -30,7 +28,6 @@ import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
-import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 

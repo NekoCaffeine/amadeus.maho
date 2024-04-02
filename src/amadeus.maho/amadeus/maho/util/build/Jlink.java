@@ -193,7 +193,7 @@ public interface Jlink {
         final Path bin = root / DefaultImageBuilder.BIN_DIRNAME;
         final String derivedName = nameAdder.apply(prototype);
         derive(bin / prototype, bin / derivedName, args);
-        derive(bin / (STR."\{prototype}.bat"), bin / (STR."\{derivedName}.bat"), args);
+        derive(bin / STR."\{prototype}.bat", bin / STR."\{derivedName}.bat", args);
     }
     
     String JLINK_VM_OPTIONS_PATTERN = "JLINK_VM_OPTIONS=";

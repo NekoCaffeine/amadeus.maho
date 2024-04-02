@@ -19,7 +19,6 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
-import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;

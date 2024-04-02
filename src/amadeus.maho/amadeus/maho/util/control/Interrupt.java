@@ -1,6 +1,5 @@
 package amadeus.maho.util.control;
 
-import java.io.InterruptedIOException;
 import java.util.function.Supplier;
 
 import amadeus.maho.lang.SneakyThrows;

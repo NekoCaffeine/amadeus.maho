@@ -3,7 +3,6 @@ package amadeus.maho.lang.javac.multithreaded.parallel;
 import java.util.Queue;
 import javax.tools.JavaFileObject;
 
-import com.sun.source.util.TaskEvent;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.CompileStates;
 import com.sun.tools.javac.comp.Env;

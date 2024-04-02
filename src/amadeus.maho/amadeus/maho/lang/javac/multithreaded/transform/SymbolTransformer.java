@@ -1,7 +1,6 @@
 package amadeus.maho.lang.javac.multithreaded.transform;
 
 import java.security.ProtectionDomain;
-import java.util.List;
 import java.util.Set;
 
 import org.objectweb.asm.tree.ClassNode;

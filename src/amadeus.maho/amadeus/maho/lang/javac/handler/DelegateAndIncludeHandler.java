@@ -50,7 +50,7 @@ public class DelegateAndIncludeHandler extends BaseSyntaxHandler {
     
     public static class DelegateScope extends MembersScope {
         
-        public DelegateScope(final Scope scope) = super(scope, symbol -> JavacContext.noneMatch(symbol.flags(), STATIC) && symbol.name != symbol.name.table.names.init);
+        public DelegateScope(final Scope scope) = super(scope, symbol -> noneMatch(symbol.flags(), STATIC) && symbol.name != symbol.name.table.names.init);
         
     }
     

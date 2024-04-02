@@ -39,6 +39,7 @@ public interface JDWP {
     
     interface MessageQueue {
         
+        @SuppressWarnings("Assign")
         static void send(final IDECommand command) {
             breakpoint(); // set breakpoint here to enable message send
         }

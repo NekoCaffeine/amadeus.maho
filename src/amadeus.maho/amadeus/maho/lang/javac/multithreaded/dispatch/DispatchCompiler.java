@@ -386,7 +386,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         }
         // attribute (explicit) permits of the current class:
         if (classSymbol.isPermittedExplicit) {
-            final ListBuffer<Symbol> permittedSubtypeSymbols = new ListBuffer<>();
+            final ListBuffer<Symbol> permittedSubtypeSymbols = { };
             final List<JCTree.JCExpression> permittedTrees = tree.permitting;
             for (final JCTree.JCExpression permitted : permittedTrees) {
                 final Type pt = (Privilege) instance.attr.attribBase(permitted, baseEnv, false, false, false);
@@ -441,6 +441,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                 final ListBuffer<Symbol.ClassSymbol> uncompletedBuffer = { };
                 (Privilege) (nextEnter.uncompleted = uncompletedBuffer);
                 (Privilege) nextEnter.classEnter(tree, null);
+                // noinspection DataFlowIssue
                 (Privilege) (nextEnter.uncompleted = null);
                 uncompletedBuffer.forEach(classSymbol -> {
                     classSymbol.completer = Symbol.Completer.NULL_COMPLETER;
@@ -631,6 +632,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         final ConcurrentTransTypes transTypes = (ConcurrentTransTypes) TransTypes.instance(compiler.context);
         try {
             (Privilege) (transTypes.make = localMake);
+            // noinspection DataFlowIssue
             (Privilege) (transTypes.pt = null);
             transTypes.translateClass(symbol, env);
             compileStates[env] = CompileStates.CompileState.TRANSTYPES;

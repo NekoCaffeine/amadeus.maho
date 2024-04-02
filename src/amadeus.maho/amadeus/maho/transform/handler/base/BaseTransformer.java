@@ -181,10 +181,7 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
         }
         final boolean flag = !opposite;
         final String condition = expr;
-        return node -> {
-            final @Nullable String lookup = environment.lookup(condition);
-            return lookup != null && environment.lookup(condition, false) == flag;
-        };
+        return node -> Boolean.parseBoolean(environment.lookup(condition)) == flag;
     }
     
     @Override

@@ -124,7 +124,7 @@ public class ConcurrentCheck extends Check {
     public Name localClassName(final Symbol.ClassSymbol symbol) {
         final Name enclFlatname = symbol.owner.enclClass().flatname;
         final String enclFlatnameString = enclFlatname.toString();
-        final Pair<Name, Name> key = new Pair<>(enclFlatname, symbol.name);
+        final Pair<Name, Name> key = { enclFlatname, symbol.name };
         synchronized (shared) {
             final Integer index = shared.localClassNameIndexes.get(key);
             for (int i = index == null ? 1 : index; ; i++) {

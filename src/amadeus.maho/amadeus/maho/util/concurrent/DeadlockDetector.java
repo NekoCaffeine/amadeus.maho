@@ -37,7 +37,7 @@ public interface DeadlockDetector {
                     DiagnosticCommander.Thread.print();
                     DebugHelper.breakpoint();
                 }
-                Interrupt.doInterruptible(() -> Thread.sleep(1000 * 10));
+                Interrupt.doInterruptible(() -> sleep(1000 * 10));
             }
         }
         

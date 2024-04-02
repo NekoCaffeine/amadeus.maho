@@ -228,7 +228,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                 .map(parameter -> new DefaultVariable(maker.Modifiers(FINAL), parameter.name, (JCTree.JCExpression) copier.copy(parameter.vartype), (JCTree.JCExpression) copier.copy(initMapping[parameter]), null)
                         .let(it -> it.type = parameter.sym.type))
                 .collect(List.<JCTree.JCStatement>collector())
-                .append(methodDecl.sym.getReturnType() instanceof Type.JCVoidType ? maker.Exec(apply) : maker.Return(apply)));
+                .append(methodDecl.sym.getReturnType() instanceof Type.JCVoidType ? maker.at(methodDecl.pos).Exec(apply) : maker.at(methodDecl.pos).Return(apply)));
     }
     
 }

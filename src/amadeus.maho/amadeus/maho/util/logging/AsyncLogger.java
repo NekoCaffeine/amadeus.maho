@@ -101,7 +101,7 @@ public class AsyncLogger extends Thread implements AutoCloseable {
         if (!closed) {
             if (isAlive() && !Environment.local().lookup(MAHO_LOGS_FORCED_INTERRUPTION, false))
                 while (!records.isEmpty())
-                    Interrupt.doInterruptible(() -> Thread.sleep(10L));
+                    Interrupt.doInterruptible(() -> sleep(10L));
             closed = true;
             interrupt();
             consumers().stream()

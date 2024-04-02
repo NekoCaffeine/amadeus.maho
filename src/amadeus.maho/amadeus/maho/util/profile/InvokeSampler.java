@@ -2,7 +2,6 @@ package amadeus.maho.util.profile;
 
 import java.lang.invoke.MethodType;
 import java.util.ArrayDeque;
-import java.util.Comparator;
 import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

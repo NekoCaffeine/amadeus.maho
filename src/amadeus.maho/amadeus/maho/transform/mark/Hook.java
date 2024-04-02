@@ -20,7 +20,6 @@ import amadeus.maho.util.annotation.mark.DisallowLoading;
 import amadeus.maho.util.annotation.mark.Freeze;
 import amadeus.maho.util.annotation.mark.IgnoredDefaultValue;
 import amadeus.maho.util.annotation.mark.paradigm.AOP;
-import amadeus.maho.util.bytecode.Bytecodes;
 
 @AOP
 @Share(erase = @Erase(method = true))

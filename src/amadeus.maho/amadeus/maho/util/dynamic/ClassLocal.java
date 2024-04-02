@@ -32,7 +32,7 @@ public class ClassLocal<V> implements Local<Class<?>, V> { // Don't use the stup
                     return super.get(key);
                 } finally {
                     guard.close();
-                    guardLocal.set(null);
+                    guardLocal.remove();
                 }
             }
             return guard.apply(key);

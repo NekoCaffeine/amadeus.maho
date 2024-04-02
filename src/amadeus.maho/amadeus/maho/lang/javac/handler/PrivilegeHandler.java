@@ -46,7 +46,6 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.runtime.ArrayHelper;
-import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.core.extension.DynamicLookup.*;
 import static amadeus.maho.util.bytecode.Bytecodes.*;
@@ -365,7 +364,7 @@ public class PrivilegeHandler extends JavacContext {
                 } else {
                     dynamicMethodSymbol.owner = target.owner;
                     invocation.meth = maker.Ident(dynamicMethodSymbol);
-                    return expression;
+                    return invocation;
                 }
         } else if (target instanceof Symbol.VarSymbol varSymbol) {
             final boolean setter = expression instanceof JCTree.JCAssign || expression instanceof JCTree.JCAssignOp;
@@ -449,8 +448,7 @@ public class PrivilegeHandler extends JavacContext {
             if (((Privilege) $this.attr).attribType(cast.clazz, env).tsym.flatName() == handler.Privilege) {
                 (Privilege) $this.processArg(cast, speculativeTree -> new TypeCastParensType($this, cast, env, speculativeTree));
                 return Hook.Result.NULL;
-            } else if (cast.clazz.toString().contains("Privilege"))
-                DebugHelper.breakpoint();
+            }
         }
         return Hook.Result.VOID;
     }
@@ -461,8 +459,7 @@ public class PrivilegeHandler extends JavacContext {
         if (capture.tsym.flatName() == handler.Privilege) {
             (Privilege) ($this.result = (Privilege) $this.check(tree, (Privilege) $this.attribTree(tree.expr, ((Privilege) $this.env).dup(tree), (Privilege) $this.resultInfo), Kinds.KindSelector.VAL, (Privilege) $this.resultInfo));
             return Hook.Result.NULL;
-        }else if (tree.clazz.toString().contains("Privilege"))
-            DebugHelper.breakpoint();
+        }
         return Hook.Result.VOID;
     }
     
@@ -488,18 +485,22 @@ public class PrivilegeHandler extends JavacContext {
                     modifiers |= CONSTANT;
                 if (hasAnnotation(type, Special.class))
                     modifiers |= SPECIAL;
-                result = handler.makeIndyQualifier(parent, symbol(switch (parent) {
+                result = handler.castIfNeeded(tree, handler.makeIndyQualifier(parent, symbol(switch (parent) {
                     case JCTree.JCAssign it           -> it.lhs;
                     case JCTree.JCAssignOp it         -> it.lhs;
                     case JCTree.JCMethodInvocation it -> it.meth;
                     default                           -> parent;
-                }), modifiers, trees.size() > 1 && trees[-2] instanceof JCTree.JCExpressionStatement);
+                }), modifiers, trees.size() > 1 && trees[-2] instanceof JCTree.JCExpressionStatement));
             } catch (final ReLowException e) {
                 e.breakTree = tree;
+                e.tree = handler.castIfNeeded(tree, (JCTree.JCExpression) e.tree);
                 throw e;
             }
             throw new ReLowException(result, tree);
         }
     }
+    
+    private JCTree.JCExpression castIfNeeded(final JCTree.JCTypeCast cast, final JCTree.JCExpression expression)
+            = !expression.type.isPrimitiveOrVoid() && cast.type.tsym != expression.type.tsym ? maker.at(cast.pos).TypeCast(cast.type, expression) : expression;
     
 }

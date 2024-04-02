@@ -376,7 +376,7 @@ public interface JVMTI extends Library {
             JVMTI_EVENT_SAMPLED_OBJECT_ALLOC      = 86,
             JVMTI_MAX_EVENT_TYPE_VAL              = 86;
     
-    Map<String, ?> OPTIONS = Map.of(Library.OPTION_ALLOW_OBJECTS, Boolean.TRUE);
+    Map<String, ?> OPTIONS = Map.of(OPTION_ALLOW_OBJECTS, Boolean.TRUE);
     
     ConstantLookup lookup = new ConstantLookup().recording(JVMTI.class);
     
@@ -1861,7 +1861,6 @@ public interface JVMTI extends Library {
         }
     }
     
-    @SuppressWarnings("ConstantConditions")
     @Structure.FieldOrder("functions")
     class Env extends Structure {
         

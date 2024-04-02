@@ -38,7 +38,7 @@ public class LookupHandler extends JavacContext {
     
     public static final AtomicInteger counter = { };
     
-    public static Name nextName(final Names names = JavacContext.instance().names, final String name) = names.fromString("$lookup$%s$%d".formatted(name, counter.getAndIncrement()));
+    public static Name nextName(final Names names = instance().names, final String name) = names.fromString("$lookup$%s$%d".formatted(name, counter.getAndIncrement()));
     
     private static final Map<String, Class<?>> name2Class = Stream.of(Field.class, Method.class, Constructor.class, VarHandle.class, MethodHandle.class).collect(Collectors.toMap(Class::getCanonicalName, Function.identity()));
     

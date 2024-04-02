@@ -16,7 +16,7 @@ public class CodeBlob {
     
     private static final WhiteBox WB = WhiteBox.instance();
     
-    public static @Nullable CodeBlob[] getCodeBlobs(BlobType type) {
+    public static @Nullable CodeBlob[] getCodeBlobs(final BlobType type) {
         final @Nullable Object entries[] = WB.getCodeHeapEntries(type.id);
         return entries == null ? null : Stream.of(entries).map(Object[].class::cast).map(CodeBlob::new).toArray(CodeBlob[]::new);
     }

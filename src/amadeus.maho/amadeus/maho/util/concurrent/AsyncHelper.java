@@ -17,7 +17,6 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.inspection.TestOnly;
-import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.throwable.RetryException;
 
 public interface AsyncHelper {

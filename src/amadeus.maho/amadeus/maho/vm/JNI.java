@@ -100,7 +100,6 @@ public interface JNI extends Library {
         
     }
     
-    @SuppressWarnings("ConstantConditions")
     @Structure.FieldOrder("functions")
     class JavaVM extends Structure {
         

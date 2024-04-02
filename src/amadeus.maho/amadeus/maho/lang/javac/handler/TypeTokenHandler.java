@@ -39,7 +39,7 @@ public class TypeTokenHandler extends JavacContext {
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void visitApply(final Attr $this, final JCTree.JCMethodInvocation tree) {
         if (tree.args.isEmpty()) {
-            final Symbol symbol = JavacContext.symbol(tree.meth);
+            final Symbol symbol = symbol(tree.meth);
             final TypeTokenHandler instance = instance(TypeTokenHandler.class);
             if (symbol instanceof Symbol.MethodSymbol methodSymbol && methodSymbol.owner.getQualifiedName() == instance.typeTokenName)
                 if (methodSymbol.name == instance.captureName) {
@@ -52,7 +52,7 @@ public class TypeTokenHandler extends JavacContext {
                         instance.log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "type-token.missing.type-arg"));
                 } else if (methodSymbol.name == instance.locateName) {
                     if (tree.typeargs.size() == 2) {
-                        if (tree.typeargs[1].type instanceof com.sun.tools.javac.code.Type.ClassType classType && classType.typarams_field != null && classType.typarams_field.size() > 0) {
+                        if (tree.typeargs[1].type instanceof com.sun.tools.javac.code.Type.ClassType classType && classType.typarams_field != null && !classType.typarams_field.isEmpty()) {
                             final Symbol.TypeSymbol typeVarSymbol = tree.typeargs.head.type.tsym;
                             int index = -1;
                             final List<com.sun.tools.javac.code.Type> typeVars = classType.typarams_field;

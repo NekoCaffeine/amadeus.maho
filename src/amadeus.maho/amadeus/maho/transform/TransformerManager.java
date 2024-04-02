@@ -659,7 +659,6 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         public static void addOptions(final OpenOption... value) = options = ArrayHelper.addAll(options(), value);
         
         static {
-            state(Environment.local().lookup(MAHO_DEBUG_DUMP_BYTECODE, debug()));
             if (state())
                 init();
         }
@@ -690,5 +689,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         }
         
     }
+    
+    static { DebugDumper.state(Environment.local().lookup(MAHO_DEBUG_DUMP_BYTECODE, debug())); }
     
 }

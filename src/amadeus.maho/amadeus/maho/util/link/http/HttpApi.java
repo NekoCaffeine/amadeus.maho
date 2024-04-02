@@ -136,7 +136,7 @@ public interface HttpApi {
             @Override
             public HttpResponse.BodyHandler handler(final Callable callable) = responseInfo -> new ResponseSubscribers.ByteArraySubscriber<>(
                     bytes -> {
-                        final String json = new String(bytes, StandardCharsets.UTF_8);
+                        final String json = { bytes, StandardCharsets.UTF_8 };
                         final amadeus.maho.util.data.Json.Dynamic dynamic = { };
                         amadeus.maho.util.data.Json.read(json, dynamic);
                         return dynamic.root();
