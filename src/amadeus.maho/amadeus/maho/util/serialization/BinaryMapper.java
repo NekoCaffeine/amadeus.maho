@@ -4,7 +4,9 @@ import java.io.EOFException;
 import java.io.IOException;
 
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.ConstructorContract;
 
+@ConstructorContract
 public interface BinaryMapper extends Serializable, Deserializable {
     
     interface EOFMark {

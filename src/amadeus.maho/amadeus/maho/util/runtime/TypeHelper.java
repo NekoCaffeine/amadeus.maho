@@ -290,11 +290,21 @@ public interface TypeHelper {
     
     static <T> IntFunction<T[]> arrayConstructor(final Class<T> type) = size -> (T[]) Array.newInstance(type, size);
     
-    @Getter
     @SneakyThrows
     ClassLocal<MethodHandle> noArgConstructorLocal = { type -> MethodHandleHelper.lookup().findConstructor(type, MethodType.methodType(void.class)), true };
     
-    static MethodHandle noArgConstructorHandle(final Class<?> type) = noArgConstructorLocal()[type];
+    ClassLocal<Boolean> hasNoArgConstructorLocal = {
+            type ->  {
+                try {
+                    MethodHandleHelper.lookup().findConstructor(type, MethodType.methodType(void.class));
+                    return true;
+                } catch (final NoSuchMethodException | IllegalAccessException e) { return false; }
+            }, true
+    };
+    
+    static boolean hasNoArgConstructor(final Class<?> type) = hasNoArgConstructorLocal[type];
+    
+    static MethodHandle noArgConstructorHandle(final Class<?> type) = noArgConstructorLocal[type];
     
     @SneakyThrows
     static <T> Supplier<T> noArgConstructor(final Class<T> type) {

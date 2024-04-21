@@ -48,11 +48,11 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
                 .forEach(path -> useModulePath.test(path) ? p : cp += path);
         if (p.nonEmpty()) {
             args += "-p";
-            args += p.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator));
+            args += ScriptHelper.W_QUOTES.formatted(p.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator)));
         }
         if (cp.nonEmpty()) {
             args += "-cp";
-            args += cp.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator));
+            args += ScriptHelper.W_QUOTES.formatted(cp.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator)));
         }
         args += "-m";
         args += module.name();

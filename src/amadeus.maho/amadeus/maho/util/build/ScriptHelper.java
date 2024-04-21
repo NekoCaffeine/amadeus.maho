@@ -22,6 +22,7 @@ import static com.sun.jna.platform.win32.WinUser.*;
 public interface ScriptHelper {
     
     String
+            W_QUOTES      = "\"%s\"",
             D_PAIR        = "-D%s=%s",
             X_FLAG        = "-X%s",
             X_PAIR        = "-X%s:%s",

@@ -16,10 +16,12 @@ import java.util.stream.Stream;
 
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.data.Json;
 import amadeus.maho.util.depend.JarRequirements;
 import amadeus.maho.util.depend.Project;
 import amadeus.maho.util.depend.Repository;
 import amadeus.maho.util.depend.maven.MavenRepository;
+import amadeus.maho.util.dynamic.DynamicObject;
 import amadeus.maho.util.link.http.HttpSetting;
 import amadeus.maho.util.shell.Main;
 import amadeus.maho.util.tuple.Tuple2;
@@ -66,11 +68,12 @@ public interface IDEA {
         @SneakyThrows
         static Tuple2<String, String> inferInstanceMetadata(final Path instanceHome) {
             final Path product_info = instanceHome / "product-info.json";
-            if (Files.exists(product_info))
-                try {
-                    final String info = Files.readString(product_info);
-                    return { info.find("\"productCode\"\\s?:\\s?\\\"(.+?)\\\"").isEmptyOr("IC"), info.find("\"buildNumber\"\\s?:\\s?\\\"(.+?)\\\"").requireNonEmpty() };
-                } catch (final Exception ignored) { }
+            if (Files.exists(product_info)) {
+                final Json.Dynamic dynamic = { };
+                Json.read(product_info, dynamic);
+                final DynamicObject object = dynamic.root();
+                return { object["productCode"].asString(), object["buildNumber"].asString() };
+            }
             return { "IC", instanceHome.getFileName().toString() };
         }
         

@@ -333,7 +333,7 @@ public final class Maho {
         final Instrumentation instrumentation = instrumentation();
         if (!instrumentation.isModifiableClass(target))
             return null;
-        try (final var _ = sampler[target.getCanonicalName()]) {
+        try (final var _ = sampler[target.getName()]) {
             final GetBytecode transformer = { target };
             instrumentation.addTransformer(transformer, true);
             try { instrumentation.retransformClasses(target); } catch (final UnmodifiableClassException e) { return null; } finally { instrumentation.removeTransformer(transformer); }

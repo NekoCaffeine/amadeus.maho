@@ -19,7 +19,7 @@ public @interface ConstructorContract {
     
     }
     
-    Parameters[] value();
+    Parameters[] value() default { };
     
     boolean anyMatch() default true;
     

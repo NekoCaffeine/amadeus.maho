@@ -17,8 +17,7 @@ import amadeus.maho.lang.inspection.Nullable;
 @Extension
 public interface ByteBufferHelper {
     
-    @Extension.Operator("|")
-    static ByteBuffer expansionBuffer(final ByteBuffer buffer, final int size) {
+    static ByteBuffer ensureBufferCapacity(final ByteBuffer buffer, final int size, final boolean copy = true) {
         if (size < 1)
             return buffer;
         final int limit = buffer.position() + size;
@@ -30,7 +29,8 @@ public interface ByteBufferHelper {
         final ByteBuffer result = buffer.isDirect() ? ByteBuffer.allocateDirect(limit) : ByteBuffer.allocate(limit);
         result.order(buffer.order());
         buffer.flip();
-        result.put(buffer);
+        if (copy)
+            result.put(buffer);
         return result;
     }
     

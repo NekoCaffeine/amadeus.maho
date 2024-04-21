@@ -488,12 +488,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         return Hook.Result.VOID;
     }
     
-    private static final VarHandle
-            q           = lookupQ("q"),
-            validateQ   = lookupQ("validateQ"),
-            typesQ      = lookupQ("typesQ"),
-            afterTypesQ = lookupQ("afterTypesQ"),
-            allQ[]      = { q, typesQ, afterTypesQ, validateQ };
+    private static final Map<String, VarHandle> allQ = List.of("q", "typesQ", "afterTypesQ", "validateQ").stream().collect(Collectors.toMap(Function.identity(), DispatchCompiler::lookupQ));
     
     @SneakyThrows
     private static VarHandle lookupQ(final String name) = MethodHandleHelper.lookup().findVarHandle(Annotate.class, name, ListBuffer.class);
@@ -503,7 +498,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         if (JavacContext.instance().context instanceof DispatchContext context) {
             final DispatchCompiler instance = instance(context);
             if (instance.enterDoing) {
-                Stream.of(allQ).forEach(q -> runTask("flushQ", () -> instance.barrier(compiler -> run((Privilege) compiler.annotate, q), () -> run($this, q))));
+                allQ.forEach((name, q) -> runTask(STR."flush-\{name}", () -> instance.barrier(compiler -> run((Privilege) compiler.annotate, q), () -> run($this, q))));
                 return Hook.Result.NULL;
             }
         }

@@ -28,6 +28,11 @@ public @interface BinaryMapping {
     @Retention(RetentionPolicy.RUNTIME)
     @interface Unsigned { }
     
+    // The fields marked by this annotation will cause init expressions to be generate in the deserialization code. Will NOT act with @Constant
+    @Target(ElementType.FIELD)
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface ForWrite { }
+    
     // Use the `transient` modifier if you need to skip both reads and writes.
     
     // The fields marked by this annotation will only generate serialization code.

@@ -153,7 +153,15 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
                     injectMember(env, maker.MethodDef(maker.Modifiers(PUBLIC), write, maker.TypeIdent(TypeTag.VOID), List.nil(),
                             List.of(maker.VarDef(maker.Modifiers(FINAL | PARAMETER), output, IdentQualifiedName(Serializable.Output.class), null)), List.of(IdentQualifiedName(IOException.class)), maker.Block(0L, fields(tree)
                                     .filter(field -> !skipWrite(field, env))
-                                    .map(field -> maker.at(field.pos).Block(0L, write(maker.Ident(output), maker.Ident(field.name), field.sym.type, bigEndian(endian, field, env), unsigned || unsigned(field, env), 0).collect(List.collector())))
+                                    .map(field -> {
+                                        List<JCTree.JCStatement> statements = write(maker.at(field.pos).Ident(output), maker.Ident(field.name), field.sym.type, bigEndian(endian, field, env), unsigned || unsigned(field, env), 0).collect(List.collector());
+                                        if (field.init != null && !constant(field, env) && forWrite(field, env)) {
+                                            statements = statements.prepend(maker.at(field.init.pos).Exec(maker.Assign(maker.Ident(field.name), field.init)));
+                                            // noinspection DataFlowIssue
+                                            field.init = null;
+                                        }
+                                        return maker.at(field.pos).Block(0L, statements);
+                                    })
                                     .collect(List.<JCTree.JCStatement>collector())
                                     .prependList(callSuper ? List.of(maker.Block(0L, List.of(maker.Exec(maker.Apply(List.nil(), maker.Select(maker.Ident(names._super), write), List.of(maker.Ident(output))))))) : List.nil())), null));
             }
@@ -168,10 +176,11 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
                                     .map(field -> {
                                         final boolean constant = constant(field, env);
                                         final List<JCTree.JCStatement> assign;
-                                        if (constant || field.init == null)
+                                        if (constant || field.init == null || forWrite(field, env))
                                             assign = List.nil();
                                         else {
                                             assign = List.of(maker.at(field.init.pos).Exec(maker.Assign(maker.Ident(field.name), field.init)));
+                                            // noinspection DataFlowIssue
                                             field.init = null;
                                         }
                                         final EOFContext context = { annotation.eofMark() && ++p_index[0] == 0 ? EOFContext.Type.MARK_RETURN : optional(field, env) ? EOFContext.Type.RETURN : EOFContext.Type.THROW };
@@ -199,6 +208,8 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
     protected boolean unsigned(final JCTree.JCVariableDecl field, final Env<AttrContext> env) = hasAnnotation(field.mods, env, BinaryMapping.Unsigned.class);
     
     protected boolean constant(final JCTree.JCVariableDecl field, final Env<AttrContext> env) = hasAnnotation(field.mods, env, BinaryMapping.Constant.class);
+    
+    protected boolean forWrite(final JCTree.JCVariableDecl field, final Env<AttrContext> env) = hasAnnotation(field.mods, env, BinaryMapping.ForWrite.class);
     
     protected boolean skipRead(final JCTree.JCVariableDecl field, final Env<AttrContext> env) = hasAnnotation(field.mods, env, BinaryMapping.SkipRead.class);
     
