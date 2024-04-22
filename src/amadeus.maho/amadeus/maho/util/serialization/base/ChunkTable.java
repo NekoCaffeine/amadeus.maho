@@ -1,4 +1,4 @@
-package amadeus.maho.util.serialization;
+package amadeus.maho.util.serialization.base;
 
 import java.io.IOException;
 import java.lang.annotation.ElementType;
@@ -32,6 +32,7 @@ import amadeus.maho.util.dynamic.DynamicMethod;
 import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.TypeHelper;
+import amadeus.maho.util.serialization.BinaryMapper;
 import amadeus.maho.vm.JVMTI;
 
 @Getter

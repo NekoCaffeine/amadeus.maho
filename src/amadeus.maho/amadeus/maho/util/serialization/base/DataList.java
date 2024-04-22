@@ -1,4 +1,4 @@
-package amadeus.maho.util.serialization;
+package amadeus.maho.util.serialization.base;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -10,7 +10,7 @@ import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
-import amadeus.maho.util.runtime.DebugHelper;
+import amadeus.maho.util.serialization.BinaryMapper;
 
 @Getter
 @SneakyThrows
@@ -29,14 +29,12 @@ public class DataList<T extends BinaryMapper> implements BinaryMapper {
     
     @Override
     public void read(final Input input) throws IOException {
-        final Input subInput = { input };
+        final Input.Limited limited = { input, limitGetter.getAsLong() };
         final ArrayList<T> list = list();
         final Supplier<? extends T> maker = maker();
         final long limit = limitGetter.getAsLong();
-        while (subInput.offset() < limit)
-            list += maker.get().let(value -> value.deserialization(subInput));
-        if (subInput.offset() > limit)
-            DebugHelper.breakpointBeforeThrow(new OverflowException("sub input offset: %d, limit: %d".formatted(subInput.offset(), limit)));
+        while (limited.offset() < limit)
+            list += maker.get().let(value -> value.deserialization(limited));
     }
     
 }

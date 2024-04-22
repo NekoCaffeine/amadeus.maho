@@ -1,4 +1,4 @@
-package amadeus.maho.util.serialization;
+package amadeus.maho.util.serialization.base;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -9,6 +9,7 @@ import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.reference.Reference;
+import amadeus.maho.util.serialization.BinaryMapper;
 
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

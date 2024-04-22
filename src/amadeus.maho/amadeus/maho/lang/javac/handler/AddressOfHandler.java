@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import com.sun.tools.javac.code.Scope;
 import com.sun.tools.javac.code.Symbol;
@@ -77,7 +78,12 @@ public class AddressOfHandler extends JavacContext {
             allocateMemory = name("allocateMemory"),
             freeMemory     = name("freeMemory");
     
-    private Symbol.MethodSymbol lookup(final Symbol.ClassSymbol owner, final Name member) = (Symbol.MethodSymbol) owner.members().getSymbolsByName(member, Scope.LookupKind.NON_RECURSIVE).iterator().next();
+    private Symbol.MethodSymbol lookup(final Symbol.ClassSymbol owner, final Name member, final Predicate<Symbol.MethodSymbol> filter = _ -> true)
+            = (Symbol.MethodSymbol) owner.members().getSymbolsByName(member, symbol -> symbol instanceof Symbol.MethodSymbol methodSymbol && filter.test(methodSymbol), Scope.LookupKind.NON_RECURSIVE).iterator().next();
+    
+    private static Predicate<Symbol.MethodSymbol> arg(final int count) = method -> method.params().size() == count;
+    
+    private static final Predicate<Symbol.MethodSymbol> arg1 = arg(1), arg2 = arg(2);
     
     @Hook
     private static Hook.Result visitApply(final Attr $this, final JCTree.JCMethodInvocation invocation) {
@@ -143,12 +149,12 @@ public class AddressOfHandler extends JavacContext {
                 offset.type = symtab.longType;
                 mapping[unary] = offset;
                 if (!tuple.v2.contains(NEG)) {
-                    final JCTree.JCMethodInvocation put = maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."put\{name}", key -> lookup(Unsafe, name(key)))), List.of(offset, arg));
+                    final JCTree.JCMethodInvocation put = maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."put\{name}", key -> lookup(Unsafe, name(key), arg2))), List.of(offset, arg));
                     put.type = symtab.voidType;
                     before.append(maker.Exec(put));
                 }
                 if (!tuple.v2.contains(POS)) {
-                    final JCTree.JCAssign assign = maker.Assign(arg, maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."get\{name}", key -> lookup(Unsafe, name(key)))), List.of(offset)));
+                    final JCTree.JCAssign assign = maker.Assign(arg, maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."get\{name}", key -> lookup(Unsafe, name(key), arg1))), List.of(offset)));
                     assign.type = type;
                     after.append(maker.Exec(assign));
                 }

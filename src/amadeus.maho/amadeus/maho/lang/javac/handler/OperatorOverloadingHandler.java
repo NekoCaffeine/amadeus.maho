@@ -273,15 +273,14 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
             throw OperatorFieldAccess.Failure.instance();
     }
     
-    @Privilege
     public final @Nullable JCTree.JCExpression methodInvocation(final Name name, final Env<AttrContext> env, final JCTree.JCExpression source, final Supplier<JCTree.JCExpression>... expressions) {
         final List<JCTree.JCExpression> args = List.from(expressions).map(Supplier::get);
-        final Env<AttrContext> localEnv = env.dup(maker.at(source.pos).Apply(List.nil(), maker.Select(args.head, name), args.tail), env.info.dup());
+        final Env<AttrContext> localEnv = env.dup(maker.at(source.pos).Apply(List.nil(), maker.Select(args.head, name), args.tail), (Privilege) env.info.dup());
         final ListBuffer<Type> argTypes = { };
-        final Kinds.KindSelector kind = attr.attribArgs(Kinds.KindSelector.VAL, ((JCTree.JCMethodInvocation) localEnv.tree).args, localEnv, argTypes);
-        final Type methodPrototype = attr.newMethodTemplate(attr.resultInfo.pt, argTypes.toList(), List.nil());
-        localEnv.info.pendingResolutionPhase = null;
-        final Attr.ResultInfo resultInfo = attr.new ResultInfo(kind, methodPrototype, attr.resultInfo.checkContext);
+        final Kinds.KindSelector kind = (Privilege) attr.attribArgs(Kinds.KindSelector.VAL, ((JCTree.JCMethodInvocation) localEnv.tree).args, localEnv, argTypes);
+        final Type methodPrototype = (Privilege) attr.newMethodTemplate((Privilege) ((Privilege) attr.resultInfo).pt, argTypes.toList(), List.nil());
+        (Privilege) (localEnv.info.pendingResolutionPhase = null);
+        final Attr.ResultInfo resultInfo = (Privilege) attr.new ResultInfo(kind, methodPrototype, (Privilege) ((Privilege) attr.resultInfo).checkContext);
         final @Nullable Type methodType = discardDiagnostic(() -> {
             final List<JCTree.JCExpression> realArgs = List.from(expressions).map(Supplier::get);
             final OperatorFieldAccess access = { realArgs.head, name, null };
@@ -290,17 +289,14 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
             final LinkedList<JCTree> attrContext = HandlerSupport.attrContext();
             attrContext << (localEnv.tree = realApply);
             try {
-                return attr.attribTree(realApply.meth, localEnv, resultInfo);
+                return (Privilege) attr.attribTree(realApply.meth, localEnv, resultInfo);
             } catch (final OperatorFieldAccess.Failure failure) {
                 return null;
             } catch (final ReAttrException e) {
                 if (e.breakTree == localEnv.tree) {
                     e.breakTree = source;
-                    if (e.tree instanceof JCTree.JCMethodInvocation invocation) {
-                        final OperatorInvocation operatorInvocation = { invocation.meth, invocation.args, source };
-                        operatorInvocation.type = invocation.meth.type?.getReturnType() ?? null;
-                        e.tree = operatorInvocation;
-                    }
+                    if (e.tree instanceof JCTree.JCMethodInvocation invocation)
+                        e.tree = new OperatorInvocation(invocation.meth, invocation.args, source);
                 }
                 throw e;
             } finally { attrContext--; }
@@ -308,8 +304,8 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         if (methodType != null)
             if (localEnv.tree instanceof JCTree.JCMethodInvocation overloading) {
                 if (!methodType.isErroneous()) {
-                    final Type returnType = methodType.getReturnType(), capturedReturnType = resultInfo.checkContext.inferenceContext().cachedCapture(source, returnType, true);
-                    attr.result = attr.check(overloading, capturedReturnType, Kinds.KindSelector.VAL, resultInfo);
+                    final Type returnType = methodType.getReturnType(), capturedReturnType = (Privilege) ((Privilege) resultInfo.checkContext).inferenceContext().cachedCapture(source, returnType, true);
+                    (Privilege) (attr.result = (Privilege) attr.check(overloading, capturedReturnType, Kinds.KindSelector.VAL, resultInfo));
                     final Symbol symbol = symbol(overloading.meth);
                     final List<JCTree.JCExpression> realArgs = List.from(expressions).map(Supplier::get);
                     final OperatorInvocation invocation;
@@ -317,7 +313,6 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                         invocation = { maker.at(source.pos).QualIdent(symbol), realArgs, source };
                     else
                         invocation = { maker.at(source.pos).Select(realArgs.head, symbol), realArgs.tail, source };
-                    invocation.type = methodType.getReturnType();
                     return invocation;
                 }
             } else
