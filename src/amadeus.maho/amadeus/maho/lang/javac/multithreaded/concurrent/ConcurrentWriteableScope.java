@@ -1,6 +1,7 @@
 package amadeus.maho.lang.javac.multithreaded.concurrent;
 
 import java.util.Collection;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -41,13 +42,13 @@ public class ConcurrentWriteableScope extends Scope.WriteableScope {
     @Default
     @Nullable ConcurrentWriteableScope next = null;
     
-    protected Queue<Symbol> queue(final Name name) = symbolTables.computeIfAbsent(name, _ -> new LinkedList<>());
+    protected Deque<Symbol> queue(final Name name) = symbolTables.computeIfAbsent(name, _ -> new LinkedList<>());
     
     @Override
     public void enter(final Symbol symbol) {
         lock.writeLock().lock();
         try {
-            queue(symbol.name) += symbol;
+            queue(symbol.name) >> symbol;
             symbols >> symbol;
             (Privilege) listeners.symbolAdded(symbol, this);
         } finally { lock.writeLock().unlock(); }
@@ -57,9 +58,9 @@ public class ConcurrentWriteableScope extends Scope.WriteableScope {
     public void enterIfAbsent(final Symbol symbol) {
         lock.writeLock().lock();
         try {
-            final Queue<Symbol> queue = queue(symbol.name);
+            final Deque<Symbol> queue = queue(symbol.name);
             if (queue.stream().noneMatch(it -> it.kind == symbol.kind)) {
-                queue += symbol;
+                queue >> symbol;
                 symbols >> symbol;
                 (Privilege) listeners.symbolAdded(symbol, this);
             }

@@ -309,7 +309,7 @@ public class DynamicMethod {
     public String debugName() = debugName.replace('.', '$');
     
     @Getter
-    final Type wrapperType = Type.getObjectType(STR."\{CLASS_NAME}$\{debugName()}");
+    final Type wrapperType = Type.getObjectType(STR."\{CLASS_NAME}$$\{debugName()}");
     
     @Getter
     final LinkedList<FieldNode> closure = { };

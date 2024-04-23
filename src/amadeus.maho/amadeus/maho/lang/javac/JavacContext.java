@@ -566,9 +566,10 @@ public class JavacContext {
     
     public static void drop() = contextLocal.remove();
     
+    public static <T> T instance(final Class<T> clazz, @Nullable final Function<Context, T> orElseGet = null) = instance(contextLocal.get().context, clazz, orElseGet);
+    
     @SneakyThrows
-    public static <T> T instance(final Class<T> clazz, @Nullable final Function<Context, T> orElseGet = null) {
-        final Context context = contextLocal.get().context;
+    public static <T> T instance(final Context context, final Class<T> clazz, @Nullable final Function<Context, T> orElseGet = null) {
         @Nullable T result = context.get(clazz);
         if (result == null) {
             final Context.Key<T> key = (Privilege) context.key(clazz);

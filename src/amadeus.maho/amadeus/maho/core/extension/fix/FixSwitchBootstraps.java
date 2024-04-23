@@ -5,8 +5,10 @@ import java.lang.invoke.MethodHandles;
 import java.lang.runtime.SwitchBootstraps;
 
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.transform.AOTTransformer;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
+import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.LookupHelper;
 
@@ -26,7 +28,7 @@ interface FixSwitchBootstraps {
     
     MethodHandle check = LookupHelper.methodHandle3(Checker::check);
     
-    @Hook(value = SwitchBootstraps.class, isStatic = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    @Hook(value = SwitchBootstraps.class, isStatic = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     private static MethodHandle createMethodHandleSwitch(final MethodHandle capture, final MethodHandles.Lookup lookup, final Object labels[])
             = guardWithTest(check.bindTo((Checker) () -> labels.length), dropArguments(constant(int.class, labels.length), 0, Object.class, int.class), capture);
     

@@ -185,6 +185,10 @@ public interface Javac {
     
     AtomicReference<Boolean> parallelStrategy = { };
     
+    static void parallel() = parallelStrategy.set(true);
+    
+    static void serial() = parallelStrategy.set(false);
+    
     {
         final @Nullable String strategy = System.getProperty("amadeus.maho.compile.parallel");
         if (strategy != null)

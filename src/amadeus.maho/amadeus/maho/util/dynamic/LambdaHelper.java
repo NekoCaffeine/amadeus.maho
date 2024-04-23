@@ -26,36 +26,46 @@ import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 
 public interface LambdaHelper {
     
-    static Method lookupFunctionalMethodWithInterface(final Class<?> lambdaType) {
-        if (!lambdaType.isInterface())
-            throw new IllegalArgumentException(STR."\{lambdaType} is not an interface");
-        final Method methods[] = Stream.of(lambdaType.getMethods())
-                .filter(ReflectionHelper.anyMatch(ReflectionHelper.ABSTRACT))
-                .toArray(Method[]::new);
-        if (methods.length != 1)
-            throw new IllegalArgumentException(STR."\{lambdaType}.getMethods().length != 1");
-        return methods[0];
+    static Stream<Method> functionalMethods(final Class<?> lambdaType) = Stream.of(lambdaType.getMethods())
+            .filter(ReflectionHelper.anyMatch(ReflectionHelper.ABSTRACT))
+            .filter(ReflectionHelper.noneMatch(ReflectionHelper.BRIDGE));
+    
+    static Method lookupFunctionalMethodWithInterface(final Class<?> functionalInterfaceType) {
+        if (!functionalInterfaceType.isInterface())
+            throw new IllegalArgumentException(STR."\{functionalInterfaceType} is not an interface");
+        final List<Method> methods = functionalMethods(functionalInterfaceType).toList();
+        if (methods.size() != 1)
+            throw new IllegalArgumentException(STR."\{functionalInterfaceType}.getMethods().length != 1");
+        return methods.getFirst();
     }
     
-    static boolean isFunctionalInterface(final Class<?> interfaceType) = Stream.of(interfaceType.getMethods())
-            .filter(ReflectionHelper.anyMatch(ReflectionHelper.ABSTRACT))
-            .filter(ReflectionHelper.noneMatch(ReflectionHelper.BRIDGE))
-            .count() == 1;
+    static boolean isFunctionalInterface(final Class<?> interfaceType) = interfaceType.isInterface() && functionalMethods(interfaceType).count() == 1;
     
-    static Class<?> lookupFunctionalInterface(final Class<?> lambdaType) = Stream.of(lambdaType.getInterfaces())
-            .filter(LambdaHelper::isFunctionalInterface)
-            .findFirst()
-            .orElseThrow(IllegalArgumentException::new);
+    static List<Class<?>> lookupFunctionalInterfaces(final Class<?> lambdaType) {
+        final List<Class<?>> interfaces = Stream.of(lambdaType.getInterfaces())
+                .filter(LambdaHelper::isFunctionalInterface)
+                .toList();
+        if (interfaces.isEmpty())
+            throw new IllegalArgumentException(STR."\{lambdaType}.getInterfaces().length == 0");
+        interfaces.stream()
+                .map(LambdaHelper::lookupFunctionalMethodWithInterface)
+                .map(method -> method.getName() + Type.getMethodDescriptor(method))
+                .distinct()
+                .reduce((a, b) -> { throw new IllegalArgumentException(STR."\{a} != \{b}"); });
+        return interfaces;
+    }
+    
+    static Class<?> lookupFunctionalInterface(final Class<?> lambdaType) = lookupFunctionalInterfaces(lambdaType).getFirst();
     
     // missing generics
     static Method lookupFunctionalMethodWithLambda(final Class<?> lambdaType) {
-        final Method methods[] = Stream.of(lambdaType.getDeclaredMethods())
+        final List<Method> methods = Stream.of(lambdaType.getDeclaredMethods())
                 .filter(ReflectionHelper.noneMatch(ReflectionHelper.STATIC))
                 .filter(ReflectionHelper.noneMatch(ReflectionHelper.BRIDGE))
-                .toArray(Method[]::new);
-        if (methods.length != 1)
+                .toList();
+        if (methods.size() != 1)
             throw new IllegalArgumentException(STR."\{lambdaType}.getMethods().length != 1");
-        return methods[0];
+        return methods.getFirst();
     }
     
     @SneakyThrows
@@ -138,6 +148,6 @@ public interface LambdaHelper {
         return instance;
     }
     
-    static boolean isLambdaClass(final Class<?> clazz) = clazz.getCanonicalName() == null && clazz.getName().contains("$Lambda$") && clazz.getName().indexOf('/') != -1;
+    static boolean isLambdaClass(final Class<?> clazz) = clazz.isSynthetic() && clazz.isHidden() && clazz.getInterfaces().length > 0 && clazz.getName().contains("$Lambda");
     
 }
