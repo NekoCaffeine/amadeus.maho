@@ -17,6 +17,8 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import jdk.internal.misc.Unsafe;
+
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Default;
@@ -167,6 +169,8 @@ public enum JIT {
     @Getter
     private static final Level defautLevel = Level.valueOf(Environment.local().lookup("maho.jit.level.default", Level.FULL_PROFILE.name()));
     
+    private static final Unsafe unsafe = UnsafeHelper.unsafe();
+    
     private volatile boolean isReady = false;
     
     private final ConcurrentWeakIdentityHashMap<Executable, Level> waitingQueue = { };
@@ -182,9 +186,12 @@ public enum JIT {
                         return;
                     }
                 }
-            if (Compiler.WB.getMethodCompilationLevel(executable) < level.ordinal() && Compiler.WB.isMethodCompilable(executable, level.ordinal()))
-                if (!Compiler.WB.enqueueMethodForCompilation(executable, level.ordinal()) && level > Level.SIMPLE)
-                    Compiler.WB.enqueueMethodForCompilation(executable, Level.SIMPLE.ordinal());
+            final Class<?> declaringClass = executable.getDeclaringClass();
+            unsafe.ensureClassInitialized(declaringClass);
+            if (!unsafe.shouldBeInitialized(declaringClass))
+                if (Compiler.WB.getMethodCompilationLevel(executable) < level.ordinal() && Compiler.WB.isMethodCompilable(executable, level.ordinal()))
+                    if (!Compiler.WB.enqueueMethodForCompilation(executable, level.ordinal()) && level > Level.SIMPLE)
+                        Compiler.WB.enqueueMethodForCompilation(executable, Level.SIMPLE.ordinal());
         }
     }
     
