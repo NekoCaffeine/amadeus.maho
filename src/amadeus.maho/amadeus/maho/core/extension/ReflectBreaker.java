@@ -1,6 +1,8 @@
 package amadeus.maho.core.extension;
 
+import java.lang.invoke.MemberName;
 import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -11,6 +13,7 @@ import java.util.function.BiConsumer;
 
 import jdk.internal.reflect.FieldAccessorImpl;
 import jdk.internal.reflect.Reflection;
+import jdk.internal.reflect.ReflectionFactory;
 
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Privilege;
@@ -37,6 +40,12 @@ public class ReflectBreaker {
         
         @Hook(forceReturn = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
         private static void throwFinalFieldIllegalAccessException(final FieldAccessorImpl $this, final String attemptedType, final String attemptedValue) { }
+        
+        @Hook(at = @At(method = @At.MethodInsn(name = "newFieldAccessor")), capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+        private static boolean newFieldAccessor(final boolean capture, final ReflectionFactory $this, final Field field, final boolean override) = false;
+        
+        @Hook(forceReturn = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
+        private static boolean isTrustedFinalField(final MemberName $this) = false;
         
     }
     

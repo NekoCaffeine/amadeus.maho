@@ -5,11 +5,14 @@ import java.lang.ref.ReferenceQueue;
 import java.util.function.Consumer;
 
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
+import amadeus.maho.util.control.Interrupt;
 
 public interface ReferenceCollector {
     
@@ -30,8 +33,12 @@ public interface ReferenceCollector {
         
     }
     
+    @RequiredArgsConstructor
     @FieldDefaults(level = AccessLevel.PROTECTED)
     class Base implements ReferenceCollector, Runnable {
+        
+        @Default
+        final int collectInterval = 10;
         
         final ConcurrentWeakIdentityHashMap.Managed<Collectible<?>, Boolean> queue = { };
         
@@ -53,10 +60,10 @@ public interface ReferenceCollector {
         public void run() {
             // noinspection InfiniteLoopStatement
             while (true)
-                try {
+                Interrupt.doInterruptible(() -> {
                     collect();
-                    Thread.sleep(10);
-                } catch (final InterruptedException e) { Thread.interrupted(); }
+                    Thread.sleep(collectInterval);
+                });
         }
         
         public synchronized void start() throws IllegalStateException {
