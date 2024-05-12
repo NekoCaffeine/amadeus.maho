@@ -297,18 +297,19 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                 generator.loadThis();
             generator.loadArgs();
         } else {
-            final Type sourceArgs[] = Type.getArgumentTypes(sourceMethod.desc), targetArgs[] = Type.getArgumentTypes(methodNode.desc);
-            final int offset = captureType != Type.VOID_TYPE ? 1 : 0;
-            int length = sourceArgs.length - offset;
+            final Type sourceArgs[] = Type.getArgumentTypes(sourceMethod.desc), targetArgs[] = generator.argumentTypes;
+            int offset = captureType != Type.VOID_TYPE ? 1 : 0, length = sourceArgs.length - offset;
             if (length > 0 && noneMatch(methodNode.access, ACC_STATIC)) {
                 generator.loadThis();
+                offset++;
                 length--;
             }
             if (length > 0)
                 for (int i = 0; i < length; i++) {
                     if (i < targetArgs.length) {
                         generator.loadArg(i);
-                        generator.checkCast(sourceArgs[i + offset]);
+                        if (!targetArgs[i].equals(sourceArgs[i + offset]))
+                            generator.checkCast(sourceArgs[i + offset]);
                     } else
                         generator.pushDefaultLdc(sourceArgs[i + offset]);
                 }

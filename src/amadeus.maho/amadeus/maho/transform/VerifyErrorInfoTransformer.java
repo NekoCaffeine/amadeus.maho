@@ -3,6 +3,8 @@ package amadeus.maho.transform;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,6 +27,8 @@ import static amadeus.maho.util.bytecode.Bytecodes.ALOAD;
 @TransformProvider
 public interface VerifyErrorInfoTransformer {
     
+    AtomicReference<List<VerifyError>> verifyErrorsRef = { };
+    
     Pattern locationPattern = Pattern.compile("Location:\\s+(?<class>.*?)\\.(?<method>.*?)(?<descriptor>\\(.*?\\).*?) "), reasonPattern = Pattern.compile("Reason:\\s+(?<reason>.*)\\n");
     
     String EXPECTED_STACKMAP = "Expected stackmap frame at this location.", EXPECTED_STACKMAP_OR_DEAD_CODE = "Expected stackmap frame at this location, or this location is unreachable.";
@@ -33,6 +37,7 @@ public interface VerifyErrorInfoTransformer {
     private static @Nullable String _init_(final String capture, final VerifyError $this, final @Nullable String message) {
         if (message == null)
             return null;
+        verifyErrorsRef.get()?.add($this);
         final String transformed[] = { message };
         try {
             {

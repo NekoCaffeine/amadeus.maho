@@ -117,23 +117,15 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 final Class classes[] = (preLoadedClasses.isEmpty() ? stream : stream.filter(clazz -> !preLoadedClasses.contains(clazz)))
                         .filter(clazz -> transformers.stream().anyMatch(transformer -> transformer.isTarget(clazz)))
                         .toArray(Class[]::new);
-                try {
-                    instrumentation.retransformClasses(classes);
-                } catch (final LinkageError | InternalError error) {
-                    if (classes.length > 1) {
-                        for (final Class clazz : classes)
-                            try {
-                                instrumentation.retransformClasses(clazz);
-                            } catch (final LinkageError | InternalError singleError) {
-                                final ExtraInformationThrowable extraInformation = { clazz.toString() };
-                                singleError.addSuppressed(extraInformation);
-                                DebugHelper.breakpointWhenDebug(singleError);
-                                error.addSuppressed(extraInformation);
-                            }
-                    }
-                    for (final Class clazz : classes)
-                        error.addSuppressed(new ExtraInformationThrowable(clazz.toString()));
-                    throw DebugHelper.breakpointBeforeThrow(error);
+                synchronized (VerifyErrorInfoTransformer.verifyErrorsRef) {
+                    final ArrayList<VerifyError> verifyErrors = { };
+                    VerifyErrorInfoTransformer.verifyErrorsRef.set(verifyErrors);
+                    try {
+                        instrumentation.retransformClasses(classes);
+                    } catch (final LinkageError | InternalError error) {
+                        verifyErrors.forEach(error::addSuppressed);
+                        throw DebugHelper.breakpointBeforeThrow(error);
+                    } finally { VerifyErrorInfoTransformer.verifyErrorsRef.set(null); }
                 }
             } finally {
                 preLoadedClasses.clear();
