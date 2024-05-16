@@ -12,6 +12,7 @@ import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.Resolve;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeInfo;
+import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
@@ -50,7 +51,7 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
         if (alias.length == 0 || Stream.of(alias).mapToInt(String::length).anyMatch(it -> it != length))
             log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, new JCDiagnostic.Error(MahoJavac.KEY, "rearrange.target.invalid.fields.alisa"));
         final Type componentType = recordFields[0].sym.type;
-        instance(DelayedContext.class).todos() += _ -> instance(RearrangeHandler.class).process(annotation, annotationTree, recordFields, componentType);
+        instance(DelayedContext.class).todos() += context -> instance(context, RearrangeHandler.class).process(annotation, annotationTree, recordFields, componentType);
     }
     
     private void process(final Rearrange annotation, final JCTree.JCAnnotation annotationTree, final List<JCTree.JCVariableDecl> recordFields, final Type componentType) {
@@ -109,21 +110,18 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
     
     private void let(final int indexes[], final Env<AttrContext> env, final JCTree.JCFieldAccess access, final Symbol.ClassSymbol symbol, final Symbol.ClassSymbol targetSymbol) {
         final @Nullable List<? extends Symbol.RecordComponent> components = symbol.getRecordComponents();
-        final int pos = maker.pos;
-        final JCTree.JCCompilationUnit topLevel = maker.toplevel;
-        try {
-            final JCTree.JCExpression expression;
-            if (access.selected instanceof JCTree.JCIdent ident) {
-                final List<JCTree.JCExpression> args = IntStream.of(indexes).mapToObj(index -> components[index]).map(it -> maker.Apply(List.nil(), maker.Select(ident, it), List.nil())).collect(List.collector());
-                expression = maker.at(access.pos).forToplevel(env.toplevel).NewClass(null, List.nil(), maker.Ident(targetSymbol), args, null);
-            } else {
-                final Name letName = LetHandler.nextName(names);
-                final JCTree.JCVariableDecl let = maker.VarDef(maker.Modifiers(FINAL), letName, maker.Type(access.selected.type), access.selected);
-                final List<JCTree.JCExpression> args = IntStream.of(indexes).mapToObj(index -> components[index]).map(it -> maker.Apply(List.nil(), maker.Select(maker.Ident(letName), it), List.nil())).collect(List.collector());
-                expression = maker.LetExpr(let, maker.at(access.pos).forToplevel(env.toplevel).NewClass(null, List.nil(), maker.Ident(targetSymbol), args, null));
-            }
-            throw new ReAttrException(() -> access.type = expression.type, expression, access);
-        } finally { maker.at(pos).forToplevel(topLevel); }
+        final TreeMaker maker = this.maker.forToplevel(env.toplevel).at(access.pos);
+        final JCTree.JCExpression expression;
+        if (access.selected instanceof JCTree.JCIdent ident) {
+            final List<JCTree.JCExpression> args = IntStream.of(indexes).mapToObj(index -> components[index]).map(it -> maker.Apply(List.nil(), maker.Select(ident, it), List.nil())).collect(List.collector());
+            expression = maker.NewClass(null, List.nil(), maker.Ident(targetSymbol), args, null);
+        } else {
+            final Name letName = LetHandler.nextName(names);
+            final JCTree.JCVariableDecl let = maker.VarDef(maker.Modifiers(FINAL), letName, maker.Type(access.selected.type), access.selected);
+            final List<JCTree.JCExpression> args = IntStream.of(indexes).mapToObj(index -> components[index]).map(it -> maker.Apply(List.nil(), maker.Select(maker.Ident(letName), it), List.nil())).collect(List.collector());
+            expression = maker.LetExpr(let, maker.NewClass(null, List.nil(), maker.Ident(targetSymbol), args, null));
+        }
+        throw new ReAttrException(() -> access.type = expression.type, expression, access);
     }
     
 }

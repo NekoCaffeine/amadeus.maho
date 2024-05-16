@@ -12,6 +12,8 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Delegate {
     
+    boolean hard() default false;
+    
     Class<?>[] only() default { };
     
     Annotation[] on() default { };

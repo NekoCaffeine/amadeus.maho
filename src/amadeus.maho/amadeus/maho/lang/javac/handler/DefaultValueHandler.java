@@ -122,6 +122,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
     }
     
     public static void eraseInitialization(final JCTree.JCVariableDecl decl) {
+        // noinspection DataFlowIssue
         decl.init = null;
         final @Nullable Symbol.VarSymbol sym = decl.sym;
         if (sym != null) {
@@ -161,7 +162,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
         return capture;
     }
     
-    private static final long removeFlags = ~(ABSTRACT | NATIVE | SYNCHRONIZED | RECORD | COMPACT_RECORD_CONSTRUCTOR);
+    public static final long removeFlags = ~(ABSTRACT | NATIVE | SYNCHRONIZED | RECORD | COMPACT_RECORD_CONSTRUCTOR);
     
     @Override
     public void process(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final boolean advance) {
@@ -178,49 +179,42 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                                     .map(ArrayList::new))
                             .collect(Collectors.toCollection(ArrayList::new));
                     if (!list.isEmpty()) { // Exhaustive different possible defaults.
-                        final int pos = maker.pos;
-                        final JCTree.JCCompilationUnit toplevel = maker.toplevel;
-                        maker.pos = tree.pos;
-                        maker.toplevel = env.toplevel;
-                        try {
-                            final List<JCTree.JCVariableDecl> params = methodDecl.params;
-                            final Env<AttrContext> methodEnv = (Privilege) memberEnter.methodEnv(methodDecl, env);
-                            (Privilege) (methodEnv.info.lint = lint);
-                            final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping = params.stream()
-                                    .filter(decl -> decl.init != null)
-                                    .peek(decl -> decl.type = attr.attribType(decl.vartype, methodEnv))
-                                    .peek(decl -> { // Allowing default parameters to be declared as an array can be done using only curly braces without full declaration.
-                                        if (decl.init instanceof JCTree.JCNewArray newArray && newArray.elemtype == null)
-                                            if (decl.type instanceof Type.ArrayType arrayType)
-                                                newArray.elemtype = maker.at(methodDecl.pos).Type(arrayType.elemtype);
-                                            else
-                                                AssignHandler.lower(decl, newArray, decl.type);
-                                    })
-                                    .collect(Collectors.toMap(Function.identity(), decl -> decl.init));
-                            params.forEach(DefaultValueHandler::eraseInitialization);
-                            final boolean def = noneMatch(methodDecl.mods.flags, PRIVATE | STATIC) && anyMatch(modifiers(owner).flags, INTERFACE);
-                            if (def)
-                                modifiers(owner).flags |= DEFAULT;
-                            list.forEach(defaultParameters -> injectMember(env, derivedMethod(maker.at(methodDecl.pos).Modifiers(methodDecl.mods.flags & removeFlags | (def ? DEFAULT : 0), methodDecl.mods.annotations),
-                                    methodDecl.name, methodDecl.restype, methodDecl.typarams, params.stream()
-                                            .filter(parameter -> defaultParameters.stream().noneMatch(defaultParameter -> defaultParameter == parameter))
-                                            .map(parameter -> maker.at(parameter.pos).VarDef(parameter.mods, parameter.name, parameter.vartype, null))
-                                            .collect(List.collector()), methodDecl.thrown, body(methodDecl, params, initMapping, defaultParameters, env), null, methodDecl)));
-                        } finally {
-                            maker.pos = pos;
-                            maker.toplevel = toplevel;
-                        }
+                        final TreeMaker maker = this.maker.forToplevel(env.toplevel).at(tree.pos);
+                        final List<JCTree.JCVariableDecl> params = methodDecl.params;
+                        final Env<AttrContext> methodEnv = (Privilege) memberEnter.methodEnv(methodDecl, env);
+                        (Privilege) (methodEnv.info.lint = lint);
+                        final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping = params.stream()
+                                .filter(decl -> decl.init != null)
+                                .peek(decl -> decl.type = attr.attribType(decl.vartype, methodEnv))
+                                .peek(decl -> { // Allowing default parameters to be declared as an array can be done using only curly braces without full declaration.
+                                    if (decl.init instanceof JCTree.JCNewArray newArray && newArray.elemtype == null)
+                                        if (decl.type instanceof Type.ArrayType arrayType)
+                                            newArray.elemtype = maker.at(methodDecl.pos).Type(arrayType.elemtype);
+                                        else
+                                            AssignHandler.lower(decl, newArray, decl.type);
+                                })
+                                .collect(Collectors.toMap(Function.identity(), decl -> decl.init));
+                        params.forEach(DefaultValueHandler::eraseInitialization);
+                        final boolean def = noneMatch(methodDecl.mods.flags, PRIVATE | STATIC) && anyMatch(modifiers(owner).flags, INTERFACE);
+                        if (def)
+                            modifiers(owner).flags |= DEFAULT;
+                        list.forEach(defaultParameters -> injectMember(env, derivedMethod(maker, maker.at(methodDecl.pos).Modifiers(methodDecl.mods.flags & removeFlags | (def ? DEFAULT : 0), methodDecl.mods.annotations),
+                                methodDecl.name, methodDecl.restype, methodDecl.typarams, params.stream()
+                                        .filter(parameter -> defaultParameters.stream().noneMatch(defaultParameter -> defaultParameter == parameter))
+                                        .map(parameter -> maker.at(parameter.pos).VarDef(parameter.mods, parameter.name, parameter.vartype, null))
+                                        .collect(List.collector()), methodDecl.thrown, body(maker, methodDecl, params, initMapping, defaultParameters, env), null, methodDecl)));
+                        
                     }
                 }
             }
         }
     }
     
-    public JCTree.JCMethodDecl derivedMethod(final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression restype, final List<JCTree.JCTypeParameter> typarams,
+    protected DerivedMethod derivedMethod(final TreeMaker maker, final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression restype, final List<JCTree.JCTypeParameter> typarams,
             final List<JCTree.JCVariableDecl> params, final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, final @Nullable JCTree.JCExpression defaultValue, final JCTree.JCMethodDecl source)
             = new DerivedMethod(mods, name, restype, typarams, null, params, thrown, body, defaultValue, null, source).let(result -> result.pos = maker.pos);
     
-    protected JCTree.JCBlock body(final JCTree.JCMethodDecl methodDecl, final List<JCTree.JCVariableDecl> params, final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping,
+    protected JCTree.JCBlock body(final TreeMaker maker, final JCTree.JCMethodDecl methodDecl, final List<JCTree.JCVariableDecl> params, final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping,
             final Collection<JCTree.JCVariableDecl> defaultParameters, final Env<AttrContext> env) {
         final TreeCopier copier = { maker };
         final JCTree.JCMethodInvocation apply = maker.Apply(null, maker.Ident(methodDecl.name.equals(names.init) ? names._this : methodDecl.name), params.map(parameter -> maker.Ident(parameter.name)));

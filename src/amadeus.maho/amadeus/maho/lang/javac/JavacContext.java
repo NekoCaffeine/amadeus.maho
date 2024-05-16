@@ -81,6 +81,7 @@ import amadeus.maho.lang.inspection.ConstructorContract;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.inspection.TestOnly;
 import amadeus.maho.lang.javac.handler.base.AnnotationProxyMaker;
+import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Proxy;
@@ -602,7 +603,8 @@ public class JavacContext {
     TypeEnvs     typeEnvs;
     ConstFold    constFold;
     
-    HandlerSupport      marker;
+    HandlerSupport marker;
+    
     Symbol.ModuleSymbol transientModule, mahoModule;
     
     public JavacContext(final Context context) = init(context);
@@ -737,6 +739,8 @@ public class JavacContext {
     public boolean hasAnnotation(final JCTree.JCModifiers modifiers, final Env<AttrContext> env, final Class<? extends Annotation> annotationType) = !getAnnotationsByType(modifiers, env, annotationType).isEmpty();
     
     public static boolean hasAnnotation(final AnnoConstruct construct, final Class<? extends Annotation> annotationType) = (Privilege) construct.getAttribute(annotationType) != null;
+    
+    public static String methodIdentity(final Symbol.MethodSymbol symbol) = symbol.name + symbol.params.stream().map(var -> var.type.tsym.getQualifiedName()).collect(Collectors.joining(",", "(", ")"));
     
     public Name name(final JCTree.Tag tag) = name(OperatorData.operatorType2operatorName.getOrDefault(tag, tag.name()));
     

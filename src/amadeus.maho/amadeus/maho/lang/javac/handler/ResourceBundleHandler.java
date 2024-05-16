@@ -51,7 +51,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
     
     @Override
     public void processClass(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final JCTree owner, final ResourceBundle annotation, final JCTree.JCAnnotation annotationTree, final boolean advance)
-            = instance(DelayedContext.class).todos() += _ -> instance(ResourceBundleHandler.class).process(env, tree, annotation, annotationTree, advance);
+            = instance(DelayedContext.class).todos() += context -> instance(context, ResourceBundleHandler.class).process(env, tree, annotation, annotationTree, advance);
     
     private void process(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final ResourceBundle annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
         final Path location = location(annotation);
