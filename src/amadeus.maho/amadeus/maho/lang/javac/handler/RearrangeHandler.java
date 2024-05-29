@@ -91,14 +91,12 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
         if (indexes.length == symbol.getRecordComponents().size())
             targetSymbol = symbol;
         else {
-            targetSymbol = rearrange.accessJavacTypes(Rearrange::adapters)
+            targetSymbol = ~rearrange.accessJavacTypes(Rearrange::adapters)
                     .cast(Type.class)
                     .map(type -> type.tsym)
                     .cast(Symbol.ClassSymbol.class)
                     .peek(Symbol.ClassSymbol::complete)
-                    .filter(classSymbol -> classSymbol.getRecordComponents().size() == indexes.length)
-                    .findFirst()
-                    .orElse(null);
+                    .filter(classSymbol -> classSymbol.getRecordComponents().size() == indexes.length);
         }
         if (targetSymbol != null) {
             if (fakeSymbol)

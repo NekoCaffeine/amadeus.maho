@@ -72,6 +72,7 @@ import amadeus.maho.util.bytecode.remap.RemapHandler;
 import amadeus.maho.util.bytecode.remap.StreamRemapHandler;
 import amadeus.maho.util.concurrent.AsyncHelper;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
+import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
 import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
@@ -100,7 +101,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     @NoArgsConstructor(AccessLevel.PRIVATE)
     public static final class Patcher {
         
-        private static final Set<Class<?>> preLoadedClasses = Collections.newSetFromMap(new ConcurrentWeakIdentityHashMap<>());
+        private static final ConcurrentWeakIdentityHashSet<Class<?>> preLoadedClasses = { };
         
         public static void patch(final TransformRange transformer) = patch(List.of(transformer));
         

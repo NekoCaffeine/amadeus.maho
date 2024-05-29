@@ -12,13 +12,12 @@ import static java.lang.annotation.ElementType.*;
 @Target({ PACKAGE, TYPE, ANNOTATION_TYPE, CONSTRUCTOR, METHOD, FIELD })
 public @interface APIStatus {
     
-    @SuppressWarnings("NonAsciiCharacters")
     enum Stage {
         
         α, // prototype or early version
         β, // partially available
         γ, // release candidate
-        δ  // general availability
+        δ, // general availability
     
     }
     

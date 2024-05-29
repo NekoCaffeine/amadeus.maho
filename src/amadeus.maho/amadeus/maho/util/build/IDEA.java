@@ -45,11 +45,7 @@ public interface IDEA {
         @SneakyThrows
         static LinkedHashSet<Module.Dependency> attachLocalInstance(final Path instanceHome, final Set<String> plugins = Set.of(), final Predicate<Path> shouldInCompile = path -> true,
                 final Tuple2<String, String> metadata = inferInstanceMetadata(instanceHome), final Path sources = resolveSources(repository(), metadata)) = Stream.concat(
-                        Stream.of(new Module.DependencySet(STR."IntelliJ IDEA \{metadata.v1}-\{metadata.v2}", Files.list(instanceHome / "lib")
-                                .filter(Files::isRegularFile)
-                                .filter(path -> path.getFileName().toString().endsWith(Jar.SUFFIX))
-                                .map(path -> new Module.SingleDependency(path, sources, null, shouldInCompile.test(path)))
-                                .collect(Collectors.toCollection(LinkedHashSet::new)))),
+                        Stream.of(new Module.DependencySet(STR."IntelliJ IDEA \{metadata.v1}-\{metadata.v2}", allDependencies(instanceHome, sources, shouldInCompile))),
                         plugins.stream()
                                 .map(Pattern::compile)
                                 .map(Pattern::asMatchPredicate)
@@ -58,11 +54,16 @@ public interface IDEA {
                                 .flatMap(predicate -> Files.list(instanceHome / "plugins")
                                         .filter(Files::isDirectory)
                                         .filter(path -> predicate.test(path.getFileName().toString()))
-                                        .map(pluginDir -> new Module.DependencySet(STR."IntelliJ IDEA Built-in Plugin [\{pluginDir.getFileName()}]", Files.list(pluginDir / "lib")
-                                                .filter(Files::isRegularFile)
-                                                .filter(path -> path.getFileName().toString().endsWith(Jar.SUFFIX))
-                                                .map(path -> new Module.SingleDependency(path, sources, null, shouldInCompile.test(path)))
-                                                .collect(Collectors.toCollection(LinkedHashSet::new))))))
+                                        .map(pluginDir -> new Module.DependencySet(STR."IntelliJ IDEA Built-in Plugin [\{pluginDir.getFileName()}]", allDependencies(pluginDir, sources, shouldInCompile)))))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        
+        @SneakyThrows
+        static Stream<Path> allJar(final Path root) = Files.walk(root / "lib")
+                .filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(Jar.SUFFIX));
+        
+        static Set<Module.SingleDependency> allDependencies(final Path root, final Path sources, final Predicate<Path> shouldInCompile) = allJar(root)
+                .map(path -> new Module.SingleDependency(path, sources, null, shouldInCompile.test(path)))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         
         @SneakyThrows

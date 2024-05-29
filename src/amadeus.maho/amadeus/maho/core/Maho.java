@@ -154,6 +154,12 @@ public final class Maho {
         } catch (final ClassNotFoundException ignored) { DebugHelper.breakpoint(); }
     }
     
+    private static Module defineBootModule(final Module maho) {
+        final ModuleDescriptor.Builder builder = ModuleDescriptor.newModule(STR."\{maho.getName()}.boot", Set.of(ModuleDescriptor.Modifier.OPEN, ModuleDescriptor.Modifier.SYNTHETIC));
+        maho.getDescriptor().rawVersion().ifPresent(builder::version);
+        return Modules.defineModule(null, builder.packages(maho.getPackages()).packages(Set.of(SHARE_PACKAGE)).build(), null);
+    }
+    
     @SneakyThrows
     private static void loadJavaSupport(final Instrumentation instrumentation) {
         checkInstrumentationSupport(instrumentation);
@@ -165,20 +171,20 @@ public final class Maho {
             inject(instrumentation, HookResultInjector.instance());
         }
         final Set<Module> extraReads = Set.of(Maho.class.getModule());
-        jailbreak(instrumentation, ModuleLayer.boot().modules().stream(), extraReads);
+        jailbreak(instrumentation, ModuleLayer.boot().modules().stream(), extraReads); // TODO image
         final Module maho = Maho.class.getModule();
-        if (maho.getClassLoader() != null && maho.isNamed()) { // Gives module attribution and privileges to the classes shared to the BootClassLoader
-            final ModuleDescriptor.Builder builder = ModuleDescriptor.newModule(STR."\{maho.getName()}.boot", Set.of(ModuleDescriptor.Modifier.OPEN, ModuleDescriptor.Modifier.SYNTHETIC));
-            maho.getDescriptor().rawVersion().ifPresent(builder::version);
-            final Module boot = Modules.defineModule(null, builder.packages(maho.getPackages()).packages(Set.of(SHARE_PACKAGE)).build(), null);
-            jailbreak(instrumentation, Stream.concat(Stream.of(maho), ModuleLayer.boot().modules().stream()), Set.of(boot));
-            jailbreak(instrumentation, Stream.of(boot), Set.of(maho));
-            ModuleHelper.readAllBootModules(boot);
-            ReflectBreaker.doBreak(maho, boot);
-        } else {
-            ReflectBreaker.doBreak(maho);
-            ModuleAdder.injectMissingSystemModules();
-        }
+        if (maho.getClassLoader() != null)
+            if (maho.isNamed()) { // Gives module attribution and privileges to the classes shared to the BootClassLoader
+                final Module boot = defineBootModule(maho);
+                jailbreak(instrumentation, Stream.concat(Stream.of(maho), ModuleLayer.boot().modules().stream()), Set.of(boot));
+                jailbreak(instrumentation, Stream.of(boot), Set.of(maho));
+                ModuleHelper.readAllBootModules(boot);
+                ReflectBreaker.doBreak(maho, boot);
+            } else {
+                ModuleHelper.openAllBootModule();
+                ReflectBreaker.doBreak(maho);
+                ModuleAdder.injectMissingSystemModules();
+            }
         stage("jailbreak");
     }
     
@@ -187,10 +193,10 @@ public final class Maho {
     public static void accessRequires(final Module module) {
         final @Nullable ModuleLayer layer = module.getLayer();
         if (layer != null)
-            jailbreak(instrumentation(), module.getDescriptor().requires().stream().map(ModuleDescriptor.Requires::name).map(layer::findModule).filter(Optional::isPresent).map(Optional::get), Set.of(module));
+            jailbreak(module.getDescriptor().requires().stream().map(ModuleDescriptor.Requires::name).map(layer::findModule).filter(Optional::isPresent).map(Optional::get), Set.of(module));
     }
     
-    private static void jailbreak(final Instrumentation instrumentation, final Stream<Module> modules, final Set<Module> extraReads) = modules.forEach(module -> {
+    public static void jailbreak(final Instrumentation instrumentation = instrumentation(), final Stream<Module> modules, final Set<Module> extraReads) = modules.forEach(module -> {
         final Map<String, Set<Module>> extra = module.getPackages().stream().collect(Collectors.toMap(Function.identity(), _ -> extraReads));
         instrumentation.redefineModule(module, extraReads, extra, extra, Set.of(), Map.of());
     });
@@ -347,10 +353,11 @@ public final class Maho {
         
         final Class<?> target;
         
-        @Nullable byte bytecode[];
+        @Nullable
+        byte bytecode[];
         
         @Override
-        public @Nullable byte[] transform(final @Nullable ClassLoader loader, final @Nullable String name, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain, final @Nullable byte[] bytecode) {
+        public @Nullable byte[] transform(final @Nullable ClassLoader loader, final @Nullable String name, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain, final @Nullable byte bytecode[]) {
             if (clazz == target)
                 this.bytecode = bytecode;
             return null;

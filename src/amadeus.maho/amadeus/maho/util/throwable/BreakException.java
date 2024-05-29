@@ -1,14 +1,12 @@
 package amadeus.maho.util.throwable;
 
-import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.NoArgsConstructor;
-import amadeus.maho.util.runtime.UnsafeHelper;
 
-@NoArgsConstructor
+@NoArgsConstructor(AccessLevel.PRIVATE)
 public final class BreakException extends RuntimeException {
     
-    @Getter
-    private static final BreakException instance = UnsafeHelper.allocateInstanceOfType(BreakException.class);
+    public static final BreakException BREAK = { };
     
     @Override
     public Throwable fillInStackTrace() = this;

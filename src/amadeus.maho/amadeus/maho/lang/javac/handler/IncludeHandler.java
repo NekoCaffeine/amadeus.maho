@@ -23,14 +23,14 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 
 import static amadeus.maho.lang.javac.JavacContext.instance;
 import static amadeus.maho.util.bytecode.Bytecodes.IRETURN;
-import static com.sun.tools.javac.code.Flags.STATIC;
+import static com.sun.tools.javac.code.Flags.*;
 
 @TransformProvider
 public interface IncludeHandler {
     
-    class StaticMethodScope extends JavacContext.MembersScope {
+    class IncludeScope extends JavacContext.MembersScope {
         
-        public StaticMethodScope(final Scope scope) = super(scope, symbol -> JavacContext.anyMatch(symbol.flags(), STATIC) && symbol.name != symbol.name.table.names.init);
+        public IncludeScope(final Scope scope) = super(scope, symbol -> JavacContext.anyMatch(symbol.flags(), STATIC) && JavacContext.anyMatch(symbol.flags(), PUBLIC) && symbol.name != symbol.name.table.names.init);
         
     }
     
@@ -45,9 +45,9 @@ public interface IncludeHandler {
                     .map(Attribute.Class.class::cast)
                     .map(clazz -> clazz.classType) : Stream.empty()) : Stream.empty();
     
-    private static Stream<StaticMethodScope> includeTypes(final Scope origin) = includeTypes(origin.owner)
+    private static Stream<IncludeScope> includeTypes(final Scope origin) = includeTypes(origin.owner)
             .map(type -> type.tsym.members())
-            .map(StaticMethodScope::new);
+            .map(IncludeScope::new);
     
     private static boolean checkContainsImportableIncludeElements(final Check $this, final Symbol.TypeSymbol symbol, final Symbol.PackageSymbol pkg, final Name name, final Set<Symbol> processed) = includeTypes(symbol)
             .map(type -> type.tsym)

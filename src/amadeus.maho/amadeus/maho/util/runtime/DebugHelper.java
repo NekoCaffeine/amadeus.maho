@@ -20,7 +20,8 @@ import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.misc.Environment;
-import amadeus.maho.util.throwable.BreakException;
+
+import static amadeus.maho.util.throwable.BreakException.BREAK;
 
 @Getter
 public interface DebugHelper {
@@ -41,7 +42,8 @@ public interface DebugHelper {
         String renderCodePath = "codePathString()"; // must be const
         
         @Setter
-        @Nullable Field codePath();
+        @Nullable
+        Field codePath();
         
         default String codePathString() {
             final @Nullable Field field = codePath();
@@ -78,7 +80,7 @@ public interface DebugHelper {
         throw throwable;
     }
     
-    static <T> T breakpointThenBreak() { throw breakpointBeforeThrow(BreakException.instance()); }
+    static <T> T breakpointThenBreak() { throw breakpointBeforeThrow(BREAK); }
     
     static <T> T breakpointThenError(final String message) = breakpointThenError(new AssertionError(message));
     
@@ -106,7 +108,7 @@ public interface DebugHelper {
     }
     
     @SneakyThrows
-    static <T> @Nullable T throwableBarrier(final Supplier<T> supplier, final Predicate<? super Throwable> filter = throwable -> throwable != BreakException.instance()) {
+    static <T> @Nullable T throwableBarrier(final Supplier<T> supplier, final Predicate<? super Throwable> filter = throwable -> throwable != BREAK) {
         try {
             return supplier.get();
         } catch (final Throwable throwable) {
@@ -117,7 +119,7 @@ public interface DebugHelper {
     }
     
     @SneakyThrows
-    static void throwableBarrier(final Runnable runnable, final Predicate<? super Throwable> filter = throwable -> throwable != BreakException.instance()) {
+    static void throwableBarrier(final Runnable runnable, final Predicate<? super Throwable> filter = throwable -> throwable != BREAK) {
         try {
             runnable.run();
         } catch (final Throwable throwable) {

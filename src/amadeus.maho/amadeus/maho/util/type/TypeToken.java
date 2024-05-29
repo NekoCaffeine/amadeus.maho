@@ -36,6 +36,9 @@ public class TypeToken<T> {
     @Override
     public boolean equals(final Object obj) = obj == this || obj instanceof TypeToken<?> token && token.genericType.equals(genericType);
     
+    @Override
+    public String toString() = genericType.getTypeName();
+    
     public static <T> TypeToken<T> capture(final Type genericType = compileTimeGenericType()) = { genericType };
     
     @SuppressWarnings("unused")

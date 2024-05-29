@@ -135,7 +135,7 @@ public enum JIT {
         { Maho.instrumentation().addTransformer(spy(), true); }
         
         @SneakyThrows
-        public void enqueue(final Predicate<Class<?>> predicate = onlyLoaded()) = Interrupt.doInterruptible(() -> Stream.generate(pending::poll)
+        public void enqueue(final Predicate<Class<?>> predicate = onlyLoaded()) = Interrupt.doInterruptible(() -> Stream.generate(pending::take)
                 .nonnull()
                 .map(supplier -> !functions().isEmpty() ? supplier.get() : null)
                 .nonnull()
