@@ -87,13 +87,9 @@ public @interface Hook {
         
         public Map<Integer, Object> stackContext;
         
-        protected transient int index = -1;
-        
         public self jump(final int index = 0) = jumpIndex = index;
         
         public Map<Integer, Object> stackContext() = stackContext == null ? stackContext = new HashMap<>() : stackContext;
-        
-        public <T> self operationStack(final int offset = 1, final T obj) = stackContext().put(index += offset, obj);
         
         @Override
         public int hashCode() = result == null ? 0 : result.hashCode();
@@ -125,11 +121,11 @@ public @interface Hook {
         
         public static Result falseToVoid(final boolean flag, final @Nullable Object result) = !flag ? VOID : new Hook.Result(result);
         
-        public static Result nullToVoid(final @Nullable Object flag) = nullToVoid(flag, flag);
+        public static Result nullToVoid(final @Nullable Object flag) = flag == null ? VOID : new Result(flag);
         
         public static Result nullToVoid(final @Nullable Object flag, final @Nullable Object result) = flag == null ? VOID : new Result(result);
         
-        public static Result nonnullToVoid(final @Nullable Object flag) = nonnullToVoid(flag, NULL);
+        public static Result nonnullToVoid(final @Nullable Object flag) = flag != null ? VOID : new Result(flag);
         
         public static Result nonnullToVoid(final @Nullable Object flag, final @Nullable Object result) = flag != null ? VOID : new Result(result);
         

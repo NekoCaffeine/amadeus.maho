@@ -124,12 +124,17 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                 final @Nullable Attribute only = ~compound.values.stream()
                         .filter(pair -> pair.fst.name.toString().equals("only"))
                         .map(pair -> pair.snd);
-                return only instanceof Attribute.Class clazz ? Stream.of(clazz.classType) : only instanceof Attribute.Array array ? Stream.of(array.values)
-                        .filter(Attribute.Class.class::isInstance)
-                        .map(Attribute.Class.class::cast)
-                        .map(clazz -> clazz.classType)
-                        .filter(type -> types.isAssignable(type, symbol.type))
-                        .distinct() : Stream.of(symbol instanceof Symbol.MethodSymbol methodSymbol ? methodSymbol.getReturnType() : symbol.type);
+                return switch (only) {
+                    case Attribute.Class clazz -> Stream.of(clazz.classType);
+                    case Attribute.Array array -> Stream.of(array.values)
+                            .filter(Attribute.Class.class::isInstance)
+                            .map(Attribute.Class.class::cast)
+                            .map(clazz -> clazz.classType)
+                            .filter(type -> types.isAssignable(type, symbol.type))
+                            .distinct();
+                    case null,
+                         default               -> Stream.of(symbol instanceof Symbol.MethodSymbol methodSymbol ? methodSymbol.getReturnType() : symbol.type);
+                };
             });
     
     public Map<Symbol, java.util.List<Type>> delegateTypes(final Symbol symbol) = shared.delegateTypesCache().computeIfAbsent(symbol, target ->
@@ -201,7 +206,8 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                 .forEach(target -> {
                     if (p_result[0].kind != MTH)
                         handler.delegateTypes(target).forEach((symbol, delegateTypes) -> delegateTypes.forEach(type -> {
-                            if ((p_result[0] = handler.findMethod(env, type, name, argTypes, typeArgTypes, type.tsym.type, p_result[0], allowBoxing, useVarargs, DelegateScope::new)).kind == MTH) {
+                            final Type inferedType = handler.inferType(type, site);
+                            if ((p_result[0] = handler.findMethod(env, inferedType, name, argTypes, typeArgTypes, inferedType.tsym.type, p_result[0], allowBoxing, useVarargs, DelegateScope::new)).kind == MTH) {
                                 if (handler.fakeSymbol) {
                                     p_result[0] = new Symbol.MethodSymbol(0L, handler.name("$fake"), p_result[0].type, handler.symtab.methodClass);
                                     throw BREAK;
@@ -280,7 +286,7 @@ public class DelegateHandler extends BaseHandler<Delegate> {
             final Env<AttrContext> env,
             final Type site,
             final Name name,
-            final Kinds.KindSelector selector) = capture.kind == VAR ? capture : findField(capture, env, name, site.tsym);
+            final Kinds.KindSelector selector) = findField(capture, env, site, name, site.tsym);
     
     @Hook(at = @At(method = @At.MethodInsn(name = "findField"), ordinal = 0), before = false, capture = true)
     private static Symbol findVar(
@@ -288,11 +294,12 @@ public class DelegateHandler extends BaseHandler<Delegate> {
             final Resolve $this,
             final Env<AttrContext> env,
             final Name name,
-            final @Hook.LocalVar(index = 4) Env<AttrContext> env1) = findField(capture, env1, name, env1.enclClass.sym);
+            final @Hook.LocalVar(index = 4) Env<AttrContext> env1) = findField(capture, env1, env1.enclClass.sym.type, name, env1.enclClass.sym);
     
     private static Symbol findField(
             final Symbol capture,
             final Env<AttrContext> env,
+            final Type site,
             final Name name,
             final Symbol.TypeSymbol c) {
         if (capture.kind == VAR)
@@ -309,14 +316,15 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                 .filter(symbol -> symbol.members() != null)
                 .forEach(target -> {
                     handler.delegateTypes(target).forEach((symbol, delegateTypes) -> delegateTypes.forEach(type -> {
-                        final Symbol field = (Privilege) handler.resolve.findField(env, type, name, type.tsym);
+                        final Type inferedType = handler.inferType(type, site);
+                        final Symbol field = (Privilege) handler.resolve.findField(env, inferedType, name, inferedType.tsym);
                         if (field.kind == VAR && noneMatch(field.flags_field, STATIC) && anyMatch(field.flags_field, PUBLIC)) {
                             if (handler.fakeSymbol) {
                                 p_result[0] = new Symbol.VarSymbol(0L, handler.name("$fake"), field.type, handler.symtab.noSymbol);
                                 throw BREAK;
                             } else
                                 switch (tree) {
-                                    case JCTree.JCIdent _            -> throw new ReAttrException(maker.Select(anyMatch(symbol.flags_field, STATIC) ? maker.QualIdent(symbol) : maker.Ident(symbol), p_result[0]), tree);
+                                    case JCTree.JCIdent _            -> throw new ReAttrException(maker.Select(anyMatch(symbol.flags_field, STATIC) ? maker.QualIdent(symbol) : maker.Ident(symbol), field), tree);
                                     case JCTree.JCFieldAccess access -> {
                                         access.selected = maker.Select(access.selected, symbol);
                                         throw new ReAttrException(access, access);
@@ -336,6 +344,11 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                 }));
         return p_result[0];
     }
+    
+    private Type inferType(final Type type, final Type site) = switch (type.getTag()) {
+        case TYPEVAR -> types.memberType(site, type.tsym);
+        default      -> types.subst(type, site.tsym.type.allparams(), site.allparams());
+    };
     
     @Hook(at = @At(insn = @At.Insn(opcode = IRETURN), offset = 1, ordinal = 0), before = false)
     private static Hook.Result checkTypeContainsImportableElement(final Check $this, final Symbol.TypeSymbol symbol, final Symbol.TypeSymbol origin, final Symbol.PackageSymbol pkg, final Name name, final Set<Symbol> processed)

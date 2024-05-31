@@ -26,6 +26,16 @@ public interface CollectionHelper {
         return collection;
     }
     
+    static <T> boolean startsWith(final List<T> $this, final List<T> prefix) {
+        final int size = prefix.size();
+        return $this.size() >= size && $this.subList(0, size).equals(prefix);
+    }
+    
+    static <T> boolean endsWith(final List<T> $this, final List<T> suffix) {
+        final int size = suffix.size(), offset = $this.size() - size;
+        return offset >= 0 && $this.subList(offset, offset + size).equals(suffix);
+    }
+    
     static <T> @Nullable T GET(final List<T> list, final int index) {
         final int size = list.size(), i = index < 0 ? size + index : index;
         return i > -1 && i < size ? list.get(i) : null;

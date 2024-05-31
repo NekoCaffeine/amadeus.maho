@@ -20,6 +20,12 @@ public interface MathHelper {
         return 31 - Integer.numberOfLeadingZeros(value);
     }
     
+    static int log2(final long value) {
+        if(value < 1)
+            throw new IllegalArgumentException(STR."value: \{value}");
+        return 63 - Long.numberOfLeadingZeros(value);
+    }
+    
     static boolean anyMatch(final long flags, final long mask) = (flags & mask) != 0;
     
     static boolean allMatch(final long flags, final long mask) = (flags & mask) == mask;
