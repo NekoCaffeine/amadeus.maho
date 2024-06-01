@@ -51,7 +51,7 @@ import static amadeus.maho.core.extension.DynamicLookup.*;
 import static amadeus.maho.util.bytecode.Bytecodes.*;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.Kind.*;
-import static com.sun.tools.javac.code.TypeTag.*;
+import static com.sun.tools.javac.code.TypeTag.TYPEVAR;
 
 @TransformProvider
 @NoArgsConstructor
@@ -154,7 +154,7 @@ public class PrivilegeHandler extends JavacContext {
             makePrivilegeProxy = name("makePrivilegeProxy"),
             _new               = name("new");
     
-    LinkedList<JCTree.JCAnnotation> dequeLocal = { };
+    LinkedList<JCTree.JCAnnotation> marks = { };
     
     public static boolean inPrivilegeContext(final java.util.List<JCTree> context, final @Nullable Env<AttrContext> env = null)
             = inPrivilegeMarkDomains(context) || canAccessByTypeCast(context, env);
@@ -201,18 +201,18 @@ public class PrivilegeHandler extends JavacContext {
     @Hook
     private static <T extends JCTree> void translate_$Enter(final LambdaToMethod $this, final T tree) {
         if (tree instanceof JCTree.JCMethodDecl decl)
-            instance(PrivilegeHandler.class).dequeLocal.addFirst(instance(PrivilegeHandler.class).marker.getAnnotationTreesByType(decl.mods, (Privilege) $this.attrEnv, Privilege.class).stream().findFirst().orElse(null));
+            instance(PrivilegeHandler.class).marks.addFirst(instance(PrivilegeHandler.class).marker.getAnnotationTreesByType(decl.mods, (Privilege) $this.attrEnv, Privilege.class).stream().findFirst().orElse(null));
     }
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.FINALLY)))
     private static <T extends JCTree> void translate_$Exit(final LambdaToMethod $this, final T tree) {
         if (tree instanceof JCTree.JCMethodDecl decl)
-            instance(PrivilegeHandler.class).dequeLocal.removeFirst();
+            instance(PrivilegeHandler.class).marks.removeFirst();
     }
     
     @Hook
     private static void makeLambdaBody(final LambdaToMethod $this, final JCTree.JCLambda tree, final JCTree.JCMethodDecl lambdaMethodDecl)
-            = instance(PrivilegeHandler.class).dequeLocal.stream().nonnull().findFirst().ifPresent(annotation -> {
+            = instance(PrivilegeHandler.class).marks.stream().nonnull().findFirst().ifPresent(annotation -> {
         lambdaMethodDecl.mods.annotations = lambdaMethodDecl.mods.annotations.append(annotation);
         final PrivilegeHandler handler = instance(PrivilegeHandler.class);
         lambdaMethodDecl.sym.appendAttributes(List.of(new Attribute.Compound(handler.symtab.enterClass(handler.mahoModule, handler.Privilege).type, List.nil())));

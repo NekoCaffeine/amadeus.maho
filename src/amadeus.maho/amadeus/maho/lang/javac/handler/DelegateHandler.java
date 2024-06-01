@@ -137,7 +137,7 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                 };
             });
     
-    public Map<Symbol, java.util.List<Type>> delegateTypes(final Symbol symbol) = shared.delegateTypesCache().computeIfAbsent(symbol, target ->
+    public Map<Symbol, java.util.List<Type>> delegateTypes(final Symbol symbol) = shared.delegateTypesCache().weakComputeIfAbsent(symbol, target ->
             target.getEnclosedElements().stream()
                     .map(member -> Map.entry(member, delegateTypes(types, false, member).toList()))
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));

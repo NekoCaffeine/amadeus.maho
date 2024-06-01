@@ -30,7 +30,7 @@ public class InvokeSampler<T> {
         @Override
         public void enter(final Class<?> clazz, final String name, final MethodType methodType) {
             final Deque<InvokeSampler<String>.Handle> handles = handlesLocal.get();
-            handles << handle(handles.peekLast(), STR."\{clazz.getName()}#\{name}\{methodType.descriptorString()}");
+            handles += handle(handles.peekLast(), STR."\{clazz.getName()}#\{name}\{methodType.descriptorString()}");
         }
         
         @Override

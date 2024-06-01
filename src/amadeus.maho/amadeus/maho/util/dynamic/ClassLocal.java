@@ -56,7 +56,7 @@ public class ClassLocal<V> implements Local<Class<?>, V> { // Don't use the stup
                     // `(Privilege) k.classRedefinedCount` cannot be stored in a local variable here, because mapper may cause redefinition.
                     (k, v) -> v instanceof RedefinedRecord record && record.classRedefinedCount == (Privilege) k.classRedefinedCount ?
                             record : new RedefinedRecord(mapper.apply(k), (Privilege) k.classRedefinedCount))).value() :
-            local[key.getClassLoader()].computeIfAbsent(key, mapper));
+            local[key.getClassLoader()].weakComputeIfAbsent(key, mapper));
     
     @Override
     public @Nullable V lookup(final Class<?> key) = (V) (strongCorrelation ?

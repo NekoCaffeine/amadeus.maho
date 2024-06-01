@@ -1,6 +1,7 @@
 package amadeus.maho.util.depend;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -33,6 +34,8 @@ public record Project(String group, String artifact, String version, String... c
             public self runtime(final String... projects) = addAll(project -> new Dependency(project, false, true), projects);
             
             public self all(final String... projects) = addAll(Dependency::new, projects);
+            
+            public self all(final List<String> projects) = all(projects.toArray(new String[0]));
             
             public void addAll(final Function<Project, Dependency> function, final String... projects) = Stream.of(projects).map(Project::of).map(function).forEach(dependencies()::add);
             

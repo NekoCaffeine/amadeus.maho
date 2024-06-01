@@ -5,6 +5,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -141,22 +143,44 @@ public interface DebugHelper {
         return false;
     }
     
+    ThreadLocal<List<String>> consumingLocal = ThreadLocal.withInitial(ArrayList::new);
+    
+    static List<String> consuming() = consumingLocal.get();
+    
+    // static void push(final String name) = consuming() << name;
+    //
+    // static void pop() = consuming()--;
+
+    static void push(final String name) = consuming().add(name);
+
+    static void pop() = consuming().removeLast();
+    
+    private static String consumingPrefix() = "  ".repeat(consuming().size());
+    
     static void logTimeConsuming(final String name, final Runnable task) {
         if (MahoExport.debug()) {
+            push(name);
             final long time = System.currentTimeMillis();
             try {
                 task.run();
-            } finally { System.out.println(STR."Task [\{name}] took \{System.currentTimeMillis() - time} ms"); }
+            } finally {
+                pop();
+                System.out.println(STR."\{consumingPrefix()}Task [\{name}] took \{System.currentTimeMillis() - time} ms");
+            }
         } else
             task.run();
     }
     
     static <T> T logTimeConsuming(final String name, final Supplier<T> task) {
         if (MahoExport.debug()) {
+            push(name);
             final long time = System.currentTimeMillis();
             try {
                 return task.get();
-            } finally { System.out.println(STR."Task [\{name}] took \{System.currentTimeMillis() - time} ms"); }
+            } finally {
+                pop();
+                System.out.println(STR."\{consumingPrefix()}Task [\{name}] took \{System.currentTimeMillis() - time} ms");
+            }
         } else
             return task.get();
     }

@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,6 +20,10 @@ import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.annotation.mark.IndirectCaller;
+import amadeus.maho.util.depend.Project;
+import amadeus.maho.util.depend.Repository;
+import amadeus.maho.util.dynamic.CallerContext;
 
 @ToString
 @EqualsAndHashCode
@@ -89,6 +94,23 @@ public record Module(Path path = Path.of(""), String name, Map<String, Path> sub
     }
     
     @SneakyThrows
-    public static Module build(final Set<Dependency> dependencies = Set.of(DependencySet.maho())) = { Path.of("build"), "script", dependencies };
+    public static Set<Dependency> buildDependencies() {
+        final HashSet<Dependency> result = { };
+        final java.lang.Module module = CallerContext.caller().getModule();
+        final @Nullable Dependencies dependencies = module.getAnnotation(Dependencies.class);
+        if (dependencies != null) {
+            final Set<SingleDependency> set = Repository.maven().resolveModuleDependencies(new Project.Dependency.Holder().all(dependencies.value()).dependencies()).stream().flatMap(Dependency::flat).collect(Collectors.toSet());
+            final DependencySet moduleDependencySet = { module.getName(), set };
+            result += moduleDependencySet;
+        }
+        return result;
+    }
+    
+    @SneakyThrows
+    public static Set<Dependency> buildDependenciesWithMaho() = buildDependencies() += DependencySet.maho();
+    
+    @SneakyThrows
+    @IndirectCaller
+    public static Module build(final Set<Dependency> dependencies = buildDependencies()) = { Path.of("build"), "script", dependencies };
     
 }

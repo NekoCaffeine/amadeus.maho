@@ -126,7 +126,7 @@ public enum Cfg implements Converter {
     public void write(final OutputStream output, final @Nullable Object data, final Charset charset) throws IOException { try (final OutputStreamWriter writer = { output, charset }) { write(writer, data, 0); } }
     
     @SneakyThrows
-    private void write(final OutputStreamWriter writer, final @Nullable Object data, final int layer) {
+    private void write(final OutputStreamWriter writer, final @Nullable Object data, final int layer) throws IOException {
         if (data == null)
             writer.append("null");
         else {
@@ -137,14 +137,14 @@ public enum Cfg implements Converter {
                     final String text = value.toString();
                     writer
                             .append("\t".repeat(layer))
-                            .append(tuple.v1.getName())
+                            .append(name)
                             .append(" = ")
                             .append(text.codePoints().anyMatch(Character::isWhitespace) || tuple.v1.getType() == String.class ? '"' + text + '\"' : text)
                             .append("\n\n");
                 } else {
                     writer
                             .append("\t".repeat(layer))
-                            .append(tuple.v1.getName());
+                            .append(name);
                     if (value != null) {
                         writer.append(" {\n\n");
                         write(writer, value, layer + 1);
@@ -156,8 +156,10 @@ public enum Cfg implements Converter {
         }
     }
     
-    private void write(final OutputStreamWriter writer, final Field field, final int layer) {
-        // TODO
+    private void write(final OutputStreamWriter writer, final Field field, final int layer) throws IOException {
+        final @Nullable Comment comment = field.getAnnotation(Comment.class);
+        if (comment != null)
+            writer.append("\t".repeat(layer)).append("# ").append(comment.value()).append("\n");
     }
     
 }

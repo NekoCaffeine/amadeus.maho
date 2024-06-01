@@ -207,20 +207,20 @@ public interface Json {
         }
         
         @Override
-        public void beginObject() = deque << new DynamicObject.MapUnit();
+        public void beginObject() = deque += new DynamicObject.MapUnit();
         
         @Override
         public void endObject() = end(deque.removeLast());
         
         @Override
-        public void beginArray() = deque << new DynamicObject.ArrayUnit();
+        public void beginArray() = deque += new DynamicObject.ArrayUnit();
         
         @Override
         public void endArray() = end(deque.removeLast());
         
         @Override
         public void visitKey(final String key) {
-            keys << key;
+            keys += key;
             assert deque.peekLast() instanceof DynamicObject.MapUnit;
         }
         

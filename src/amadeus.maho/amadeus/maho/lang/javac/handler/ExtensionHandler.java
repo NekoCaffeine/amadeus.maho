@@ -17,6 +17,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import com.sun.tools.javac.code.Kinds;
@@ -213,6 +214,8 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                     }
                 }
             }
+            if (result instanceof Resolve.AmbiguityError ambiguityError)
+                result = ((Privilege) ambiguityError.ambiguousSyms).getLast();
             if (result.kind == Kinds.Kind.MTH && result instanceof Symbol.MethodSymbol methodSymbol) {
                 final TreeMaker maker = instance.maker.at(env.tree.pos);
                 if (env.tree instanceof JCTree.JCMethodInvocation invocation) {
@@ -222,7 +225,7 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                     final JCTree.JCMethodInvocation resolved = maker.Apply(invocation.typeargs, maker.QualIdent(result), args);
                     throw new ReAttrException(() -> invocation.type = resolved.type, resolved, invocation);
                 } else if (env.tree instanceof JCTree.JCMemberReference reference) {
-                    List<JCTree.JCVariableDecl> decls = methodSymbol.params.tail.stream().map(parameter -> maker.VarDef(maker.Modifiers(0L), parameter.name, maker.Type(parameter.type), null)).collect(List.collector());
+                    List<JCTree.JCVariableDecl> decls = IntStream.range(0, argTypes.size()).mapToObj(i -> maker.VarDef(maker.Modifiers(0L), instance.name(STR."$arg\{i}"), null, null, true)).collect(List.collector());
                     List<JCTree.JCExpression> args = decls.map(decl -> maker.Ident(decl.name));
                     final @Nullable Type type = ((Privilege) instance.deferredAttr.attribSpeculative(reference.expr, env.dup(reference.expr), (Privilege) instance.attr.unknownExprInfo)).type;
                     if (type != null) {

@@ -2,7 +2,6 @@ package amadeus.maho.util.bytecode.traverser;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -29,7 +28,6 @@ import amadeus.maho.util.bytecode.traverser.exception.ComputeException;
 import amadeus.maho.util.bytecode.traverser.exception.FrameMergeException;
 
 import static amadeus.maho.util.bytecode.FrameHelper.*;
-import static amadeus.maho.util.math.MathHelper.*;
 
 @Setter
 @Getter
@@ -96,7 +94,7 @@ public class Frame {
     
     public Frame dup(final AbstractInsnNode insn = insn(), final TypeOwner... owners) = new Frame(insn).let(result -> {
         locals().forEach(result.locals()::add);
-        final Deque<TypeOwner> stack = result.stack();
+        final LinkedList<TypeOwner> stack = result.stack();
         for (final TypeOwner owner : owners)
             stack << owner;
     });

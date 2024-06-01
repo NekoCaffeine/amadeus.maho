@@ -69,7 +69,7 @@ public interface CollectionHelper {
         return collection;
     }
     
-    static <M extends Map<K, V>, K, V> M MULEQ(final M map, final Map<K,V> value) {
+    static <M extends Map<K, V>, K, V> M MULEQ(final M map, final Map<K, V> value) {
         map.putAll(value);
         return map;
     }
@@ -100,24 +100,24 @@ public interface CollectionHelper {
     
     static <T> @Nullable Optional<T> lookup(final Collection<T> $this, final Class<T> type) = $this.stream().cast(type).findFirst();
     
-    static <D extends Deque<T>, T> D LTLT(final D deque, final @Nullable T value) {
-        deque.addLast(value);
-        return deque;
+    static <L extends List<T>, T> L LTLT(final L list, final @Nullable T value) {
+        list.addLast(value);
+        return list;
     }
-    
-    static <D extends Deque<T>, T> D GTGT(final D deque, final @Nullable T value) {
-        deque.addFirst(value);
-        return deque;
+
+    static <L extends List<T>, T> L GTGT(final L list, final @Nullable T value) {
+        list.addFirst(value);
+        return list;
     }
-    
-    static <D extends Deque<T>, T> D PREDEC(final D deque) {
-        deque.removeFirst();
-        return deque;
+
+    static <L extends List<T>, T> L PREDEC(final L list) {
+        list.removeFirst();
+        return list;
     }
-    
-    static <D extends Deque<T>, T> D POSTDEC(final D deque) {
-        deque.removeLast();
-        return deque;
+
+    static <L extends List<T>, T> L POSTDEC(final L list) {
+        list.removeLast();
+        return list;
     }
     
     static <T> Iterator<T> descendingListIterator(final List<T> $this) {

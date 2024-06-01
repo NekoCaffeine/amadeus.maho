@@ -15,7 +15,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import amadeus.maho.profile.Profiler;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Default;
 import amadeus.maho.lang.Extension;
@@ -24,6 +23,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.profile.Profiler;
 import amadeus.maho.util.container.Node;
 import amadeus.maho.util.control.LinkedForkedIterator;
 
@@ -60,7 +60,7 @@ public class InvokeTimer implements Profiler {
         ConcurrentHashMap<Thread, InvokeTimer> timerMap = { };
         
         @Default
-        Function<Thread, InvokeTimer> timerMapper = thread -> new InvokeTimer();
+        Function<Thread, InvokeTimer> timerMapper = _ -> new InvokeTimer();
         
         @Override
         public InvokeTimer get() = timerMap.computeIfAbsent(Thread.currentThread(), timerMapper);

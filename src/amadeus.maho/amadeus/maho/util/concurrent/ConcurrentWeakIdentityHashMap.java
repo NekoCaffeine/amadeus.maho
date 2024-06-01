@@ -234,16 +234,24 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
     });
     
     @Override
-    public V computeIfPresent(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = purgeKeys().computeIfPresent(new Key<>(key), (ref, value) -> remappingFunction.apply(key, value));
+    public V computeIfPresent(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = purgeKeys().computeIfPresent(new Key<>(key), (_, value) -> remappingFunction.apply(key, value));
     
     @Override
     public V computeIfAbsent(final K key, final Function<? super K, ? extends V> mappingFunction) {
         final ConcurrentHashMap<Key<K>, V> inner = purgeKeys();
-        return inner[new Key<>(key)] ?? recursiveGuard(() -> inner.computeIfAbsent(new Key<>(key, referenceQueue), ref -> mappingFunction.apply(key)));
+        return inner[new Key<>(key)] ?? recursiveGuard(() -> inner.computeIfAbsent(new Key<>(key, referenceQueue), _ -> mappingFunction.apply(key)));
+    }
+    
+    public V weakComputeIfAbsent(final K key, final Function<? super K, ? extends V> mappingFunction) {
+        final ConcurrentHashMap<Key<K>, V> inner = purgeKeys();
+        return inner[new Key<>(key)] ?? recursiveGuard(() -> {
+            final V v = mappingFunction.apply(key);
+            return inner.computeIfAbsent(new Key<>(key, referenceQueue), _ -> v);
+        });
     }
     
     @Override
-    public V compute(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = recursiveGuard(() -> purgeKeys().compute(new Key<>(key, referenceQueue), (ref, value) -> remappingFunction.apply(key, value)));
+    public V compute(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = recursiveGuard(() -> purgeKeys().compute(new Key<>(key, referenceQueue), (_, value) -> remappingFunction.apply(key, value)));
     
     @Override
     public V merge(final K key, final V value, final BiFunction<? super V, ? super V, ? extends V> remappingFunction) = purgeKeys().merge(new Key<>(key, referenceQueue), value, remappingFunction);

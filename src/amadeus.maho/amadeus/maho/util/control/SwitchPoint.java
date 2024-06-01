@@ -58,7 +58,7 @@ public class SwitchPoint<T> {
             if (this.context == null)
                 this.context = context;
             final Handle result = { };
-            deque.add(result);
+            deque += result;
             return result;
         } finally { lock.unlock(); }
     }

@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.text.MessageFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -17,14 +18,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
+import java.util.Queue;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipFile;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
 import javax.tools.DiagnosticListener;
@@ -37,6 +42,8 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.MultiTaskListener;
+import com.sun.tools.javac.comp.AttrContext;
+import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.file.BaseFileManager;
 import com.sun.tools.javac.file.CacheFSInfo;
 import com.sun.tools.javac.file.JavacFileManager;
@@ -45,13 +52,16 @@ import com.sun.tools.javac.main.Arguments;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.resources.LauncherProperties;
+import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.Log;
+import com.sun.tools.javac.util.Pair;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchCompiler;
@@ -88,12 +98,12 @@ public interface Javac {
     record Request(Collection<Path> paths, List<String> options, Locale locale = Locale.getDefault(), Charset charset = StandardCharsets.UTF_8,
                    @Nullable DiagnosticListener<? super JavaFileObject> listener = null, PrintWriter writer = { new OutputStreamWriter(System.out), true }) {
         
-        public <C extends Context> C generateCompileContext(final C context, final boolean cacheFSInfo = true) {
+        public <C extends Context> C generateCompileContext(final C context) {
             context.put(Locale.class, locale);
             if (listener != null)
                 context.put(DiagnosticListener.class, listener);
             context.put(Log.errKey, writer);
-            if (cacheFSInfo)
+            if (!options["nonBatchMode"])
                 CacheFSInfo.preRegister(context);
             final JavacFileManager fileManager = { context, true, charset };
             fileManager.autoClose = true;
@@ -105,19 +115,20 @@ public interface Javac {
             return context;
         }
         
-        public CompileTask.Parallel parallelCompileTask(final boolean cacheFSInfo = true) = { this, generateCompileContext(new DispatchContext()) };
+        public CompileTask.Parallel parallelCompileTask() = { this, generateCompileContext(new DispatchContext()) };
         
-        public CompileTask.Serial serialCompileTask(final boolean cacheFSInfo = true) = { this, generateCompileContext(new Context()) };
+        public CompileTask.Serial serialCompileTask() = { this, generateCompileContext(new Context()) };
         
-        public CompileTask compileTask(final boolean parallel = true, final boolean cacheFSInfo = true) = parallel ? parallelCompileTask(cacheFSInfo) : serialCompileTask(cacheFSInfo);
+        public CompileTask compileTask(final boolean parallel = true) = parallel ? parallelCompileTask() : serialCompileTask();
         
         @SneakyThrows
-        public void compile(final boolean parallel = true, final boolean cacheFSInfo = true) throws Javac.Failure {
-            try (final CompileTask<?> compileTask = compileTask(parallel, cacheFSInfo)) { DebugHelper.logTimeConsuming(parallel ? "parallel-compile" : "serial-compile", compileTask::compile); }
+        public void compile(final boolean parallel = true) throws Javac.Failure {
+            try (final CompileTask<?> compileTask = compileTask(parallel)) { DebugHelper.logTimeConsuming(parallel ? "parallel-compile" : "serial-compile", compileTask::compile); }
         }
         
     }
     
+    @SneakyThrows
     sealed interface CompileTask<C extends JavaCompiler> extends AutoCloseable {
         
         record Parallel(Request request, DispatchContext context) implements CompileTask<DispatchCompiler> {
@@ -134,23 +145,52 @@ public interface Javac {
             
         }
         
-        private static com.sun.tools.javac.util.List<JavaFileObject> sources(final Context context, final Request request)
-                = ((JavacFileManager) context.get(JavaFileManager.class)).getJavaFileObjectsFromPaths(request.paths).fromIterable().collect(com.sun.tools.javac.util.List.collector());
-        
         Request request();
         
         Context context();
         
         C compiler();
         
-        default void compile() throws Javac.Failure {
-            final Context context = context();
+        default void checkErrors() throws Javac.Failure {
+            if (compiler().errorCount() > 0)
+                throw new Javac.Failure(LauncherProperties.Errors.CompilationFailed);
+        }
+        
+        default void run(final Consumer<C> task) throws Javac.Failure {
             try {
-                compiler().compile(sources(context, request()));
-                if (compiler().errorCount() > 0)
-                    throw new Javac.Failure(LauncherProperties.Errors.CompilationFailed);
+                task.accept(compiler());
             } catch (final Throwable throwable) { throw new Javac.Failure(LauncherProperties.Errors.CompilationFailed, throwable); }
         }
+        
+        default <T> T get(final Function<C, T> task) throws Javac.Failure {
+            try {
+                return task.apply(compiler());
+            } catch (final Throwable throwable) { throw new Javac.Failure(LauncherProperties.Errors.CompilationFailed, throwable); }
+        }
+        
+        default void compile() throws Javac.Failure = run(compiler -> {
+            compiler.compile(sources(context(), request()));
+            checkErrors();
+        });
+        
+        default List<JCTree.JCCompilationUnit> parse(final Iterable<JavaFileObject> sources = sources(context(), request())) throws Javac.Failure = get(compiler -> compiler.parseFiles(sources));
+        
+        default List<JCTree.JCCompilationUnit> initModules(final List units = parse()) throws Javac.Failure = get(compiler -> compiler.initModules(wrap(units)));
+        
+        default Queue<Env<AttrContext>> enter(final List<JCTree.JCCompilationUnit> units = initModules()) throws Javac.Failure = get(compiler -> {
+            compiler.enterTrees(wrap(units));
+            if (((Privilege) compiler.taskListener).isEmpty() && (Privilege) compiler.implicitSourcePolicy == JavaCompiler.ImplicitSourcePolicy.NONE)
+                compiler.todo.retainFiles((Privilege) compiler.inputFiles);
+            return compiler.todo;
+        });
+        
+        default Queue<Env<AttrContext>> attribute(final Queue<Env<AttrContext>> envs = enter()) throws Javac.Failure = get(compiler -> compiler.attribute(envs));
+        
+        default Queue<Env<AttrContext>> flow(final Queue<Env<AttrContext>> envs = attribute()) throws Javac.Failure = get(compiler -> compiler.flow(envs));
+        
+        default Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> desugar(final Queue<Env<AttrContext>> envs = flow()) throws Javac.Failure = get(compiler -> compiler.desugar(envs));
+        
+        default Queue<JavaFileObject> generate(final Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> envs = desugar()) throws Javac.Failure = get(compiler -> new ArrayDeque<JavaFileObject>().let(results -> compiler.generate(envs, results)));
         
         @Override
         default void close() throws Exception {
@@ -159,6 +199,11 @@ public interface Javac {
             if (context.get(JavaFileManager.class) instanceof BaseFileManager baseFileManager && baseFileManager.autoClose)
                 baseFileManager.close();
         }
+        
+        private static com.sun.tools.javac.util.List<JavaFileObject> sources(final Context context, final Request request)
+                = ((JavacFileManager) context.get(JavaFileManager.class)).getJavaFileObjectsFromPaths(request.paths).fromIterable().collect(com.sun.tools.javac.util.List.collector());
+        
+        private static <T> com.sun.tools.javac.util.List<T> wrap(final List<T> list) = list instanceof com.sun.tools.javac.util.List ? (com.sun.tools.javac.util.List<T>) list : com.sun.tools.javac.util.List.from(list);
         
     }
     
@@ -252,6 +297,29 @@ public interface Javac {
         return javacOpts;
     }
     
+    static List<String> injectDependencies(final List<String> options, final List<Path> dependencies) {
+        if (dependencies.nonEmpty()) {
+            final List<Path> modulePaths = dependencies.stream().filter(hasModuleInfo).toList(), classPaths = dependencies.stream().filterNot(modulePaths::contains).toList();
+            if (modulePaths.nonEmpty())
+                injectDependenciesIn(options, "-p", modulePaths);
+            if (classPaths.nonEmpty())
+                injectDependenciesIn(options, "-cp", classPaths);
+        }
+        return options;
+    }
+    
+    static void injectDependenciesIn(final List<String> options, final String in, final List<Path> modulePaths) {
+        final int index = options.indexOf(in);
+        if (index != -1)
+            options[index + 1] = STR."\{options[index + 1]}\{File.pathSeparator}\{pathsToClassPath(modulePaths)}";
+        else {
+            options += in;
+            options += pathsToClassPath(modulePaths);
+        }
+    }
+    
+    static String pathsToClassPath(final List<Path> paths) = paths.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator));
+    
     @SneakyThrows
     static void compile(final Collection<Path> paths, final List<String> options, final Charset charset = StandardCharsets.UTF_8, final Locale locale = Locale.getDefault(),
             final DiagnosticListener<? super JavaFileObject> listener = null, final PrintWriter writer = { new OutputStreamWriter(System.out), true }) throws Failure {
@@ -259,7 +327,12 @@ public interface Javac {
         request.compile(parallelStrategy.get()?.booleanValue() ?? (paths.size() > 8));
     }
     
-    Predicate<Path> hasModuleInfo = path -> path ^ root -> Files.exists(root / (MODULE_INFO + CLASS_SUFFIX));
+    @SneakyThrows
+    Predicate<Path> hasModuleInfo = path -> {
+        try (final JarFile jar = { path.toFile(), false, ZipFile.OPEN_READ, Runtime.version() }) {
+            return jar.getEntry(MODULE_INFO + CLASS_SUFFIX) != null;
+        }
+    };
     
     @SneakyThrows
     static Path compile(final Workspace workspace, final Module module, final Predicate<Path> useModulePath = hasModuleInfo, final Consumer<List<String>> argsTransformer = FunctionHelper.abandon(),

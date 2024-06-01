@@ -246,6 +246,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         return copier.copy(instance(LetHandler.class).let(let, access.indexed, access.index));
     }
     
+    @SuppressWarnings("DataFlowIssue")
     public @Nullable JCTree.JCExpression lower(final JCTree tree, final Env<AttrContext> env, final @Nullable JCTree.JCExpression lowerExpr) {
         if (lowerExpr != null)
             throw new ReAttrException(() -> tree.type = lowerExpr.type, lowerExpr.type == null, next -> {
@@ -279,6 +280,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         final ListBuffer<Type> argTypes = { };
         final Kinds.KindSelector kind = (Privilege) attr.attribArgs(Kinds.KindSelector.VAL, ((JCTree.JCMethodInvocation) localEnv.tree).args, localEnv, argTypes);
         final Type methodPrototype = (Privilege) attr.newMethodTemplate((Privilege) ((Privilege) attr.resultInfo).pt, argTypes.toList(), List.nil());
+        // noinspection DataFlowIssue
         (Privilege) (localEnv.info.pendingResolutionPhase = null);
         final Attr.ResultInfo resultInfo = (Privilege) attr.new ResultInfo(kind, methodPrototype, (Privilege) ((Privilege) attr.resultInfo).checkContext);
         final @Nullable Type methodType = discardDiagnostic(() -> {
