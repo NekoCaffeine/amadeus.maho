@@ -28,6 +28,7 @@ import amadeus.maho.util.bytecode.traverser.exception.ComputeException;
 import amadeus.maho.util.bytecode.traverser.exception.FrameMergeException;
 
 import static amadeus.maho.util.bytecode.FrameHelper.*;
+import static amadeus.maho.util.math.MathHelper.*;
 
 @Setter
 @Getter
