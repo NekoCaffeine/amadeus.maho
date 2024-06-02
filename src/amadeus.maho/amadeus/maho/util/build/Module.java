@@ -111,6 +111,6 @@ public record Module(Path path = Path.of(""), String name, Map<String, Path> sub
     
     @SneakyThrows
     @IndirectCaller
-    public static Module build(final Set<Dependency> dependencies = buildDependencies()) = { Path.of("build"), "script", dependencies };
+    public static Module build(final Set<Dependency> dependencies = buildDependenciesWithMaho()) = { Path.of("build"), "script", dependencies };
     
 }
