@@ -45,8 +45,8 @@ public interface JDWP {
         }
         
         @IndirectCaller
-        static void notify(final IDECommand.Notification notification, final @Nullable BiConsumer<LogLevel, String> logger = MahoExport.logger()?.namedLogger() ?? null) {
-            logger?.accept(notification.type.level, notification.asString());
+        static void notify(final IDECommand.Notification notification, final BiConsumer<LogLevel, String> logger = MahoExport.namedLogger()) {
+            logger[notification.type.level] = notification.asString();
             send(notification);
         }
         

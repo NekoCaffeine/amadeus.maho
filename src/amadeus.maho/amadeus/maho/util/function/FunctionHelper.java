@@ -1,9 +1,11 @@
 package amadeus.maho.util.function;
 
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.DoubleSupplier;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
@@ -62,11 +64,23 @@ public interface FunctionHelper {
             };
         }
         
+        static int TILDE(final IntSupplier supplier) = supplier.getAsInt();
+        
+        static long TILDE(final LongSupplier supplier) = supplier.getAsLong();
+        
+        static double TILDE(final DoubleSupplier supplier) = supplier.getAsDouble();
+        
+        static boolean TILDE(final BooleanSupplier supplier) = supplier.getAsBoolean();
+        
         static <T> T TILDE(final Supplier<T> supplier) = supplier.get();
         
         static <A, B> B GET(final Function<A, B> function, final A a) = function.apply(a);
         
         static <T> void GET(final Consumer<T> consumer, final T t) = consumer.accept(t);
+        
+        static <A, B> void PUT(final BiConsumer<A, B> consumer, final A a, final B b) = consumer.accept(a, b);
+        
+        static <A, B, R> R PUT(final BiFunction<A, B, R> function, final A a, final B b) = function.apply(a, b);
         
     }
     

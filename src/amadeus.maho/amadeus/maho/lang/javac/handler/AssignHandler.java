@@ -137,7 +137,7 @@ public class AssignHandler {
                     .filter(insn -> insn instanceof FieldInsnNode fieldInsn && fieldInsn.name.equals("LBRACE"))
                     .findFirst()
                     .orElseThrow();
-            final LabelNode jump = new LinkedIterator<>(AbstractInsnNode::getNext, StreamHelper.fromIterator(methodNode.instructions.iterator())
+            final LabelNode jump = LinkedIterator.of(AbstractInsnNode::getNext, StreamHelper.fromIterator(methodNode.instructions.iterator())
                     .filter(insn -> insn instanceof MethodInsnNode methodInsn && methodInsn.name.equals("block"))
                     .skip(1L)
                     .findFirst().orElseThrow())

@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntPredicate;
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -147,14 +148,10 @@ public interface DebugHelper {
     
     static List<String> consuming() = consumingLocal.get();
     
-    // static void push(final String name) = consuming() << name;
-    //
-    // static void pop() = consuming()--;
+    static void push(final String name) = consuming() << name;
 
-    static void push(final String name) = consuming().add(name);
+    static void pop() = consuming()--;
 
-    static void pop() = consuming().removeLast();
-    
     private static String consumingPrefix() = "  ".repeat(consuming().size());
     
     static void logTimeConsuming(final String name, final Runnable task) {
@@ -183,6 +180,20 @@ public interface DebugHelper {
             }
         } else
             return task.get();
+    }
+    
+    static void recordTimeConsuming(final Runnable task, final LongConsumer consumer) {
+        final long time = System.currentTimeMillis();
+        try {
+            task.run();
+        } finally { consumer.accept(System.currentTimeMillis() - time); }
+    }
+    
+    static <T> T recordTimeConsuming(final Supplier<T> task, final LongConsumer consumer) {
+        final long time = System.currentTimeMillis();
+        try {
+            return task.get();
+        } finally { consumer.accept(System.currentTimeMillis() - time); }
     }
     
 }

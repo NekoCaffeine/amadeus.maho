@@ -7,17 +7,20 @@ import java.util.stream.Stream;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
+import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.runtime.StreamHelper;
 
-@AllArgsConstructor
+@RequiredArgsConstructor(AccessLevel.PROTECTED)
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LinkedForkedIterator<T> {
     
     final Function<T, T> parentMapper;
     final Function<T, List<T>> forksMapper;
     
+    @Default
     T context;
     
     public @Nullable T parent() {

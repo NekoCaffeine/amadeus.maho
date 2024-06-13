@@ -49,7 +49,6 @@ public class AnnotationHandler<T> {
         @SneakyThrows
         private static final VarHandle handlerHandle = MethodHandleHelper.lookup().findVarHandle(BaseAnnotation.class, "handler", AnnotationHandler.class);
         
-        @Getter
         AnnotationHandler<?> handler;
         
         @SneakyThrows
@@ -141,8 +140,10 @@ public class AnnotationHandler<T> {
     public static <T extends Annotation> T make(final Class<T> clazz, final @Nullable ClassLoader contextLoader, final Map<String, Object> sourceMemberValues)
             = wrapper(clazz).let(it -> BaseAnnotation.handler(it, new AnnotationHandler<>(clazz, contextLoader, sourceMemberValues)));
     
-    @Nullable
-    public static <T extends Annotation> AnnotationHandler<T> asOneOfUs(final T object) = BaseAnnotation.handler(object);
+    public static <T extends Annotation> AnnotationHandler<T> asOneOfUs(final T object) = switch (object) {
+        case BaseAnnotation annotation -> BaseAnnotation.handler(annotation);
+        default                        -> throw new IllegalArgumentException(object.getClass().getName());
+    };
     
     public static <K, V> Map<K, V> valueToMap(final @Nullable List<?> list) {
         if (list == null || list.isEmpty())
@@ -168,7 +169,8 @@ public class AnnotationHandler<T> {
     Class<T> type;
     
     @Getter
-    @Nullable ClassLoader contextLoader;
+    @Nullable
+    ClassLoader contextLoader;
     
     Map<String, Object> sourceMemberValues;
     

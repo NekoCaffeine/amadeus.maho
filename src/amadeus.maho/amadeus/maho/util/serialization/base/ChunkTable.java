@@ -78,7 +78,7 @@ public class ChunkTable<H extends BinaryMapper, V extends BinaryMapper> implemen
                     if (AutomaticMapperType.Int.class.isAssignableFrom(headerType)) {
                         final Map<Integer, Class<?>> mapper = new HashMap<>();
                         final boolean p_flag[] = { true };
-                        new LinkedIterator<Class<?>>(Class::getSuperclass, headerType).stream(true)
+                        LinkedIterator.<Class<?>>of(Class::getSuperclass, headerType).stream(true)
                                 .takeWhile(clazz -> clazz != Object.class)
                                 .takeWhile(clazz -> {
                                     final boolean flag = p_flag[0];
@@ -155,7 +155,7 @@ public class ChunkTable<H extends BinaryMapper, V extends BinaryMapper> implemen
             return header.eofMark() ? null : header;
         }, endChecker, mapper);
         
-        public static <T> Class<? super T> cloneBaseType(final Class<T> subType) = new LinkedIterator<Class<? super T>>(Class::getSuperclass, subType).stream(true)
+        public static <T> Class<? super T> cloneBaseType(final Class<T> subType) = LinkedIterator.<Class<? super T>>of(Class::getSuperclass, subType).stream(true)
                 .filter(clazz -> clazz != Object.class)
                 .filter(clazz -> clazz.isAnnotationPresent(CloneBase.class))
                 .findFirst()

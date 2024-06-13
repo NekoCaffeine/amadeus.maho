@@ -1,5 +1,6 @@
 package amadeus.maho.util.shell;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -15,6 +16,7 @@ import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.util.build.Scaffold;
 import amadeus.maho.util.build.ScriptHelper;
 import amadeus.maho.util.bytecode.ASMHelper;
+import amadeus.maho.util.dynamic.LambdaHelper;
 import amadeus.maho.util.misc.Dumper;
 import amadeus.maho.util.runtime.UnsafeHelper;
 
@@ -25,6 +27,11 @@ public interface ShellHelper extends ScriptHelper {
     Unsafe unsafe = UnsafeHelper.unsafe();
     
     static void print(final Class<?> target) = ASMHelper.printBytecode(Maho.getClassNodeFromClass(target));
+    
+    static void print(final Object object) {
+        if (object != null && LambdaHelper.isLambdaClass(object.getClass()))
+            ASMHelper.printBytecode(Maho.getMethodNodeFromMethod((Method) object.getClass().constantPool().lastExecutableWithoutBoxed()));
+    }
     
     static void profile() = Dumper.print(Stream.of(MahoProfile::dump));
     

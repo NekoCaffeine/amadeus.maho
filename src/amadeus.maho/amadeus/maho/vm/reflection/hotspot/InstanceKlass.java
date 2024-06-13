@@ -10,10 +10,12 @@ import amadeus.maho.lang.ToString;
 import amadeus.maho.util.dynamic.ClassLocal;
 import amadeus.maho.util.runtime.StreamHelper;
 
+import static amadeus.maho.vm.reflection.hotspot.HotSpotBase.*;
+
 @ToString
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = true)
-public class InstanceKlass implements HotSpotBase {
+public class InstanceKlass {
     
     public static final HotSpotType
             InstanceKlass = jvm.type("InstanceKlass"),
@@ -23,8 +25,6 @@ public class InstanceKlass implements HotSpotBase {
             oopSize       = jvm.longConstant("oopSize"),
             _klass_offset = unsafe.getInt(jvm.type("java_lang_Class").global("_klass_offset")),
             _constants    = InstanceKlass.offset("_constants"),
-            _fields       = InstanceKlass.offset("_fields"),
-            _fields_data  = jvm.type("Array<u2>").offset("_data"),
             _methods      = InstanceKlass.offset("_methods"),
             _methods_data = jvm.type("Array<Method*>").offset("_data");
     
@@ -34,14 +34,6 @@ public class InstanceKlass implements HotSpotBase {
     Class<?> clazz;
     
     long address = oopSize == 8 ? unsafe.getLong(clazz, _klass_offset) : unsafe.getInt(clazz, _klass_offset) & 0xFFFFFFFFL, pool = unsafe.getAddress(address + _constants);
-    
-    public Stream<KlassField> fields() {
-        final long fieldArray = unsafe.getAddress(address + _fields);
-        final int methodCount = unsafe.getInt(fieldArray);
-        final long fields = fieldArray + _fields_data;
-        final int p_index[] = { -1 };
-        return StreamHelper.takeWhileNonNull(() -> ++p_index[0] < methodCount ? new KlassField(unsafe.getAddress(fields + p_index[0] * oopSize), pool) : null);
-    }
     
     public Stream<KlassMethod> methods() {
         final long methodArray = unsafe.getAddress(address + _methods);

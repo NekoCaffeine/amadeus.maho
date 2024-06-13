@@ -16,7 +16,6 @@ import com.sun.tools.javac.util.Pair;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.multithreaded.SharedComponent;
@@ -26,7 +25,6 @@ import static com.sun.tools.javac.code.Kinds.Kind.*;
 import static com.sun.tools.javac.code.Scope.LookupKind.NON_RECURSIVE;
 import static com.sun.tools.javac.code.TypeTag.CLASS;
 
-@NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ConcurrentCheck extends Check {
     

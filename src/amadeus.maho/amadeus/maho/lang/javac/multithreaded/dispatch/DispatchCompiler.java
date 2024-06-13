@@ -441,7 +441,6 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                 final ListBuffer<Symbol.ClassSymbol> uncompletedBuffer = { };
                 (Privilege) (nextEnter.uncompleted = uncompletedBuffer);
                 (Privilege) nextEnter.classEnter(tree, null);
-                // noinspection DataFlowIssue
                 (Privilege) (nextEnter.uncompleted = null);
                 uncompletedBuffer.forEach(classSymbol -> {
                     classSymbol.completer = Symbol.Completer.NULL_COMPLETER;
@@ -627,7 +626,6 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         final ConcurrentTransTypes transTypes = (ConcurrentTransTypes) TransTypes.instance(compiler.context);
         try {
             (Privilege) (transTypes.make = localMake);
-            // noinspection DataFlowIssue
             (Privilege) (transTypes.pt = null);
             transTypes.translateClass(symbol, env);
             compileStates[env] = CompileStates.CompileState.TRANSTYPES;

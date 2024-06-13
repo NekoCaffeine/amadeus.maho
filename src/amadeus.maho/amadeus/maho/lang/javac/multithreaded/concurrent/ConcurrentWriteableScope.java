@@ -156,7 +156,7 @@ public class ConcurrentWriteableScope extends Scope.WriteableScope {
         } finally { lock.readLock().unlock(); }
     }
     
-    public Stream<ConcurrentWriteableScope> scopes() = new LinkedIterator<>(scope -> scope.next, this).stream(true);
+    public Stream<ConcurrentWriteableScope> scopes() = LinkedIterator.of(scope -> scope.next, this).stream(true);
     
     @Hook(value = WriteableScope.class, isStatic = true)
     public static Hook.Result create(final Symbol owner) {

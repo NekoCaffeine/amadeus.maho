@@ -25,7 +25,7 @@ public final class HotSpotMethodFlagsMarker extends MethodMarker<HotSpotMethodFl
         InstanceKlass.klassLocals()[Class.forName(ASMHelper.sourceName(sourceClass.name), false, loader)].methods()
                 .filter(method -> method.constMethod.name.equals(sourceMethod.name) && method.constMethod.signature.equals(sourceMethod.desc))
                 .findFirst()
-                .ifPresent(method -> method.flags((short) (method.flags() & annotation.mask() | annotation.value())));
+                .ifPresent(method -> method.constMethod.flags((short) (method.constMethod.flags() & annotation.mask() | annotation.value())));
     }
     
 }

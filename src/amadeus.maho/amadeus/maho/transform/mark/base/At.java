@@ -291,7 +291,7 @@ public @interface At {
             default                 -> selector.isJavaIdentifierPart() ? (Predicate<String>) selector::equals : selector.matchPredicate();
         };
         
-        public static @Nullable String dropInvalidPart(final String name) = StringHelper.dropStartsWith(name, "_$");
+        public static String dropInvalidPart(final String name) = StringHelper.dropStartsWith(name, "_$");
         
     }
     

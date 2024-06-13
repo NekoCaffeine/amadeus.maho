@@ -2,9 +2,10 @@ package amadeus.maho.vm.reflection.hotspot;
 
 import java.util.stream.Stream;
 
+import static amadeus.maho.vm.reflection.hotspot.HotSpotBase.*;
 import static amadeus.maho.vm.reflection.hotspot.HotSpotFlag.Flags.*;
 
-public record HotSpotFlag(long address, String name, int flags, int type) implements Comparable<HotSpotFlag>, HotSpotBase {
+public record HotSpotFlag(long address, String name, int flags, int type) implements Comparable<HotSpotFlag> {
     
     private interface Flags {
         

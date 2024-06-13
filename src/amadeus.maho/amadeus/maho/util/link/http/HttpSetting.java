@@ -14,7 +14,7 @@ public record HttpSetting(
         Map<String, String> headers = baseHeaders,
         HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(3)).version(HttpClient.Version.HTTP_1_1).build(),
         int maxRetries = 2,
-        BiConsumer<LogLevel, String> logger = MahoExport.logger().namedLogger("HttpClient")
+        BiConsumer<LogLevel, String> logger = MahoExport.namedLogger("HttpClient")
 ) {
     
     public static final Map<String, String> baseHeaders = Map.of(HttpHelper.Header.User_Agent, STR."Maho/\{MahoExport.VERSION}");

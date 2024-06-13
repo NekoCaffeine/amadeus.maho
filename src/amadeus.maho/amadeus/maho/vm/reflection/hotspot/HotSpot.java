@@ -200,15 +200,4 @@ public enum HotSpot {
         types.values().forEach(type -> type.dump(list, subHead));
     }
     
-    int oopDescSize = type("oopDesc").size - (flag("UseCompressedClassPointers").asBool() ? type("jint").size : 0);
-    
-    public <T> T copyObjectWithoutHead(final Class<T> type, final Object target) {
-        if (type == target.getClass())
-            return (T) target;
-        final T result = UnsafeHelper.allocateInstanceOfType(type);
-        final long objectSize = Maho.instrumentation().getObjectSize(target);
-        (Privilege) unsafe.copyMemory0(target, oopDescSize, result, oopDescSize, objectSize - oopDescSize);
-        return result;
-    }
-    
 }

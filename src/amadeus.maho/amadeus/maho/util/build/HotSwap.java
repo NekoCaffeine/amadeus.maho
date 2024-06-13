@@ -45,8 +45,7 @@ public interface HotSwap {
     
     interface Logger {
         
-        @Nullable
-        BiConsumer<LogLevel, String> logger = MahoExport.logger()?.namedLogger("HotSwap") ?? null;
+        BiConsumer<LogLevel, String> logger = MahoExport.namedLogger("HotSwap");
         
     }
     

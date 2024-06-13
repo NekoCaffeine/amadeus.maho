@@ -61,7 +61,7 @@ public class ConcurrentTrie<P, E, V> implements ConcurrentMap<P, V> {
         
         public boolean isChildrenEmpty() = children == null || children.isEmpty();
         
-        public E[] paths() = (E[]) new LinkedIterator<>(Node::parent, this).stream(true).toList().descendingListStream().toArray();
+        public E[] paths() = (E[]) LinkedIterator.of(Node::parent, this).stream(true).toList().descendingListStream().toArray();
         
         public @Nullable Node<P, E, V> next(final E path) = ((ConcurrentMap<E, Node<P, E, V>>) childrenHandle.getOpaque(this))?.get(path) ?? null;
         

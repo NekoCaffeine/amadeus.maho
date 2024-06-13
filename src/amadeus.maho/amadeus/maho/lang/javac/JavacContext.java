@@ -821,7 +821,7 @@ public class JavacContext {
     
     public boolean shouldInjectInnerClass(final Env<AttrContext> env, final Name name) = lookupInnerClassDecl(env, name) == null;
     
-    public static Stream<Symbol.ClassSymbol> supers(final Symbol.ClassSymbol symbol) = new LinkedIterator<>(it -> {
+    public static Stream<Symbol.ClassSymbol> supers(final Symbol.ClassSymbol symbol) = LinkedIterator.of(it -> {
         final Type superType = it.getSuperclass();
         return superType == Type.noType ? null : (Symbol.ClassSymbol) superType.tsym;
     }, symbol).stream(true);

@@ -2,6 +2,7 @@ package amadeus.maho.core;
 
 import java.nio.file.Path;
 import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -15,7 +16,9 @@ import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.APIStatus;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.logging.AsyncLogger;
+import amadeus.maho.util.logging.LogLevel;
 import amadeus.maho.util.logging.LoggerHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.resource.ResourcePath;
@@ -107,6 +110,8 @@ public final class MahoExport {
     public static void enableLogger() = loggerState(true);
     
     public static @Nullable AsyncLogger logger() = loggerState() ? logger != null ? logger : (logger = LoggerHelper.makeAsyncLogger("MAHO", env.lookup(MAHO_LOGS_OUTPUT_FILE, true))) : null;
+    
+    public static BiConsumer<LogLevel, String> namedLogger(final String name = CallerContext.caller().getSimpleName()) = logger()?.namedLogger(name) ?? (_, _) -> { };
     
     public static void wrapperStdOut() = LoggerHelper.wrapperStdOut(logger());
     

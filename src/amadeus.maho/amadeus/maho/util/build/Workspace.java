@@ -4,13 +4,16 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.util.config.Config;
+import amadeus.maho.util.logging.LogLevel;
 import amadeus.maho.util.misc.Environment;
 
 import static com.sun.jna.Platform.*;
@@ -18,6 +21,8 @@ import static com.sun.jna.Platform.*;
 @ToString
 @EqualsAndHashCode
 public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFileSystem(root / Path.of("build"))), Path buildDir = Path.of("build"), Path outputDir = Path.of("output")) {
+    
+    public static final BiConsumer<LogLevel, String> logger = MahoExport.namedLogger();
     
     public Path buildOutputDir() = buildDir() / outputDir();
     
@@ -31,8 +36,10 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
     
     public self clean(final Module module) = --(root() / module.path() / buildOutputDir());
     
+    public Path runDir(final Module module) = root() / module.path() / "run";
+    
     public Process run(final Module module, final int debugPort = -1, final List<String> jvmArgs = List.of(), final boolean openTerminal = true,
-            final Path runDir = root() / module.path() / "run", final Predicate<Path> useModulePath = path -> true) = run(runDir, openTerminal, runArgs(module, debugPort, jvmArgs, useModulePath));
+            final Path runDir = runDir(module), final Predicate<Path> useModulePath = path -> true) = run(runDir, openTerminal, runArgs(module, debugPort, jvmArgs, useModulePath));
     
     public List<String> runArgs(final Module module, final int debugPort = -1, final List<String> jvmArgs = List.of(), final Predicate<Path> useModulePath = path -> true) {
         final ArrayList<String> args = { };
@@ -75,10 +82,12 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
                 case WINDOWS -> commands *= List.of("cmd", "/c", String.join(" ", args));
                 default      -> commands *= args;
             }
-        return new ProcessBuilder()
+        final Process started = new ProcessBuilder()
                 .directory((~directory).toAbsolutePath().toFile())
                 .command(commands)
                 .start();
+        logger[LogLevel.DEBUG] = STR."Start Process(\{started.pid()}) at \{directory.toAbsolutePath() | "/"}:\n\{String.join("\n", commands)}";
+        return started;
     }
     
     static UnsupportedOperationException unsupportedOSType() = { STR."Unsupported OS Type: \{System.getProperty("os.name")} \{System.getProperty("os.version")} (\{System.getProperty("os.arch")})" };
