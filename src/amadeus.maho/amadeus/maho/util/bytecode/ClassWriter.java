@@ -1,13 +1,16 @@
 package amadeus.maho.util.bytecode;
 
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
@@ -105,12 +108,17 @@ public class ClassWriter extends org.objectweb.asm.ClassWriter {
     
     public static byte[] toBytecode(final Consumer<ClassWriter> accepter) = new ClassWriter(null).let(accepter).toByteArray();
     
-    public byte[] toBytecode(final ClassNode node, final ComputeType... computeTypes) {
+    public byte[] toBytecode(final ClassNode node, final Collection<MethodNode> methods) = toBytecode(node, methods::contains);
+    
+    public byte[] toBytecode(final ClassNode node, final Predicate<MethodNode> shouldCompute = _ -> true) {
         mark(node);
-        if (computeTypes.length > 0) {
-            final Set<ComputeType> types = Set.of(computeTypes);
-            node.methods.forEach(methodNode -> MethodTraverser.instance().compute(methodNode, this, types));
-        }
+        node.methods.stream().filter(shouldCompute).forEach(methodNode -> MethodTraverser.instance().compute(methodNode, this));
+        node.accept(this);
+        return toByteArray();
+    }
+    
+    public byte[] toBytecodeNoCompute(final ClassNode node) {
+        mark(node);
         node.accept(this);
         return toByteArray();
     }

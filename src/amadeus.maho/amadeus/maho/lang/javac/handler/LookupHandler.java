@@ -6,7 +6,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -21,7 +20,6 @@ import com.sun.tools.javac.jvm.PoolConstant;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
 
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
@@ -36,9 +34,10 @@ import amadeus.maho.util.runtime.ArrayHelper;
 @NoArgsConstructor
 public class LookupHandler extends JavacContext {
     
-    public static final AtomicInteger counter = { };
-    
-    public static Name nextName(final Names names = instance().names, final String name) = names.fromString("$lookup$%s$%d".formatted(name, counter.getAndIncrement()));
+    public static Name nextName(final Env<AttrContext> env, final String name) {
+        final LetHandler instance = instance(LetHandler.class);
+        return instance.names.fromString("$lookup$%s$%d".formatted(name, instance.nextId(env)));
+    }
     
     private static final Map<String, Class<?>> name2Class = Stream.of(Field.class, Method.class, Constructor.class, VarHandle.class, MethodHandle.class).collect(Collectors.toMap(Class::getCanonicalName, Function.identity()));
     
@@ -60,14 +59,14 @@ public class LookupHandler extends JavacContext {
                         else
                             targetSymbol = null;
                         if (targetSymbol != null) {
-                            (Privilege) ($this.result = instance.maker.at(invocation).Ident(instance.constant(invocation, (Privilege) lambdaToMethod.attrEnv, target == Field.class ? "field" : "varHandle", target, targetSymbol)));
+                            (Privilege) ($this.result = instance.maker.at(invocation.pos).Ident(instance.constant(invocation, (Privilege) lambdaToMethod.attrEnv, target == Field.class ? "field" : "varHandle", target, targetSymbol)));
                             return Hook.Result.NULL;
                         }
                     }
                 }
                 if (target == Method.class || target == Constructor.class || target == MethodHandle.class) {
                     if (invocation.args.head instanceof JCTree.JCMemberReference reference) {
-                        (Privilege) ($this.result = instance.maker.at(invocation).Ident(instance.constant(invocation, (Privilege) lambdaToMethod.attrEnv, target == Method.class ? "method" : target == Constructor.class ? "constructor" :
+                        (Privilege) ($this.result = instance.maker.at(invocation.pos).Ident(instance.constant(invocation, (Privilege) lambdaToMethod.attrEnv, target == Method.class ? "method" : target == Constructor.class ? "constructor" :
                                 reference.mode == MemberReferenceTree.ReferenceMode.NEW ? "constructorHandle" : "methodHandle", target, reference.sym)));
                         return Hook.Result.NULL;
                     }
@@ -83,7 +82,7 @@ public class LookupHandler extends JavacContext {
             constants = { lookupDynamicLookupMethod(name(name)).asHandle(), (Type.ClassType) symbol.owner.type };
         else
             constants = { lookupDynamicLookupMethod(name(name)).asHandle(), (Type.ClassType) symbol.owner.type, PoolConstant.LoadableConstant.String(symbol.name.toString()) };
-        return { nextName(names, STR."\{symbol.owner.getQualifiedName().toString().replace('.', '_')}#\{symbol.name}"), symtab.noSymbol, constantInvokeBSM(position, env).asHandle(), symtab.enterClass(symtab.java_base, name(targetType)).type,
+        return { nextName(env, STR."\{symbol.owner.getQualifiedName().toString().replace('.', '_')}#\{symbol.name}"), symtab.noSymbol, constantInvokeBSM(position, env).asHandle(), symtab.enterClass(symtab.java_base, name(targetType)).type,
                  symbol instanceof Symbol.MethodSymbol methodSymbol ? ArrayHelper.addAll(constants, methodSymbol.type.asMethodType()) : constants };
     }
     

@@ -17,7 +17,7 @@ public interface ATFiles {
     
     @SneakyThrows
     static MapTable<String, String, ATRule> parseATRules(final Path atFile) throws IOException {
-        final MapTable<String, String, ATRule> result = MapTable.newHashMapTable();
+        final MapTable<String, String, ATRule> result = MapTable.ofHashMapTable();
         final int lineCounter[] = { -1 };
         Files.lines(atFile).forEach(line -> {
             lineCounter[0]++;

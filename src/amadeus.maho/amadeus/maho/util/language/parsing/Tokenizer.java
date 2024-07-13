@@ -16,7 +16,6 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.container.MapTable;
-import amadeus.maho.util.function.FunctionHelper;
 
 import static java.lang.Character.getType;
 
@@ -180,7 +179,7 @@ public class Tokenizer {
     
     public <R> Parser<R> parser(final Class<R> type) = (Parser<R>) parserProvider().apply(type);
     
-    public Context root() = { this, null, -1, -1, MapTable.newMapTable(new HashMap<>(), FunctionHelper.abandon(IdentityHashMap::new)) };
+    public Context root() = { this, null, -1, -1, MapTable.of(new HashMap<>(), _ -> new IdentityHashMap<>()) };
     
     public <R> R parsing(final Parser<R> parser, final Context context = root()) throws ParseException = context.scan(parser);
     

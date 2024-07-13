@@ -17,6 +17,7 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
+import amadeus.maho.lang.inspection.Nullable;
 
 import static com.sun.tools.javac.code.TypeTag.CLASS;
 
@@ -47,7 +48,7 @@ public class NestedScanner extends TreeScanner {
         boolean envForSuperTypeFound = false;
         while (!envForSuperTypeFound && supertype.hasTag(CLASS)) {
             final Symbol.ClassSymbol superClassSymbol = supertype.tsym.outermostClass();
-            final Env<AttrContext> superEnv = enter.getEnv(superClassSymbol);
+            final @Nullable Env<AttrContext> superEnv = enter.getEnv(superClassSymbol);
             if (superEnv != null && env != superEnv) {
                 if (dependencies.add(superEnv)) {
                     final boolean

@@ -204,9 +204,11 @@ public class Frame {
         stack().replaceAll(mapper);
     }
     
-    public void erase(final Object flag) {
-        final TypeOwner p_owner[] = { null };
-        map(owner -> owner.flag() == flag ? p_owner[0] == null ? p_owner[0] = owner.erase() : p_owner[0] : owner);
+    public void erase(final @Nullable Object flag) {
+        if (flag != null) {
+            final TypeOwner p_owner[] = { null };
+            map(owner -> owner.flag() == flag ? p_owner[0] == null ? p_owner[0] = owner.erase() : p_owner[0] : owner);
+        }
     }
     
     public void push(final TypeOwner value) = stack().addLast(value);

@@ -150,7 +150,7 @@ public interface Repository {
         final Collection<Project> baseProjects = dependencies.stream().map(Project.Dependency::project).collect(Collectors.toSet());
         final ConcurrentHashMap<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPath = { };
         final ConcurrentHashMap<Project, CompletableFuture<?>> context = { };
-        final Function<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPathGetter = key -> dependenciesPath.computeIfAbsent(key, FunctionHelper.abandon(ConcurrentLinkedQueue::new));
+        final Function<Project.Dependency, ConcurrentLinkedQueue<List<Project>>> dependenciesPathGetter = key -> dependenciesPath.computeIfAbsent(key, _ -> new ConcurrentLinkedQueue<>());
         return resolveConflict(dependencies.stream().map(dependency -> recursiveResolveCache().computeIfAbsent(dependency, it -> async(() -> {
             final ConcurrentLinkedQueue<CompletableFuture<?>> futures = { };
             final Set<Project.Dependency> subDependencies = ConcurrentHashMap.newKeySet();

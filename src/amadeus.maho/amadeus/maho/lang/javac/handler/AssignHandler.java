@@ -11,6 +11,7 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Env;
@@ -35,6 +36,7 @@ import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.control.LinkedIterator;
+import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.StreamHelper;
 
 import static amadeus.maho.lang.javac.JavacContext.*;
@@ -54,8 +56,26 @@ public class AssignHandler {
         if (!type.isPrimitiveOrVoid() && !type.isErroneous()) {
             final TreeMaker maker = instance().maker.at(newArray.pos);
             if (type instanceof Type.ClassType classType)
-                tree.init = maker.NewClass(null, List.nil(), dropTypeArguments(maker.Type(classType)), newArray.elems, null);
+                tree.init = lower(maker, newArray, classType);
+            else if (type instanceof Type.ArrayType arrayType)
+                tree.init = transform(maker, newArray, arrayType);
         }
+    }
+    
+    public static JCTree.JCNewArray transform(final TreeMaker maker, final JCTree.JCNewArray newArray, final Type.ArrayType arrayType) {
+        if (arrayType.elemtype instanceof Type.ClassType classType)
+            newArray.elems = newArray.elems.map(element -> element instanceof JCTree.JCNewArray subNewArray ? lower(maker.at(subNewArray.pos), subNewArray, classType) : element);
+        else if (arrayType.elemtype instanceof Type.ArrayType subArrayType)
+            newArray.elems = newArray.elems.map(element -> element instanceof JCTree.JCNewArray subNewArray ? transform(maker.at(subNewArray.pos), subNewArray, subArrayType) : element);
+        return newArray;
+    }
+    
+    public static JCTree.JCNewClass lower(final TreeMaker maker, final JCTree.JCNewArray newArray, final Type type) {
+        if (!type.isPrimitiveOrVoid() && !type.isErroneous()) {
+            if (type instanceof Type.ClassType classType)
+                return maker.at(newArray.pos).NewClass(null, List.nil(), dropTypeArguments(maker.Type(classType)), newArray.elems, null);
+        }
+        throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException(STR."Unsupported type: \{type}"));
     }
     
     @Hook(metadata = @TransformMetadata(order = -1))
@@ -75,7 +95,9 @@ public class AssignHandler {
             if (!type.isPrimitiveOrVoid() && !type.isErroneous()) {
                 final TreeMaker maker = instance().maker.at(tree.rhs.pos);
                 if (type instanceof Type.ClassType classType)
-                    tree.rhs = maker.NewClass(null, List.nil(), dropTypeArguments(maker.Type(classType)), newArray.elems, null);
+                    tree.rhs = lower(maker, newArray, classType);
+                else if (type instanceof Type.ArrayType arrayType)
+                    tree.rhs = transform(maker, newArray, arrayType);
             }
             tree.lhs.type = null;
         }
@@ -91,10 +113,12 @@ public class AssignHandler {
                 if (!type.isPrimitiveOrVoid() && !type.isErroneous()) {
                     final JavacContext context = instance();
                     final TreeMaker maker = context.maker.at(tree.expr.pos);
-                    if (type instanceof Type.ArrayType arrayType)
+                    if (type instanceof Type.ClassType classType)
+                        tree.expr = lower(maker, newArray, classType);
+                    else if (type instanceof Type.ArrayType arrayType) {
                         newArray.elemtype = maker.Type(arrayType.elemtype);
-                    else if (type instanceof Type.ClassType classType)
-                        tree.expr = maker.NewClass(null, List.nil(), dropTypeArguments(maker.Type(classType)), newArray.elems, null);
+                        tree.expr = transform(maker, newArray, arrayType);
+                    }
                 }
             }
         }
@@ -162,13 +186,13 @@ public class AssignHandler {
             generator.goTo(jump.markLabel());
             generator.mark(label);
             methodNode.instructions.insertBefore(lbrace, list);
-            context.markModified().markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
+            context.markModified().markCompute(methodNode);
         }
         
     }
     
     @Redirect(targetClass = JavacParser.class, selector = "methodDeclaratorRest", slice = @Slice(@At(method = @At.MethodInsn(name = $$$BLOCK$$$))))
-    private static JCTree.JCBlock block(final JavacParser parser, final JCTree.JCExpression type) {
+    private static JCTree.JCBlock block(final JavacParser parser, final @Nullable JCTree.JCExpression type) {
         parser.nextToken();
         final JCTree.JCExpression expression = parser.variableInitializer();
         parser.accept(SEMI);

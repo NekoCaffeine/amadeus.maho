@@ -9,7 +9,11 @@ import amadeus.maho.util.runtime.ArrayHelper;
 class compiler_zh_CN {
     
     private static Object[][] injectContents() = {
+            { "amadeus.maho.lang.err.safe.access.not.allowed", "此处不允许 ?. 表达式，必须处于 ?? 表达式的下文中" },
             { "amadeus.maho.lang.err.reference.mark.nesting", "引用标记嵌套" },
+            { "amadeus.maho.lang.err.delegate.hard.static", "硬委托的目标必须是非静态的成员" },
+            { "amadeus.maho.lang.err.delegate.primitive.type.not.allowed", "委托不允许基本类型" },
+            { "amadeus.maho.lang.err.delegate.array.type.not.allowed", "委托不允许数组类型" },
             { "amadeus.maho.lang.err.delegate.method.must.have.no.parameters", "委托方法 {0} 必须没有参数" },
             { "amadeus.maho.lang.err.getter.method.lazy", "@Getter 标记的方法不支持 'lazy' 属性" },
             { "amadeus.maho.lang.err.lazy.getter.must.not.interface", "@Getter(lazy = true) 标记的字段不支持声明在接口中" },

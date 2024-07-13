@@ -37,10 +37,12 @@ import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.DynamicAnnotationHandler;
@@ -65,6 +67,8 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
     
     public static final int PRIORITY = -1 << 24;
     
+    @ToString
+    @EqualsAndHashCode
     public record SymbolTable(ConcurrentHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ClassSymbol>> extensionProviders = { },
                               ConcurrentHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ModuleSymbol>> importInfos = { },
                               ConcurrentHashMap<Symbol.ModuleSymbol, Map<Name, Collection<Symbol.MethodSymbol>>> extensionMethodsWithImport = { }) implements SharedComponent {
@@ -87,7 +91,7 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
             return methods;
         });
         
-        public Collection<Symbol.MethodSymbol> lookupExtensionProvider(final Types types, final Env<AttrContext> env, final Name name) = lookupExtensionProvider(types, env)[name];
+        public @Nullable Collection<Symbol.MethodSymbol> lookupExtensionProvider(final Types types, final Env<AttrContext> env, final Name name) = lookupExtensionProvider(types, env)[name];
         
         public static Predicate<Symbol> filter() = symbol -> {
             final long flags = symbol.flags();

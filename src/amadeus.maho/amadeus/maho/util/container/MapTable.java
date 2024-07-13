@@ -7,24 +7,26 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import amadeus.maho.lang.Extension;
+import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.function.Consumer3;
-import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.tuple.Tuple2;
 import amadeus.maho.util.tuple.Tuple3;
 
 public interface MapTable<R, C, V> {
     
-    static <R, C, V> MapTable<R, C, V> newMapTable(final Map<R, Map<C, V>> backingMap, final Function<R, Map<C, V>> factory) = new MapTable<>() {
+    static <R, C, V> MapTable<R, C, V> of(final Map<R, Map<C, V>> backingMap, final Function<R, Map<C, V>> factory) = new MapTable<>() {
         
         @Override
         public Map<R, Map<C, V>> backingMap() = backingMap;
@@ -43,26 +45,53 @@ public interface MapTable<R, C, V> {
         
     };
     
-    static <R, C, V> MapTable<R, C, V> newMapTable(final Supplier<Map<R, Map<C, V>>> backingMapSupplier, final Supplier<Map<C, V>> factory) = newMapTable(backingMapSupplier.get(), FunctionHelper.abandon(factory));
+    static <R, C, V> MapTable<R, C, V> of(final MapTable<R, C, V> table, final Function<Map<?, ?>, Map<?, ?>> mapper) = new MapTable<>() {
+        
+        @Getter
+        final Map<R, Map<C, V>> backingMap = (Map<R, Map<C, V>>) mapper.apply(table.backingMap());
+        
+        final ConcurrentWeakIdentityHashMap<Map<?, ?>, Map<?, ?>> map = { };
+        
+        @Override
+        public Function<R, Map<C, V>> factory() = table.factory();
+        
+        @Override
+        public int hashCode() = backingMap().hashCode();
+        
+        @Override
+        public boolean equals(final Object obj) = obj instanceof MapTable table && backingMap().equals(table.backingMap());
+        
+        @Override
+        public String toString() = backingMap().toString();
+        
+        @Override
+        public @Nullable Map<C, V> get(@Nullable final R rowKey) {
+            final @Nullable  Map<C, V> result = MapTable.super.get(rowKey);
+            return result == null ? null : (Map<C, V>) map.computeIfAbsent(result, mapper);
+        }
+        
+        @Override
+        public Map<C, V> row(@Nullable final R rowKey) = (Map<C, V>) map.computeIfAbsent(MapTable.super.row(rowKey), mapper);
+        
+    };
     
-    static <R, C, V> MapTable<R, C, V> newHashMapTable() = newMapTable(new HashMap<>(), FunctionHelper.abandon(HashMap::new));
+    static <R, C, V> MapTable<R, C, V> ofHashMapTable() = of(new HashMap<>(), _ -> new HashMap<>());
     
-    static <R, C, V> MapTable<R, C, V> newLinkedHashMapTable() = newMapTable(new LinkedHashMap<>(), FunctionHelper.abandon(LinkedHashMap::new));
+    static <R, C, V> MapTable<R, C, V> ofLinkedHashMapTable() = of(new LinkedHashMap<>(), _ -> new LinkedHashMap<>());
     
-    static <R, C, V> MapTable<R, C, V> newWeakHashMapTable() = newMapTable(new WeakHashMap<>(), FunctionHelper.abandon(WeakHashMap::new));
+    static <R, C, V> MapTable<R, C, V> ofWeakHashMapTable() = of(new WeakHashMap<>(), _ -> new WeakHashMap<>());
     
-    static <R, C, V> MapTable<R, C, V> newIdentityHashMapTable() = newMapTable(new IdentityHashMap<>(), FunctionHelper.abandon(IdentityHashMap::new));
+    static <R, C, V> MapTable<R, C, V> ofIdentityHashMapTable() = of(new IdentityHashMap<>(), _ -> new IdentityHashMap<>());
     
-    static <R, C, V> MapTable<R, C, V> newConcurrentHashMapTable() = newMapTable(new ConcurrentHashMap<>(), FunctionHelper.abandon(ConcurrentHashMap::new));
+    static <R, C, V> MapTable<R, C, V> ofConcurrentHashMapTable() = of(new ConcurrentHashMap<>(), _ -> new ConcurrentHashMap<>());
     
-    static <R extends Comparable<R>, C extends Comparable<C>, V> MapTable<R, C, V> newConcurrentSkipListMapTable() = newMapTable(new ConcurrentSkipListMap<>(), FunctionHelper.abandon(ConcurrentSkipListMap::new));
+    static <R, C, V> MapTable<R, C, V> ofConcurrentWeakIdentityHashMapTable() = of(new ConcurrentWeakIdentityHashMap<>(), _ -> new ConcurrentWeakIdentityHashMap<>());
     
-    static <R, C, V> MapTable<R, C, V> unmodifiableTable(final MapTable<R, C, V> table) = newMapTable(Collections.unmodifiableMap(table.backingMap()), FunctionHelper.abandon(Collections::emptyMap));
+    static <R extends Comparable<R>, C extends Comparable<C>, V> MapTable<R, C, V> ofConcurrentSkipListMapTable() = of(new ConcurrentSkipListMap<>(), _ -> new ConcurrentSkipListMap<>());
     
-    static <R, C, V> MapTable<R, C, V> synchronizedTable(final MapTable<R, C, V> table) {
-        table.backingMap().replaceAll((row, map) -> Collections.synchronizedMap(map));
-        return newMapTable(Collections.synchronizedMap(table.backingMap()), FunctionHelper.map(table.factory(), Collections::synchronizedMap));
-    }
+    static <R, C, V> MapTable<R, C, V> unmodifiableTable(final MapTable<R, C, V> table) = of(table, Collections::unmodifiableMap);
+    
+    static <R, C, V> MapTable<R, C, V> synchronizedTable(final MapTable<R, C, V> table) = of(table, Collections::synchronizedMap);
     
     Map<R, Map<C, V>> backingMap();
     
@@ -70,11 +99,10 @@ public interface MapTable<R, C, V> {
     
     default int size() = backingMap().values().stream().mapToInt(Map::size).sum();
     
-    default boolean isEmpty() = backingMap().values().stream().anyMatch(((Predicate<Map<C, V>>) Map::isEmpty).negate());
+    default boolean isEmpty() = backingMap().values().stream().allMatch(Map::isEmpty);
     
     default void clear() = backingMap().clear();
     
-    @Extension.Operator("GET")
     default @Nullable Map<C, V> get(final @Nullable R rowKey) = backingMap().get(rowKey);
     
     default @Nullable V get(final @Nullable R rowKey, final @Nullable C columnKey) {
@@ -98,6 +126,7 @@ public interface MapTable<R, C, V> {
     
     default void putAll(final MapTable<R, C, V> table) = table.backingMap().forEach((rowKey, columnMap) -> row(rowKey).putAll(columnMap));
     
+    @Extension.Operator("GET")
     default Map<C, V> row(final @Nullable R rowKey) = backingMap().computeIfAbsent(rowKey, factory());
     
     default @Nullable V remove(final @Nullable R rowKey, final @Nullable C columnKey) {
@@ -122,10 +151,16 @@ public interface MapTable<R, C, V> {
     
     default boolean containsRow(final @Nullable R rowKey) = backingMap().containsKey(rowKey);
     
-    default boolean containsColumn(final @Nullable C columnKey) = backingMap().values().stream().map(Map::keySet).flatMap(Collection::stream).anyMatch(Predicate.isEqual(columnKey));
+    default boolean containsColumn(final @Nullable C columnKey) = backingMap().values().stream().anyMatch(map -> map.containsKey(columnKey));
     
-    default boolean containsValue(final @Nullable V value) = backingMap().values().stream().map(Map::values).flatMap(Collection::stream).anyMatch(Predicate.isEqual(value));
+    default boolean containsValue(final @Nullable V value) = backingMap().values().stream().map(Map::values).anyMatch(collection -> collection.contains(value));
     
     default void forEach(final Consumer3<R, C, V> consumer) = backingMap().forEach((row, map) -> map.forEach((column, value) -> consumer.accept(row, column, value)));
+    
+    default Stream<R> rowKeys() = backingMap().keySet().stream();
+    
+    default Stream<C> columnKeys() = backingMap().values().stream().map(Map::keySet).flatMap(Set::stream).distinct();
+    
+    default Stream<V> values() = backingMap().values().stream().map(Map::values).flatMap(Collection::stream);
     
 }

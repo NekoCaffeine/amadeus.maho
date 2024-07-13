@@ -300,7 +300,8 @@ public class DynamicMethod {
     public static MethodHandle constructor(final Class<?> owner, final Class<?>... argTypes) = constructor(owner, MethodType.methodType(void.class, argTypes));
     
     @Getter
-    final @Nullable ClassLoader loader;
+    @Default
+    final @Nullable ClassLoader loader = CallerContext.caller().getClassLoader();
     
     @Getter
     @Default
@@ -436,7 +437,7 @@ public class DynamicMethod {
     @SneakyThrows
     public Object allocateInstance() = UnsafeHelper.allocateInstance(wrapperClass());
     
-    public byte[] toBytecode(final @Nullable ClassLoader loader) = new ClassWriter(loader).toBytecode(wrapper(), ComputeType.MAX, ComputeType.FRAME);
+    public byte[] toBytecode(final @Nullable ClassLoader loader) = new ClassWriter(loader).toBytecode(wrapper());
     
     public ClassNode wrapper() {
         final ClassNode result = { };

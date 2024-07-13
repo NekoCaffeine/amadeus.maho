@@ -235,8 +235,9 @@ public class HandlerSupport extends JavacContext {
                     .collect(Collectors.toCollection(ArrayList::new))
                     .let(result -> result.sort((a, b) -> (int) (a.getKey().handler().priority() - b.getKey().handler().priority())))
                     .forEach(entry -> entry.getValue().forEach(tuple -> process(env, tree, owner, entry.getKey(), tuple.v1, tuple.v2, advance)));
-        syntaxHandlers().forEach(handler -> handler.process(env, tree, owner, advance));
-        AccessibleHandler.transformPackageLocalToProtected(tree, owner, modifiers);
+        syntaxHandlers().forEach(handler -> process(env, tree, owner, handler, advance));
+        if (modifiers != null)
+            AccessibleHandler.transformPackageLocalToProtected(tree, owner, modifiers);
     }
     
     public @Nullable <A extends Annotation> Map.Entry<BaseHandler<A>, List<Tuple2<A, JCTree.JCAnnotation>>> getAnnotationsByTypeWithOuter(final @Nullable JCTree.JCModifiers modifiers, final Env<AttrContext> env, final JCTree tree,
@@ -260,6 +261,19 @@ public class HandlerSupport extends JavacContext {
     
     public <A extends Annotation> @Nullable A lookupAnnotation(final JCTree.JCModifiers modifiers, final Env<AttrContext> env, final JCTree tree, final Class<A> annotationType)
             = getAnnotationsByTypeWithOuter(modifiers, env, tree, annotationType).stream().findFirst().map(Tuple2::v1).orElse(null);
+    
+    private void process(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final BaseSyntaxHandler baseHandler, final boolean advance) {
+        final JCTree.JCCompilationUnit topLevel = maker.toplevel;
+        final int pos = maker.pos;
+        try {
+            maker.toplevel = env.toplevel;
+            maker.pos = tree.pos;
+            baseHandler.process(env, tree, owner, advance);
+        } finally {
+            maker.toplevel = topLevel;
+            maker.pos = pos;
+        }
+    }
     
     private void process(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final BaseHandler<Annotation> baseHandler, final Annotation annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
         final JCTree.JCCompilationUnit topLevel = maker.toplevel;

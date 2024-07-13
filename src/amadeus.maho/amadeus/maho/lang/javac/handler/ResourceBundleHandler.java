@@ -95,7 +95,7 @@ public class ResourceBundleHandler extends BaseHandler<ResourceBundle> {
                                     final boolean instance = itf || noneMatch(methodSymbol.flags_field, Flags.STATIC);
                                     final Name name = name(agentMethod.agent.format(), matcher, location, path);
                                     final String nameString = name.toString();
-                                    final java.util.List<Symbol.MethodSymbol> symbols = record.computeIfAbsent(nameString, FunctionHelper.abandon(LinkedList::new));
+                                    final java.util.List<Symbol.MethodSymbol> symbols = record.computeIfAbsent(nameString, _ -> new LinkedList<>());
                                     symbols += methodSymbol;
                                     if (symbols.size() > 1) {
                                         p_repeatedly[0] = true;

@@ -79,7 +79,7 @@ public class ConcurrentWriteableScope extends Scope.WriteableScope {
     public ConcurrentWriteableScope dup(final Symbol newOwner) = dupUnshared(newOwner);
     
     @Override
-    public ConcurrentWriteableScope leave() = next;
+    public @Nullable ConcurrentWriteableScope leave() = next;
     
     @Override
     public ConcurrentWriteableScope dupUnshared(final Symbol newOwner) = { newOwner, this };
@@ -160,7 +160,7 @@ public class ConcurrentWriteableScope extends Scope.WriteableScope {
     
     @Hook(value = WriteableScope.class, isStatic = true)
     public static Hook.Result create(final Symbol owner) {
-        if (JavacContext.instance()?.context ?? null instanceof MultiThreadedContext)
+        if (JavacContext.instanceMayNull()?.context ?? null instanceof MultiThreadedContext)
             return { new ConcurrentWriteableScope(owner) };
         return Hook.Result.VOID;
     }

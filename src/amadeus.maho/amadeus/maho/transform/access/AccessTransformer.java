@@ -16,7 +16,7 @@ public enum AccessTransformer implements ClassTransformer {
     
     INSTANCE;
     
-    private final MapTable<String, String, ATRule> atRuleTable = MapTable.newConcurrentHashMapTable();
+    private final MapTable<String, String, ATRule> atRuleTable = MapTable.ofConcurrentHashMapTable();
     
     public void addRules(final MapTable<String, String, ATRule> rules) = rules.forEach((raw, column, value) -> {
         final @Nullable ATRule rule = atRuleTable.get(raw, column);

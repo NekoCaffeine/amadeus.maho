@@ -326,7 +326,7 @@ public interface HttpApi {
                 generator.endMethod();
             }
         });
-        wrapper.context().markCompute(wrapper.node(), ComputeType.MAX);
+        wrapper.context().markCompute(wrapper.node());
         final Class<? extends T> wrapperClass = wrapper.defineWrapperClass();
         final T instance = (T) wrapperClass.getConstructors()[0].newInstance(root, setting);
         final MethodHandles.Lookup lookup = MethodHandleHelper.lookup();

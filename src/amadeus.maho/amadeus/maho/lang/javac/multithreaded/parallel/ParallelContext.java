@@ -3,6 +3,7 @@ package amadeus.maho.lang.javac.multithreaded.parallel;
 import java.util.concurrent.CompletableFuture;
 
 import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.Lower;
 import com.sun.tools.javac.comp.Modules;
 import com.sun.tools.javac.comp.TransTypes;
 import com.sun.tools.javac.jvm.ClassWriter;
@@ -69,6 +70,7 @@ public class ParallelContext extends Context implements MultiThreadedContext {
         final boolean multiModuleMode = modules.multiModuleMode;
         JNIWriter.instance(this).multiModuleMode = multiModuleMode;
         ClassWriter.instance(this).multiModuleMode = multiModuleMode;
+        Lower.instance(this).prunedTree = Lower.instance(context).prunedTree;
     }
     
     @Override

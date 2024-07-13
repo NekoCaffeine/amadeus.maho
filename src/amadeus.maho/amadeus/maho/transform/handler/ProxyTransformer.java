@@ -129,7 +129,7 @@ public final class ProxyTransformer extends MethodTransformer<Proxy> implements 
                     }
                     generator.returnValue();
                 });
-                context.markModified().markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
+                context.markModified().markCompute(methodNode);
                 break;
             }
         return node;

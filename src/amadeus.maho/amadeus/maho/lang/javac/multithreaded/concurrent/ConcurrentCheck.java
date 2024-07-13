@@ -68,11 +68,8 @@ public class ConcurrentCheck extends Check {
                     if (clazz.interfaces_field != null)
                         for (List<Type> l = clazz.interfaces_field; l.nonEmpty(); l = l.tail)
                             complete &= checkNonCyclicInternal(pos, l.head);
-                    if (clazz.supertype_field != null) {
-                        final @Nullable Type st = clazz.supertype_field;
-                        if (st != null && st.hasTag(CLASS))
-                            complete &= checkNonCyclicInternal(pos, st);
-                    }
+                    if (clazz.supertype_field instanceof Type st && st.hasTag(CLASS))
+                        complete &= checkNonCyclicInternal(pos, st);
                     if (symbol.owner.kind == TYP)
                         complete &= checkNonCyclicInternal(pos, symbol.owner.type);
                 }

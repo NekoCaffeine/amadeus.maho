@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.SOURCE)
 public @interface EqualsAndHashCode {
     
-    @Target(ElementType.TYPE)
+    @Target({ ElementType.FIELD, ElementType.RECORD_COMPONENT })
     @Retention(RetentionPolicy.RUNTIME)
     @interface Mark { }
     

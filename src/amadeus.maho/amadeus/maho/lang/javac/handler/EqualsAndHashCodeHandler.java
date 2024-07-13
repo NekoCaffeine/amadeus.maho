@@ -17,6 +17,7 @@ import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
 import amadeus.maho.util.runtime.ArrayHelper;
 
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static com.sun.tools.javac.code.Flags.*;
 
 public class EqualsAndHashCodeHandler {
@@ -64,7 +65,7 @@ public class EqualsAndHashCodeHandler {
                     a = maker.Apply(List.nil(), a, List.nil()); // this.member()
                     b = maker.Apply(List.nil(), b, List.nil()); // target.member()
                 }
-                final Type type = symbol(member).type;
+                final Type type = requireNonNull(symbol(member)).type;
                 if (type.isPrimitive())
                     consumer.accept(switch (type.getTag()) {
                         case FLOAT, DOUBLE -> maker.Binary(JCTree.Tag.NE, maker.Apply(List.nil(), maker.Select(maker.Ident(types.boxedClass(type)), name("compare")), List.of(a, b)), maker.Literal(0));
@@ -100,7 +101,7 @@ public class EqualsAndHashCodeHandler {
                 JCTree.JCExpression expr = maker.Select(maker.Ident(names._this), name(member));
                 if (member instanceof JCTree.JCMethodDecl)
                     expr = maker.Apply(List.nil(), expr, List.nil()); // this.member()
-                final Type type = symbol(member).type;
+                final Type type = requireNonNull(symbol(member)).type;
                 if (type.isPrimitive())
                     consumer.accept(maker.Apply(List.nil(), maker.Select(maker.Ident(types.boxedClass(type)), names.hashCode), List.of(expr)));
                 else if (types.isArray(type))

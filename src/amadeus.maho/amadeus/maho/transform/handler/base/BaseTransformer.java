@@ -78,12 +78,13 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
     public @Nullable ClassNode transform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
         if (nodeFilter().test(node)) {
             debugTransformCount++;
-           return doTransform(context, node, loader, clazz, domain);
+            // noinspection DataFlowIssue
+            return doTransform(context, node, loader, clazz, domain);
         }
         return node;
     }
     
-    public abstract @Nullable ClassNode doTransform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain);
+    public abstract @Nullable ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain);
     
     public @Nullable ClassNode transformWithoutContext(final @Nullable ClassNode node, final @Nullable ClassLoader loader) = transform(new ClassWriter(loader).mark(node).context(), node, null, null, null);
     
@@ -113,8 +114,9 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
                                 .map(manager.remapper()::mapType)
                                 .toArray(Type[]::new));
                     else {
-                        final String string = handler.lookupSourceValue(name);
-                        handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.mapType(string));
+                        final @Nullable String string = handler.lookupSourceValue(name);
+                        if (string != null)
+                            handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.mapType(string));
                     }
                     flag = true;
                 }
@@ -122,23 +124,26 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
                     checkMethodReturnType(member);
                     checkRemapContext();
                     checkFlag(flag, member);
-                    final String string = handler.lookupSourceValue(name);
-                    handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.mapFieldName(context.lookupOwner(name), string));
+                    final @Nullable String string = handler.lookupSourceValue(name);
+                    if (string != null)
+                        handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.mapFieldName(context.lookupOwner(name), string));
                     flag = true;
                 }
                 if (member.isAnnotationPresent(Remap.Method.class)) {
                     checkMethodReturnType(member);
                     checkRemapContext();
                     checkFlag(flag, member);
-                    final String string = handler.lookupSourceValue(name);
-                    handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.mapMethodName(context.lookupOwner(name), string, context.lookupDescriptor(name)));
+                    final @Nullable String string = handler.lookupSourceValue(name);
+                    if (string != null)
+                        handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.mapMethodName(context.lookupOwner(name), string, context.lookupDescriptor(name)));
                     flag = true;
                 }
                 if (member.isAnnotationPresent(Remap.Descriptor.class)) {
                     checkMethodReturnType(member);
                     checkFlag(flag, member);
-                    final String string = handler.lookupSourceValue(name);
-                    handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.remapper().mapDesc(string));
+                    final @Nullable String string = handler.lookupSourceValue(name);
+                    if (string != null)
+                        handler.changeValue(name, string.isEmpty() || string.equals(At.Lookup.WILDCARD) ? string : manager.remapper().mapDesc(string));
                 }
             }
         }

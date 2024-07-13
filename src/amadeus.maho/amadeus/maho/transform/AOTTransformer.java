@@ -22,11 +22,13 @@ import jdk.nio.zipfs.ZipFileSystem;
 import org.objectweb.asm.tree.ClassNode;
 
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
@@ -45,6 +47,10 @@ public class AOTTransformer implements ClassTransformer.Limited {
         CLOSED_WORLD, // closed-world assumptions, usually used to make image (jlink tool)
         RUNTIME,      // only in runtime, can't aot
     }
+    
+    @ToString
+    @EqualsAndHashCode
+    public record NameAndDescriptor(String name, String descriptor) { }
     
     @Getter
     @RequiredArgsConstructor
@@ -77,23 +83,25 @@ public class AOTTransformer implements ClassTransformer.Limited {
     
     Set<Class<? extends Annotation>> annotationTypes = ConcurrentHashMap.newKeySet();
     
-    Map<Tuple2<String, String>, Set<Class<? extends Annotation>>> fields = new ConcurrentHashMap<>(), methods = new ConcurrentHashMap<>();
+    Map<NameAndDescriptor, Set<Class<? extends Annotation>>> fields = new ConcurrentHashMap<>(), methods = new ConcurrentHashMap<>();
     
     public void addClassAnnotation(final Class<? extends Annotation> annotationType) = annotationTypes() += annotationType;
     
-    public void addFieldAnnotation(final String name, final String desc, final Class<? extends Annotation> annotationType) = fields().computeIfAbsent(Tuple.tuple(name, desc), FunctionHelper.abandon(HashSet::new)) += annotationType;
+    public void addFieldAnnotation(final String name, final String desc, final Class<? extends Annotation> annotationType) = fields().computeIfAbsent(new NameAndDescriptor(name, desc), _ -> new HashSet<>()) += annotationType;
     
-    public void addMethodAnnotation(final String name, final String desc, final Class<? extends Annotation> annotationType) = methods().computeIfAbsent(Tuple.tuple(name, desc), FunctionHelper.abandon(HashSet::new)) += annotationType;
+    public void addMethodAnnotation(final String name, final String desc, final Class<? extends Annotation> annotationType) = methods().computeIfAbsent(new NameAndDescriptor(name, desc), _ -> new HashSet<>()) += annotationType;
     
     @Override
     public Set<String> targets() = Set.of(target);
     
     @Override
-    public ClassNode transform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
-        context.markModified();
-        ASMHelper.delAllAnnotation(node, annotationTypes);
-        fields().forEach((desc, annotationTypes) -> ASMHelper.lookupFieldNode(node, desc.v1, desc.v2).ifPresent(fieldNode -> ASMHelper.delAnnotation(fieldNode, annotationTypes)));
-        methods().forEach((desc, annotationTypes) -> ASMHelper.lookupMethodNode(node, desc.v1, desc.v2).ifPresent(methodNode -> ASMHelper.delAnnotation(methodNode, annotationTypes)));
+    public ClassNode transform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
+        if (node != null) {
+            context.markModified();
+            ASMHelper.delAllAnnotation(node, annotationTypes);
+            fields().forEach((info, annotationTypes) -> ASMHelper.lookupFieldNode(node, info.name(), info.descriptor()).ifPresent(fieldNode -> ASMHelper.delAnnotation(fieldNode, annotationTypes)));
+            methods().forEach((info, annotationTypes) -> ASMHelper.lookupMethodNode(node, info.name(), info.descriptor()).ifPresent(methodNode -> ASMHelper.delAnnotation(methodNode, annotationTypes)));
+        }
         return node;
     }
     

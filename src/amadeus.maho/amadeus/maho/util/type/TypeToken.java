@@ -45,7 +45,7 @@ public class TypeToken<T> {
     public static <T, P> TypeToken<T> locate(final Type genericType = compileTimeGenericType()) = { genericType };
     
     @Ghost
-    private static Type compileTimeGenericType() { throw GhostContext.touch(); }
+    private static Type compileTimeGenericType();
     
     @IndirectCaller
     public static Type runtimeType(final String signature) {

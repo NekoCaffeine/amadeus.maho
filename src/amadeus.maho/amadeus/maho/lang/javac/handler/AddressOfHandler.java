@@ -48,14 +48,13 @@ import static com.sun.tools.javac.tree.JCTree.Tag.*;
 public class AddressOfHandler extends JavacContext {
     
     @Hook
-    @Privilege
     private static Hook.Result term3(final JavacParser $this) {
-        final Tokens.Token token = $this.token;
+        final Tokens.Token token = (Privilege) $this.token;
         if (token.kind == AMP) {
             $this.nextToken();
-            $this.selectExprMode();
-            final JCTree.JCExpression t = $this.term3();
-            return { $this.F.at(token.pos).Unary(BITAND, t) };
+            (Privilege) $this.selectExprMode();
+            final JCTree.JCExpression t = (Privilege) $this.term3();
+            return { F($this).at(token.pos).Unary(BITAND, t) };
         }
         return Hook.Result.VOID;
     }
@@ -110,14 +109,13 @@ public class AddressOfHandler extends JavacContext {
         return { arg, tags };
     }
     
-    @Privilege
     private void letExpr(final JCTree.JCMethodInvocation invocation, final List<JCTree.JCUnary> addressOfArgs) {
-        final Env<AttrContext> env = attr.env;
-        final JCTree.JCMethodInvocation speculativeTree = (JCTree.JCMethodInvocation) attr.deferredAttr.attribSpeculative(invocation, env, attr.resultInfo);
+        final Env<AttrContext> env = (Privilege) attr.env;
+        final JCTree.JCMethodInvocation speculativeTree = (JCTree.JCMethodInvocation) (Privilege) ((Privilege) attr.deferredAttr).attribSpeculative(invocation, env, (Privilege) attr.resultInfo);
         final Type returnType = speculativeTree.type;
         final boolean isVoid = returnType.getTag() == TypeTag.VOID;
         final Symbol.ClassSymbol UnsafeHelper = symtab.enterClass(mahoModule, this.UnsafeHelper), Unsafe = symtab.enterClass(mahoModule, this.Unsafe);
-        final Symbol owner = env.info.scope.owner;
+        final Symbol owner = ((Privilege) env.info.scope).owner;
         final Symbol.VarSymbol $unsafe = unsafe(invocation, env), $address = { FINAL, names.fromString("$address"), symtab.longType, owner };
         final @Nullable Symbol.VarSymbol $result = isVoid ? null : new Symbol.VarSymbol(FINAL, names.fromString("$result"), returnType, owner);
         long size = 0;
@@ -127,9 +125,9 @@ public class AddressOfHandler extends JavacContext {
         for (final JCTree.JCUnary unary : addressOfArgs) {
             final Tuple2<JCTree.JCExpression, Set<JCTree.Tag>> tuple = arg(unary);
             final JCTree.JCExpression arg = tuple.v1;
-            final Type type = attr.attribTree(arg, env.dup(arg), tuple.v2.contains(POS) ? attr.unknownExprInfo : attr.varAssignmentInfo);
+            final Type type = (Privilege) attr.attribTree(arg, env.dup(arg), tuple.v2.contains(POS) ? (Privilege) attr.unknownExprInfo : (Privilege) attr.varAssignmentInfo);
             if (type instanceof Type.JCPrimitiveType primitiveType) {
-                final @Nullable String name = switch (primitiveType.tag) {
+                final @Nullable String name = switch ((Privilege) primitiveType.tag) {
                     case BYTE   -> "Byte";
                     case SHORT  -> "Short";
                     case INT    -> "Int";
@@ -145,7 +143,7 @@ public class AddressOfHandler extends JavacContext {
                     continue;
                 final JCTree.JCExpression offset = size == 0 ? maker.Ident($address) : maker.Binary(PLUS, maker.Ident($address), maker.Literal(size));
                 if (offset instanceof JCTree.JCBinary binary)
-                    binary.operator = operators.resolveBinary(offset, PLUS, symtab.longType, symtab.longType);
+                    binary.operator = (Privilege) operators.resolveBinary(offset, PLUS, symtab.longType, symtab.longType);
                 offset.type = symtab.longType;
                 mapping[unary] = offset;
                 if (!tuple.v2.contains(NEG)) {
@@ -158,7 +156,7 @@ public class AddressOfHandler extends JavacContext {
                     assign.type = type;
                     after.append(maker.Exec(assign));
                 }
-                size += switch (primitiveType.tag) {
+                size += switch ((Privilege) primitiveType.tag) {
                     case BYTE   -> 1;
                     case SHORT  -> 2;
                     case INT    -> 4;
@@ -172,7 +170,7 @@ public class AddressOfHandler extends JavacContext {
         before.prepend(maker.VarDef($address, maker.App(maker.Select(maker.Ident($unsafe), lookup(Unsafe, allocateMemory)), List.of(maker.Literal(size)))));
         after.append(maker.Exec(maker.App(maker.Select(maker.Ident($unsafe), lookup(Unsafe, freeMemory)), List.of(maker.Ident($address)))));
         speculativeTree.args = invocation.args.map(arg -> mapping.getOrDefault(arg, arg));
-        final Scope.WriteableScope scope = env.info.scope;
+        final Scope.WriteableScope scope = (Privilege) env.info.scope;
         scope.enter($unsafe);
         scope.enter($address);
         if (!isVoid)
@@ -181,7 +179,7 @@ public class AddressOfHandler extends JavacContext {
                         .appendList(List.of(isVoid ? maker.Exec(speculativeTree) : maker.VarDef($result, speculativeTree)))
                         .appendList(after.toList()),
                 isVoid ? maker.App(maker.Ident(lookup(UnsafeHelper, names.fromString("nop"))), List.nil()) : maker.Ident($result));
-        letExpr.type = invocation.type = speculativeTree.type = attr.attribExpr(speculativeTree, env, attr.pt());
+        letExpr.type = invocation.type = speculativeTree.type = attr.attribExpr(speculativeTree, env, (Privilege) attr.pt());
         throw new ReAttrException(FunctionHelper.nothing(), false, letExpr, invocation);
     }
     

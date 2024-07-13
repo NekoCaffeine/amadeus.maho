@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import jdk.internal.module.ModuleInfoExtender;
 import jdk.internal.module.ModuleResolution;
 
+import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.SneakyThrows;
@@ -72,7 +73,7 @@ public interface Jar {
         final Manifest manifest = { };
         final Attributes attributes = manifest.getMainAttributes();
         attributes[MANIFEST_VERSION] = "1.0";
-        attributes[MAHO_VERSION] = Jar.class.getModule().getDescriptor().version().map(ModuleDescriptor.Version::toString).orElse("?");
+        attributes[MAHO_VERSION] = MahoExport.VERSION;
         attributes[CREATED_TIME] = ZonedDateTime.now().format(DateTimeFormatter.ISO_ZONED_DATE_TIME);
         if (mainClass != null)
             attributes[MAIN_CLASS] = mainClass;

@@ -13,6 +13,7 @@ import com.sun.tools.javac.util.Pair;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchCompiler;
 
 @FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = true)
@@ -33,7 +34,7 @@ public class ParallelCompiler extends JavaCompiler {
     protected boolean shouldStop(final CompileStates.CompileState cs) = false;
     
     @Override
-    public CharSequence readSource(final JavaFileObject filename) = parent.readSource(filename);
+    public @Nullable CharSequence readSource(final JavaFileObject filename) = parent.readSource(filename);
     
     @Override
     public Env<AttrContext> attribute(final Env<AttrContext> env) {
@@ -56,7 +57,7 @@ public class ParallelCompiler extends JavaCompiler {
     public void desugar(final Env<AttrContext> env, final Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> results) = super.desugar(env, results);
     
     @Override
-    public void generate(final Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> queue, final Queue<JavaFileObject> results) = super.generate(queue, results);
+    public void generate(final Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> queue, final @Nullable Queue<JavaFileObject> results) = super.generate(queue, results);
     
     @Override
     public int errorCount() = log.nerrors;

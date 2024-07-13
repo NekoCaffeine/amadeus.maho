@@ -1,9 +1,11 @@
 package amadeus.maho.util.runtime;
 
+import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.jar.Manifest;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.Extension;

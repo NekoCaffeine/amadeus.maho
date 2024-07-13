@@ -21,6 +21,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeCopier;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
+import com.sun.tools.javac.util.Names;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
@@ -87,33 +88,34 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
         return Hook.Result.VOID;
     }
     
-    @Privilege
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void visitApply(final Gen $this, final JCTree.JCMethodInvocation invocation) {
         if (invocation instanceof AfterReadMethodInvocation afterReadMethodInvocation) {
-            final Items.Item result = $this.result;
-            final Code code = $this.code;
+            final Items.Item result = (Privilege) $this.result;
+            final Code code = (Privilege) $this.code;
+            final Names names = (Privilege) $this.names;
+            final Env<Gen.GenContext> env = (Privilege) $this.env;
             code.emitop0(dup);
             code.emitop0(iconst_m1);
             final Code.Chain branch = code.branch(if_icmpne);
             switch (afterReadMethodInvocation.type) {
                 case THROW       -> {
                     final BinaryMappingHandler instance = instance(BinaryMappingHandler.class);
-                    final Symbol eof = instance.finder.loadClass($this.env.toplevel.modle, instance.name(BinaryMapper.class.getCanonicalName())).members_field
-                            .findFirst($this.names.fromString(BinaryMappingHandler.eof), symbol -> symbol instanceof Symbol.MethodSymbol methodSymbol && anyMatch(symbol.flags_field, STATIC) && methodSymbol.params.isEmpty());
+                    final Symbol eof = instance.finder.loadClass(env.toplevel.modle, instance.name(BinaryMapper.class.getCanonicalName())).members_field
+                            .findFirst(names.fromString(BinaryMappingHandler.eof), symbol -> symbol instanceof Symbol.MethodSymbol methodSymbol && anyMatch(symbol.flags_field, STATIC) && methodSymbol.params.isEmpty());
                     code.emitInvokestatic(eof, eof.type);
                 }
                 case RETURN      -> code.emitop0(return_);
                 case MARK_RETURN -> {
                     code.emitop0(aload_0);
                     code.emitop0(iconst_1);
-                    final Symbol eofMark = $this.env.enclClass.sym.members_field.findFirst($this.names.fromString(BinaryMappingHandler.eofMark), symbol -> symbol.kind == Kinds.Kind.VAR && noneMatch(symbol.flags_field, STATIC));
-                    code.emitop2(putfield, eofMark, PoolWriter::putMember);
+                    final Symbol eofMark = env.enclClass.sym.members_field.findFirst(names.fromString(BinaryMappingHandler.eofMark), symbol -> symbol.kind == Kinds.Kind.VAR && noneMatch(symbol.flags_field, STATIC));
+                    code.emitop2(putfield, eofMark, (writer, symbol) -> (Privilege) writer.putMember(symbol));
                     code.emitop0(return_);
                 }
             }
             code.resolve(branch);
-            $this.result = result;
+            (Privilege) ($this.result = result);
         }
     }
     

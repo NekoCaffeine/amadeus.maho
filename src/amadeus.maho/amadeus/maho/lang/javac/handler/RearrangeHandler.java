@@ -114,7 +114,7 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
             final List<JCTree.JCExpression> args = IntStream.of(indexes).mapToObj(index -> components[index]).map(it -> maker.Apply(List.nil(), maker.Select(ident, it), List.nil())).collect(List.collector());
             expression = maker.NewClass(null, List.nil(), maker.Ident(targetSymbol), args, null);
         } else {
-            final Name letName = LetHandler.nextName(names);
+            final Name letName = instance(LetHandler.class).nextName(env);
             final JCTree.JCVariableDecl let = maker.VarDef(maker.Modifiers(FINAL), letName, maker.Type(access.selected.type), access.selected);
             final List<JCTree.JCExpression> args = IntStream.of(indexes).mapToObj(index -> components[index]).map(it -> maker.Apply(List.nil(), maker.Select(maker.Ident(letName), it), List.nil())).collect(List.collector());
             expression = maker.LetExpr(let, maker.NewClass(null, List.nil(), maker.Ident(targetSymbol), args, null));

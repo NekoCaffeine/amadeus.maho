@@ -76,7 +76,7 @@ public class LiveStack {
                 if (insn.getOpcode() == RETURN) {
                     methodNode.instructions.insertBefore(insn, insnList);
                     context.markModified();
-                    context.markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
+                    context.markCompute(methodNode);
                     return;
                 }
         }

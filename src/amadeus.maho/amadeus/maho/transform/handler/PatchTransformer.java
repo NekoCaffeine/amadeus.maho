@@ -130,7 +130,7 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
                         if (copy != null)
                             sources += copy;
                         if (inline) {
-                            context.markCompute(patchMethod, ComputeType.MAX, ComputeType.FRAME);
+                            context.markCompute(patchMethod);
                             final MethodNode copyRef = { method.access, method.name, method.desc, method.signature, method.exceptions.toArray(String[]::new) };
                             method.accept(copyRef);
                             final int baseStackSize = ASMHelper.baseStackSize(ASMHelper.anyMatch(copyRef.access, ACC_STATIC), copyRef.desc);
@@ -152,7 +152,7 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
                         }
                         mapping.put(method, patchMethod);
                     } else {
-                        context.markCompute(method, ComputeType.MAX, ComputeType.FRAME);
+                        context.markCompute(method);
                         final ListIterator<AbstractInsnNode> insnListIterator = method.instructions.iterator(method.instructions.size());
                         for (AbstractInsnNode insn = insnListIterator.previous(); insnListIterator.hasPrevious(); ) {
                             insnListIterator.remove();

@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ToString {
     
-    @Target(ElementType.FIELD)
+    @Target({ ElementType.FIELD, ElementType.RECORD_COMPONENT })
     @Retention(RetentionPolicy.RUNTIME)
     @interface Mark { }
     

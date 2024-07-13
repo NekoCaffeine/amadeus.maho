@@ -19,7 +19,6 @@ import java.nio.file.Path;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -71,10 +70,8 @@ import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.RemapHandler;
 import amadeus.maho.util.bytecode.remap.StreamRemapHandler;
 import amadeus.maho.util.concurrent.AsyncHelper;
-import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
 import amadeus.maho.util.container.MapTable;
-import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.profile.Sampler;
 import amadeus.maho.util.resource.ClassLoadable;
@@ -162,7 +159,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     final MapTable<
             Class<? extends BaseTransformer>,
             Class<? extends Annotation>,
-            Class<? extends BaseTransformer>> transformerTable = MapTable.newConcurrentHashMapTable();
+            Class<? extends BaseTransformer>> transformerTable = MapTable.ofConcurrentHashMapTable();
     
     final ReentrantReadWriteLock lock = { };
     
@@ -232,7 +229,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     @FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = true)
     public static class Context {
         
-        private static final Function<String, ConcurrentLinkedQueue<ClassTransformer>> queueMaker = FunctionHelper.abandon(ConcurrentLinkedQueue::new);
+        private static final Function<String, ConcurrentLinkedQueue<ClassTransformer>> queueMaker = _ -> new ConcurrentLinkedQueue<>();
         
         TransformerManager manager;
         
@@ -458,7 +455,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                             .flatMap(Collection::stream)
                             .cast(BaseTransformer.class)
                             .forEach(transformer -> transformer.onAOT(aotTransformerMap.computeIfAbsent(ASMHelper.sourceName(transformer.sourceClass.name), AOTTransformer::new)));
-                    aotTransformerMap.forEach((target, aotTransformer) -> transformerMap.computeIfAbsent(target, FunctionHelper.abandon(CopyOnWriteArrayList::new)) += aotTransformer);
+                    aotTransformerMap.forEach((target, aotTransformer) -> transformerMap.computeIfAbsent(target, _ -> new CopyOnWriteArrayList<>()) += aotTransformer);
                 } finally { lock.unlock(); }
             }
             if (!aot) {
@@ -627,7 +624,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final AnnotationNode annotationNode = { Type.getDescriptor(Transformed.class) };
             node.visibleAnnotations == null ? node.visibleAnnotations = new LinkedList<>() : node.visibleAnnotations += annotationNode;
         }
-        try (final var _ = sampler()["MahoCompute"]) { return context.compute().writer().toBytecode(node); }
+        try (final var _ = sampler()["MahoCompute"]) { return context.compute().writer().toBytecodeNoCompute(node); }
     }
     
     public static void transform(final String name, final String text) = Maho.debug(STR."Transform: <\{name}> \{text}");

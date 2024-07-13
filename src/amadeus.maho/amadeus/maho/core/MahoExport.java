@@ -61,7 +61,7 @@ public final class MahoExport {
         
     }
     
-    public static final String VERSION = "DEV";
+    public static final String VERSION = Maho.class.getModule()?.getDescriptor().version().map(Object::toString).orElse("DEV") ?? "DEV";
     
     public static final String
             MAHO_WORK_DIRECTORY           = "amadeus.maho.work.directory", // string
@@ -111,7 +111,7 @@ public final class MahoExport {
     
     public static @Nullable AsyncLogger logger() = loggerState() ? logger != null ? logger : (logger = LoggerHelper.makeAsyncLogger("MAHO", env.lookup(MAHO_LOGS_OUTPUT_FILE, true))) : null;
     
-    public static BiConsumer<LogLevel, String> namedLogger(final String name = CallerContext.caller().getSimpleName()) = logger()?.namedLogger(name) ?? (_, _) -> { };
+    public static BiConsumer<LogLevel, String> namedLogger(final String name = CallerContext.caller().getSimpleName()) = logger()?.namedLogger(name) ?? (BiConsumer<LogLevel, String>) (_, _) -> { };
     
     public static void wrapperStdOut() = LoggerHelper.wrapperStdOut(logger());
     

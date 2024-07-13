@@ -16,16 +16,18 @@ import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.function.FunctionHelper;
-import amadeus.maho.util.runtime.DebugHelper;
 
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.Kind.*;
 
@@ -36,15 +38,16 @@ public class ConcurrentSymtab extends Symtab {
     @FieldDefaults(level = AccessLevel.PUBLIC)
     public static class ClassLoading {
         
+        @ToString
+        @EqualsAndHashCode
+        public record Info(Symbol.ModuleSymbol moduleSymbol, Name flatName, Symbol.ClassSymbol loadingClassSymbol) { }
+        
+        @Nullable
+        Info info;
+        
         public static ClassLoading instance(final Context context) = context.get(ClassLoading.class) ?? new ClassLoading(context);
         
         public ClassLoading(final Context context) = context.put(ClassLoading.class, this);
-        
-        @Nullable Symbol.ModuleSymbol moduleSymbol;
-        
-        @Nullable Name flatName;
-        
-        @Nullable Symbol.ClassSymbol loadingClassSymbol;
         
     }
     
@@ -74,9 +77,9 @@ public class ConcurrentSymtab extends Symtab {
     
     @Override
     public @Nullable Symbol.ClassSymbol getClass(final Symbol.ModuleSymbol moduleSymbol, final Name flatname) {
-        final ClassLoading loading = ClassLoading.instance(JavacContext.instance().context);
-        if (loading.moduleSymbol == moduleSymbol && loading.flatName == flatname)
-            return loading.loadingClassSymbol;
+        final @Nullable ClassLoading.Info info = ClassLoading.instance(JavacContext.instance().context).info;
+        if (info != null && info.moduleSymbol == moduleSymbol && info.flatName == flatname)
+            return info.loadingClassSymbol;
         return classes()[flatname]?.get(moduleSymbol) ?? null;
     }
     
@@ -98,29 +101,35 @@ public class ConcurrentSymtab extends Symtab {
         final @Nullable Symbol.ClassSymbol classSymbol = map[packageSymbol.modle];
         if (classSymbol != null)
             return classSymbol;
-        final @Nullable JavacContext instance = JavacContext.instance();
+        final @Nullable JavacContext instance = JavacContext.instanceMayNull();
         if (instance != null) { // null when invoke <init>
-            final ClassLoading loading = ClassLoading.instance(instance.context);
-            if (loading.moduleSymbol == moduleSymbol && loading.flatName == flatname)
-                return loading.loadingClassSymbol;
+            final @Nullable ClassLoading.Info info = ClassLoading.instance(instance.context).info;
+            if (info != null && info.moduleSymbol == moduleSymbol && info.flatName == flatname)
+                return requireNonNull(info.loadingClassSymbol);
         }
         return map.computeIfAbsent(packageSymbol.modle, _ -> defineClass(Convert.shortName(flatname), packageSymbol));
     }
     
     @Override
-    public Symbol.ClassSymbol enterClass(final Symbol.ModuleSymbol moduleSymbol, final Name name, final Symbol.TypeSymbol owner) {
-        final Name flatname = Symbol.TypeSymbol.formFlatName(name, owner);
-        return modules2classes(flatname).compute(moduleSymbol, (m, c) -> {
-            if (c == null)
-                return defineClass(name, owner);
-            if ((c.name != name || c.owner != owner) && owner.kind == TYP && c.owner.kind == PCK && (c.flags_field & FROM_SOURCE) == 0) {
-                c.owner.members().remove(c);
-                c.name = name;
-                c.owner = owner;
-                c.fullname = Symbol.ClassSymbol.formFullName(name, owner);
+    public Symbol.ClassSymbol enterClass(final Symbol.ModuleSymbol moduleSymbol, final Name name, final Symbol.TypeSymbol owner)
+            = adjustClassOwner(modules2classes(Symbol.TypeSymbol.formFlatName(name, owner)).computeIfAbsent(moduleSymbol, m -> defineClass(name, owner)), name, owner);
+    
+    public Symbol.ClassSymbol adjustClassOwner(final Symbol.ClassSymbol symbol, final Name name, final Symbol.TypeSymbol owner) {
+        if (owner.kind == TYP && symbol.owner.kind == PCK && (symbol.flags_field & FROM_SOURCE) == 0) {
+            final Symbol.PackageSymbol pkg = (Symbol.PackageSymbol) symbol.owner;
+            boolean shouldRemove = false;
+            synchronized (symbol) {
+                if (symbol.owner != owner) {
+                    shouldRemove = true;
+                    symbol.name = name;
+                    symbol.owner = owner;
+                    symbol.fullname = Symbol.ClassSymbol.formFullName(name, owner);
+                }
             }
-            return c;
-        });
+            if (shouldRemove)
+                synchronized (pkg) { pkg.members().remove(symbol); }
+        }
+        return symbol;
     }
     
     @Override
@@ -258,7 +267,7 @@ public class ConcurrentSymtab extends Symtab {
     });
     
     @Override
-    public Symbol.ModuleSymbol getModule(final Name name) = modules()[name];
+    public @Nullable Symbol.ModuleSymbol getModule(final Name name) = modules()[name];
     
     @Override
     public Collection<Symbol.ModuleSymbol> getAllModules() = modules().values();
@@ -285,11 +294,7 @@ public class ConcurrentSymtab extends Symtab {
                             return retry;
                         final Symbol.ClassSymbol loadingClassSymbol = defineClass(Convert.shortName(flatname), packageSymbol);
                         final ClassLoading loading = ClassLoading.instance(JavacContext.instance().context);
-                        if (loading.flatName != null)
-                            DebugHelper.breakpoint();
-                        loading.moduleSymbol = moduleSymbol;
-                        loading.flatName = flatname;
-                        loading.loadingClassSymbol = loadingClassSymbol;
+                        loading.info = { moduleSymbol, flatname, loadingClassSymbol };
                         try {
                             loadingClassSymbol.complete();
                             if ((loadingClassSymbol.flags_field & UNNAMED_CLASS) == 0)
@@ -299,11 +304,7 @@ public class ConcurrentSymtab extends Symtab {
                             map[moduleSymbol] = failure;
                             failure.dcfh.classSymbolRemoved(loadingClassSymbol);
                             throw failure;
-                        } finally {
-                            loading.moduleSymbol = null;
-                            loading.flatName = null;
-                            loading.loadingClassSymbol = null;
-                        }
+                        } finally { loading.info = null; }
                     }
                 }
             }

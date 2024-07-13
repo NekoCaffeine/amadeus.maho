@@ -59,7 +59,7 @@ public class MethodHandleProxy<T> {
                     generator.returnValue();
                     generator.endMethod();
                 });
-        wrapper.context().markCompute(wrapper.node(), ComputeType.MAX);
+        wrapper.context().markCompute(wrapper.node());
         return { wrapper.defineHiddenWrapperClass() };
     }
     

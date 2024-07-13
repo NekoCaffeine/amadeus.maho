@@ -289,7 +289,7 @@ public interface Reference {
             StreamHelper.fromIterable(result.instructions)
                     .filter(insn -> Bytecodes.isReturn(insn.getOpcode()))
                     .forEach(insn -> insn.opcode(returnOpcode));
-            generalization.compute(result, writer, ComputeType.MAX, ComputeType.FRAME);
+            generalization.compute(result, writer);
             result.instructions.resetLabels();
             return result;
         }
@@ -311,7 +311,7 @@ public interface Reference {
                                     .orElseThrow(() -> illegalArgument(target));
                     if (!processorChain().process(Tuple.tuple(outerClass, genericType, wrapper, modifier)))
                         throw illegalArgument(target);
-                    wrapper.context().markCompute(wrapper.node(), ComputeType.MAX, ComputeType.FRAME);
+                    wrapper.context().markCompute(wrapper.node());
                     final Class<?> proxyClass = wrapper.defineWrapperClass();
                     final MethodHandle noArg = wrapper.node().methods.stream().anyMatch(ASMHelper::isInit) ?
                             MethodHandleHelper.lookup().findConstructor(proxyClass, MethodType.methodType(void.class)) : allocateInstance().bindTo(proxyClass).asType(MethodType.methodType(proxyClass));

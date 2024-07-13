@@ -83,6 +83,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
     private static Hook.Result check(final Attr $this, final JCTree tree, final Type found, @Hook.Reference Kinds.KindSelector kind, final Attr.ResultInfo resultInfo) {
         if (tree instanceof JCTree.JCMethodInvocation invocation && invocation.args.isEmpty() && invocation.typeargs.isEmpty()) {
             final Name name = name(invocation.meth);
+            assert name != null;
             final Names names = name.table.names;
             if (name != names._this && name != names._super) {
                 kind = Kinds.KindSelector.VAR;
@@ -104,7 +105,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         else if (tree.lhs instanceof JCTree.JCArrayAccess access)
             lowerExpr = handler.methodInvocation(handler.PUT, env, tree, () -> access.indexed, () -> access.index, () -> tree.rhs);
         if (lowerExpr == null && tree.lhs instanceof JCTree.JCMethodInvocation invocation && invocation.args.isEmpty() && invocation.typeargs.isEmpty())
-            lowerExpr = handler.lowerSetter(invocation, getter -> tree.rhs);
+            lowerExpr = handler.lowerSetter(env, invocation, getter -> tree.rhs);
         return Hook.Result.nullToVoid(handler.lower(tree, env, lowerExpr));
     }
     
@@ -115,12 +116,12 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         @Nullable JCTree.JCExpression lowerExpr;
         final OperatorOverloadingHandler handler = instance(OperatorOverloadingHandler.class);
         final TreeMaker maker = handler.maker.at(tree.pos);
-        final Names names = handler.names;
         final Env<AttrContext> env = env($this);
         final JCTree.Tag tag = tree.getTag();
         if ((lowerExpr = handler.methodInvocation(handler.name(tag), env, tree, () -> tree.lhs, () -> tree.rhs)) == null)
             if (tree.lhs instanceof OperatorInvocation invocation && invocation.source instanceof JCTree.JCArrayAccess getter) {
-                final Name resultName = LetHandler.nextName(names), indexedName = LetHandler.nextName(names), indexName = LetHandler.nextName(names);
+                final LetHandler let = instance(LetHandler.class);
+                final Name resultName = let.nextName(env), indexedName = let.nextName(env), indexName = let.nextName(env);
                 lowerExpr = maker.LetExpr(List.of(
                                 maker.VarDef(maker.Modifiers(FINAL), indexedName, null, getter.indexed),
                                 maker.VarDef(maker.Modifiers(FINAL), indexName, null, getter.index),
@@ -130,7 +131,8 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                         maker.Ident(resultName));
             } else if (tree.lhs instanceof JCTree.JCArrayAccess getter && canOverload(tag.noAssignOp()) &&
                        (lowerExpr = handler.methodInvocation(handler.name(tag.noAssignOp()), env, tree, () -> tree.lhs, () -> tree.rhs)) != null) {
-                final Name resultName = LetHandler.nextName(names), indexedName = LetHandler.nextName(names), indexName = LetHandler.nextName(names);
+                final LetHandler let = instance(LetHandler.class);
+                final Name resultName = let.nextName(env), indexedName = let.nextName(env), indexName = let.nextName(env);
                 lowerExpr = maker.LetExpr(List.of(
                                 maker.VarDef(maker.Modifiers(FINAL), indexedName, null, getter.indexed),
                                 maker.VarDef(maker.Modifiers(FINAL), indexName, null, getter.index),
@@ -139,9 +141,10 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                         maker.Ident(resultName));
             } else if ((tree.lhs instanceof JCTree.JCFieldAccess || tree.lhs instanceof JCTree.JCIdent) && canOverload(tag.noAssignOp()) &&
                        (lowerExpr = handler.methodInvocation(handler.name(tag.noAssignOp()), env, tree, () -> tree.lhs, () -> tree.rhs)) != null) {
-                final Name resultName = LetHandler.nextName(names);
+                final LetHandler let = instance(LetHandler.class);
+                final Name resultName = let.nextName(env);
                 if (tree.lhs instanceof JCTree.JCFieldAccess access && !(access.selected instanceof JCTree.JCIdent)) {
-                    final Name varName = LetHandler.nextName(names);
+                    final Name varName = let.nextName(env);
                     lowerExpr = maker.LetExpr(List.of(
                                     maker.VarDef(maker.Modifiers(FINAL), varName, null, access.selected),
                                     maker.VarDef(maker.Modifiers(FINAL), resultName, null, maker.Binary(tag.noAssignOp(), maker.Select(maker.Ident(varName), access.name), tree.rhs)),
@@ -154,7 +157,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                             maker.Ident(resultName));
             }
         if (lowerExpr == null && tree.lhs instanceof JCTree.JCMethodInvocation invocation && invocation.args.isEmpty() && invocation.typeargs.isEmpty())
-            lowerExpr = handler.lowerSetter(invocation, getter -> maker.Binary(tag.noAssignOp(), getter, tree.rhs));
+            lowerExpr = handler.lowerSetter(env, invocation, getter -> maker.Binary(tag.noAssignOp(), getter, tree.rhs));
         return Hook.Result.nullToVoid(handler.lower(tree, env, lowerExpr));
     }
     
@@ -188,8 +191,8 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                         pre = flag ? getter -> maker.Binary(tree.getTag() == PREINC ? JCTree.Tag.PLUS : MINUS, getter, maker.Literal(1)) : UnaryOperator.identity(),
                         post = flag ? UnaryOperator.identity() : getter -> maker.Binary(tree.getTag() == POSTINC ? JCTree.Tag.PLUS : MINUS, getter, maker.Literal(1));
                 switch (tree.arg) {
-                    case JCTree.JCMethodInvocation invocation when invocation.args.isEmpty() && invocation.typeargs.isEmpty()                   -> lowerExpr = handler.lowerSetter(invocation, pre, post);
-                    case OperatorOverloadingHandler.OperatorInvocation invocation when invocation.source instanceof JCTree.JCArrayAccess access -> lowerExpr = handler.lowerPutter(access, pre, post);
+                    case JCTree.JCMethodInvocation invocation when invocation.args.isEmpty() && invocation.typeargs.isEmpty()                   -> lowerExpr = handler.lowerSetter(env, invocation, pre, post);
+                    case OperatorOverloadingHandler.OperatorInvocation invocation when invocation.source instanceof JCTree.JCArrayAccess access -> lowerExpr = handler.lowerPutter(env, access, pre, post);
                     default                                                                                                                     -> { }
                 }
             }
@@ -212,13 +215,15 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
     
     private static boolean skip(final @Nullable Type type) = type != null && !type.isErroneous() && !(type instanceof Type.UnknownType);
     
-    public @Nullable JCTree.JCExpression lowerSetter(final JCTree.JCMethodInvocation invocation, final UnaryOperator<JCTree.JCExpression> pre, final UnaryOperator<JCTree.JCExpression> post = UnaryOperator.identity()) {
+    public @Nullable JCTree.JCExpression lowerSetter(final Env<AttrContext> env, final JCTree.JCMethodInvocation invocation,
+            final UnaryOperator<JCTree.JCExpression> pre, final UnaryOperator<JCTree.JCExpression> post = UnaryOperator.identity()) {
         final Name name = name(invocation.meth);
         if (name != names._this && name != names._super) {
             maker.at(invocation.pos);
-            final Name resultName = LetHandler.nextName(names);
+            final LetHandler let = instance(LetHandler.class);
+            final Name resultName = let.nextName(env);
             if (invocation.meth instanceof JCTree.JCFieldAccess access && !(access.selected instanceof JCTree.JCIdent)) {
-                final Name varName = LetHandler.nextName(names);
+                final Name varName = let.nextName(env);
                 return maker.LetExpr(List.of(
                                 maker.VarDef(maker.Modifiers(FINAL), varName, null, access.selected),
                                 maker.VarDef(maker.Modifiers(FINAL), resultName, null, pre.apply(maker.Apply(List.nil(), maker.Select(maker.Ident(varName), access.name), List.nil()))),
@@ -235,15 +240,17 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         return null;
     }
     
-    public @Nullable JCTree.JCExpression lowerPutter(final JCTree.JCArrayAccess access, final UnaryOperator<JCTree.JCExpression> pre, final UnaryOperator<JCTree.JCExpression> post = UnaryOperator.identity()) {
+    public @Nullable JCTree.JCExpression lowerPutter(final Env<AttrContext> env, final JCTree.JCArrayAccess access,
+            final UnaryOperator<JCTree.JCExpression> pre, final UnaryOperator<JCTree.JCExpression> post = UnaryOperator.identity()) {
         maker.at(access.pos);
         final TreeCopier<?> copier = { maker };
-        final Name resultName = LetHandler.nextName(names);
-        final JCTree.JCExpression let = maker.LetExpr(List.of(
+        final LetHandler let = instance(LetHandler.class);
+        final Name resultName = let.nextName(env);
+        final JCTree.JCExpression letExpr = maker.LetExpr(List.of(
                         maker.VarDef(maker.Modifiers(FINAL), resultName, null, pre.apply(access)),
                         maker.Exec(maker.Assign(access, post.apply(maker.Ident(resultName))))),
                 maker.Ident(resultName));
-        return copier.copy(instance(LetHandler.class).let(let, access.indexed, access.index));
+        return copier.copy(instance(LetHandler.class).let(env, letExpr, access.indexed, access.index));
     }
     
     @SuppressWarnings("DataFlowIssue")
@@ -309,6 +316,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                     final Type returnType = methodType.getReturnType(), capturedReturnType = (Privilege) ((Privilege) resultInfo.checkContext).inferenceContext().cachedCapture(source, returnType, true);
                     (Privilege) (attr.result = (Privilege) attr.check(overloading, capturedReturnType, Kinds.KindSelector.VAL, resultInfo));
                     final Symbol symbol = symbol(overloading.meth);
+                    assert symbol != null;
                     final List<JCTree.JCExpression> realArgs = List.from(expressions).map(Supplier::get);
                     final OperatorInvocation invocation;
                     if (anyMatch(symbol.flags_field, STATIC))

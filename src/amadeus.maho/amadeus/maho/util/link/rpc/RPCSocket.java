@@ -27,6 +27,7 @@ import amadeus.maho.util.serialization.base.ByteArray;
 import amadeus.maho.util.serialization.base.TrustedByteArrayOutputStream;
 
 import static amadeus.maho.util.link.rpc.RPCPacket.*;
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 
 @Getter
 @RequiredArgsConstructor
@@ -70,13 +71,13 @@ public class RPCSocket {
                     try {
                         final Class<?> itf = context().interfaces()[request.interfaceIndex];
                         p_code[0] = ERROR_MISSING_INSTANCE;
-                        final Object instance = localInstances()[itf];
+                        final Object instance = requireNonNull(localInstances()[itf]);
                         p_code[0] = ERROR_INVALID_METHOD;
-                        final Method method = RPCContext.allMethods(itf)[request.methodIndex];
+                        final Method method = requireNonNull(RPCContext.allMethods(itf)[request.methodIndex]);
                         localExecutor().execute(() -> {
                             try {
                                 p_code[0] = ERROR_INVALID_DATA;
-                                final Object args[] = (Object[]) context().serializer().deserialization(new Deserializable.Input.Limited(new ByteArrayInputStream(data.value), data.length));
+                                final @Nullable Object args[] = (Object[]) context().serializer().deserialization(new Deserializable.Input.Limited(new ByteArrayInputStream(data.value), data.length));
                                 p_code[0] = ERROR_INVOKE_EXCEPTION;
                                 final Object result = method.invoke(instance, args);
                                 response(request.id, 0, result);
@@ -91,10 +92,10 @@ public class RPCSocket {
                     if (future != null)
                         localExecutor().execute(() -> {
                             switch (response.code) {
-                                case ERROR_SERIALIZATION_RESULT -> future.complete(new RPCException(response.code));
+                                case ERROR_SERIALIZATION_RESULT -> future.completeExceptionally(new RPCException(response.code));
                                 default                         -> {
                                     try {
-                                        final Object result = context().serializer().deserialization(new Deserializable.Input.Limited(new ByteArrayInputStream(response.data.value), response.data.length));
+                                        final @Nullable Object result = context().serializer().deserialization(new Deserializable.Input.Limited(new ByteArrayInputStream(response.data.value), response.data.length));
                                         if (response.code != 0)
                                             future.completeExceptionally(new RPCException(ObjectHelper.toString(result), response.code));
                                         else

@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import javax.tools.JavaFileManager;
 
+import com.sun.tools.javac.api.MultiTaskListener;
 import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.CompileStates;
@@ -32,11 +33,13 @@ import amadeus.maho.lang.javac.multithreaded.SharedComponent;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCheck;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCompileStates;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentDelayedContext;
+import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentMultiTaskListener;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentNames;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentSymtab;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentTransTypes;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentTypeEnvs;
 import amadeus.maho.lang.javac.multithreaded.parallel.ParallelContext;
+import amadeus.maho.util.misc.Environment;
 
 import static amadeus.maho.util.concurrent.AsyncHelper.await;
 
@@ -46,7 +49,7 @@ import static amadeus.maho.util.concurrent.AsyncHelper.await;
 public class DispatchContext extends Context implements MultiThreadedContext {
     
     @Default
-    int parallelism = Runtime.getRuntime().availableProcessors();
+    int parallelism = Environment.local().lookup("maho.javac.parallelism", Runtime.getRuntime().availableProcessors());
     
     AtomicInteger workerIndex = { 0 };
     
@@ -78,6 +81,7 @@ public class DispatchContext extends Context implements MultiThreadedContext {
     { initSharedKeys(); }
     
     {
+        put(MultiTaskListener.taskListenerKey, new ConcurrentMultiTaskListener(this));
         put(Names.namesKey, new ConcurrentNames(this));
         put((Privilege) TypeEnvs.typeEnvsKey, new ConcurrentTypeEnvs(this));
         put((Privilege) CompileStates.compileStatesKey, new ConcurrentCompileStates(this));
@@ -94,6 +98,7 @@ public class DispatchContext extends Context implements MultiThreadedContext {
     protected void initSharedKeys() = List.of(
             DispatchCompiler.dispatchCompilerKey,
             Log.errKey,
+            MultiTaskListener.taskListenerKey,
             key(JavaFileManager.class),
             Names.namesKey,
             (Privilege) Target.targetKey,

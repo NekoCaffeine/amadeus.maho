@@ -1,58 +1,82 @@
 package amadeus.maho.util.container;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntFunction;
-import java.util.function.ToIntFunction;
+import java.util.concurrent.CopyOnWriteArrayList;
 
-import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.FieldDefaults;
-import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.Setter;
-import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.EqualsAndHashCode;
+import amadeus.maho.lang.Extension;
+import amadeus.maho.lang.ToString;
+
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 
 public interface Indexed<T> {
     
-    @Setter
-    @Getter
-    @AllArgsConstructor
-    @FieldDefaults(level = AccessLevel.PROTECTED)
-    class Default<T> implements Indexed<T> {
-        
-        ToIntFunction<T> submit;
-        IntFunction<T> fetch, remove;
-    
-        public Default(final ConcurrentHashMap<Integer, T> backend = { }, final AtomicInteger p_index = { }) = this(value -> {
-            synchronized (backend) {
-                return backend.entrySet().stream()
-                        .filter(entry -> entry.getValue() == value)
-                        .map(Map.Entry::getKey)
-                        .findAny()
-                        .orElseGet(() -> {
-                            final int index = p_index.getAndIncrement();
-                            backend.put(index, value);
-                            return index;
-                        });
-            }
-        }, backend::get, backend::remove);
-    
-        @Override
-        public int submit(final @Nullable T value) = submit.applyAsInt(value);
+    @ToString
+    @EqualsAndHashCode
+    record Base<T>(@ToString.Mark @EqualsAndHashCode.Mark Map<T, Integer> ids = new HashMap<>(), List<T> values = new ArrayList<>()) implements Indexed<T> {
         
         @Override
-        public @Nullable T fetch(final int id) = fetch.apply(id);
+        public int id(final T value) = ids.computeIfAbsent(value, it -> {
+            final int id = values.size();
+            values += it;
+            return id;
+        });
         
         @Override
-        public @Nullable T remove(final int id) = remove.apply(id);
+        public T value(final int id) = requireNonNull(values[id]);
+        
+        @Override
+        public void clear() {
+            ids.clear();
+            values.clear();
+        }
         
     }
     
-    int submit(final @Nullable T value);
+    @ToString
+    @EqualsAndHashCode
+    record Concurrent<T>(@ToString.Mark @EqualsAndHashCode.Mark ConcurrentHashMap<T, Integer> ids = { }, CopyOnWriteArrayList<T> values = { }) implements Indexed<T> {
+        
+        @Override
+        public int id(final T value) = ids.computeIfAbsent(value, it -> {
+            final int id;
+            synchronized (this) {
+                id = values.size();
+                values += it;
+            }
+            return id;
+        });
+        
+        @Override
+        public T value(final int id) = requireNonNull(values[id]);
+        
+        @Override
+        public synchronized void clear() {
+            ids.clear();
+            values.clear();
+        }
+        
+    }
     
-    @Nullable T fetch(final int id);
+    @Extension.Operator("GET")
+    int id(T value);
     
-    @Nullable T remove(final int id);
+    @Extension.Operator("GET")
+    T value(int id);
+    
+    List<T> values();
+    
+    void clear();
+    
+    static <T> Base<T> of(final Map<T, Integer> ids = new HashMap<>(), final List<T> values = new ArrayList<>()) = { ids, values };
+    
+    static <T> Base<T> ofIdentity() = { new IdentityHashMap<>() };
+    
+    static <T> Concurrent<T> ofConcurrent() = { };
     
 }

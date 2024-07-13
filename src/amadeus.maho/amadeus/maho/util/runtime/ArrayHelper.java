@@ -4,7 +4,7 @@ import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Comparator;
-import java.util.Random;
+import java.util.random.RandomGenerator;
 
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.Include;
@@ -19,81 +19,67 @@ public interface ArrayHelper {
     
     @Extension
     interface Ext {
-    
+        
         static int length(final Object $this[]) = $this.length;
-    
+        
         static int length(final char $this[]) = $this.length;
-    
+        
         static int length(final int $this[]) = $this.length;
-    
+        
         static int length(final double $this[]) = $this.length;
-    
+        
         static int length(final float $this[]) = $this.length;
-    
+        
         static int length(final long $this[]) = $this.length;
-    
+        
         static int length(final short $this[]) = $this.length;
-    
+        
         static int length(final byte $this[]) = $this.length;
-    
+        
         static int length(final boolean $this[]) = $this.length;
-    
+        
     }
     
     static <T> T deepClone(final T array) {
-        if (array == null || !array.getClass().isArray())
+        if (!array.getClass().isArray())
             throw new IllegalArgumentException(toString(array));
-        if (array instanceof Object[]) {
-            final Object result[] = ((Object[]) array).clone();
-            for (int i = 0; i < result.length; i++) {
-                final Object object = result[i];
-                if (object != null && object.getClass().isArray())
-                    result[i] = deepClone(object);
+        return switch (array) {
+            case Object[] objects   -> {
+                final Object result[] = objects.clone();
+                for (int i = 0; i < result.length; i++) {
+                    final Object object = result[i];
+                    if (object != null && object.getClass().isArray())
+                        result[i] = deepClone(object);
+                }
+                yield (T) result;
             }
-            return (T) result;
-        }
-        if (array instanceof byte[])
-            return (T) ((byte[]) array).clone();
-        if (array instanceof short[])
-            return (T) ((short[]) array).clone();
-        if (array instanceof int[])
-            return (T) ((int[]) array).clone();
-        if (array instanceof long[])
-            return (T) ((long[]) array).clone();
-        if (array instanceof char[])
-            return (T) ((char[]) array).clone();
-        if (array instanceof float[])
-            return (T) ((float[]) array).clone();
-        if (array instanceof double[])
-            return (T) ((double[]) array).clone();
-        if (array instanceof boolean[])
-            return (T) ((boolean[]) array).clone();
-        throw new AssertionError(toString(array));
+            case byte[] bytes       -> (T) bytes.clone();
+            case short[] shorts     -> (T) shorts.clone();
+            case int[] ints         -> (T) ints.clone();
+            case long[] longs       -> (T) longs.clone();
+            case char[] chars       -> (T) chars.clone();
+            case float[] floats     -> (T) floats.clone();
+            case double[] doubles   -> (T) doubles.clone();
+            case boolean[] booleans -> (T) booleans.clone();
+            default                 -> throw new AssertionError(toString(array));
+        };
     }
     
-    static int deepHashCode(final Object obj) {
-        if (obj instanceof Object[])
-            return Arrays.deepHashCode((Object[]) obj);
-        if (obj instanceof byte[])
-            return Arrays.hashCode((byte[]) obj);
-        if (obj instanceof short[])
-            return Arrays.hashCode((short[]) obj);
-        if (obj instanceof int[])
-            return Arrays.hashCode((int[]) obj);
-        if (obj instanceof long[])
-            return Arrays.hashCode((long[]) obj);
-        if (obj instanceof char[])
-            return Arrays.hashCode((char[]) obj);
-        if (obj instanceof float[])
-            return Arrays.hashCode((float[]) obj);
-        if (obj instanceof double[])
-            return Arrays.hashCode((double[]) obj);
-        if (obj instanceof boolean[])
-            return Arrays.hashCode((boolean[]) obj);
-        return ObjectHelper.hashCode(obj);
-    }
+    static int deepHashCode(final @Nullable Object obj) = switch (obj) {
+        case Object[] objects   -> Arrays.deepHashCode(objects);
+        case byte[] bytes       -> Arrays.hashCode(bytes);
+        case short[] shorts     -> Arrays.hashCode(shorts);
+        case int[] ints         -> Arrays.hashCode(ints);
+        case long[] longs       -> Arrays.hashCode(longs);
+        case char[] chars       -> Arrays.hashCode(chars);
+        case float[] floats     -> Arrays.hashCode(floats);
+        case double[] doubles   -> Arrays.hashCode(doubles);
+        case boolean[] booleans -> Arrays.hashCode(booleans);
+        case null               -> 0;
+        default                 -> ObjectHelper.hashCode(obj);
+    };
     
-    static boolean deepEquals(final Object a, final Object b) {
+    static boolean deepEquals(final @Nullable Object a, final @Nullable Object b) {
         if (a == b)
             return true;
         if (a == null || b == null)
@@ -125,30 +111,19 @@ public interface ArrayHelper {
         return ObjectHelper.equals(a, b);
     }
     
-    static String toString(final Object obj) {
-        if (obj == null)
-            return "null";
-        final Class<?> clazz = obj.getClass();
-        if (!clazz.isArray())
-            return obj.toString();
-        if (clazz == byte[].class)
-            return Arrays.toString((byte[]) obj);
-        if (clazz == char[].class)
-            return Arrays.toString((char[]) obj);
-        if (clazz == double[].class)
-            return Arrays.toString((double[]) obj);
-        if (clazz == float[].class)
-            return Arrays.toString((float[]) obj);
-        if (clazz == int[].class)
-            return Arrays.toString((int[]) obj);
-        if (clazz == long[].class)
-            return Arrays.toString((long[]) obj);
-        if (clazz == short[].class)
-            return Arrays.toString((short[]) obj);
-        if (clazz == boolean[].class)
-            return Arrays.toString((boolean[]) obj);
-        return Arrays.deepToString((Object[]) obj);
-    }
+    static String toString(final @Nullable Object obj) = switch (obj) {
+        case byte[] bytes       -> Arrays.toString(bytes);
+        case short[] shorts     -> Arrays.toString(shorts);
+        case int[] ints         -> Arrays.toString(ints);
+        case long[] longs       -> Arrays.toString(longs);
+        case char[] chars       -> Arrays.toString(chars);
+        case float[] floats     -> Arrays.toString(floats);
+        case double[] doubles   -> Arrays.toString(doubles);
+        case boolean[] booleans -> Arrays.toString(booleans);
+        case Object[] objects   -> Arrays.deepToString(objects);
+        case null               -> "null";
+        default                 -> obj.toString();
+    };
     
     static void checkArrayLength(final Object array, final int length) {
         if (Array.getLength(array) < length)
@@ -198,25 +173,6 @@ public interface ArrayHelper {
     static <T> T[] emptyArray(final Class<T> type) = (T[]) emptyArrayCache[type];
     
     int INDEX_NOT_FOUND = -1;
-    
-    // Clone
-    static @Nullable <T> T[] clone(final T array[]) = array == null ? null : array.clone();
-    
-    static @Nullable long[] clone(final long array[]) = array == null ? null : array.clone();
-    
-    static @Nullable int[] clone(final int array[]) = array == null ? null : array.clone();
-    
-    static @Nullable short[] clone(final short array[]) = array == null ? null : array.clone();
-    
-    static @Nullable char[] clone(final char array[]) = array == null ? null : array.clone();
-    
-    static @Nullable byte[] clone(final byte array[]) = array == null ? null : array.clone();
-    
-    static @Nullable double[] clone(final double array[]) = array == null ? null : array.clone();
-    
-    static @Nullable float[] clone(final float array[]) = array == null ? null : array.clone();
-    
-    static @Nullable boolean[] clone(final boolean array[]) = array == null ? null : array.clone();
     
     // nullToEmpty
     static <T> T[] nullToEmpty(final @Nullable T array[], final Class<T[]> type) {
@@ -1155,6 +1111,7 @@ public interface ArrayHelper {
         }
         return INDEX_NOT_FOUND;
     }
+    
     static int indexOfRef(final Object array[], final Object objectToFind, int startIndex = 0) {
         if (array == null)
             return INDEX_NOT_FOUND;
@@ -2110,9 +2067,9 @@ public interface ArrayHelper {
     @SafeVarargs
     static <T> T[] addAll(final T array1[], final T... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final Class<?> type1 = array1.getClass().getComponentType();
         final T joinedArray[] = (T[]) Array.newInstance(type1, array1.length + array2.length);
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
@@ -2129,9 +2086,9 @@ public interface ArrayHelper {
     
     static boolean[] addAll(final boolean array1[], final boolean... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final boolean joinedArray[] = new boolean[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2140,9 +2097,9 @@ public interface ArrayHelper {
     
     static char[] addAll(final char array1[], final char... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final char joinedArray[] = new char[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2151,9 +2108,9 @@ public interface ArrayHelper {
     
     static byte[] addAll(final byte array1[], final byte... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final byte joinedArray[] = new byte[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2162,9 +2119,9 @@ public interface ArrayHelper {
     
     static short[] addAll(final short array1[], final short... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final short joinedArray[] = new short[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2173,9 +2130,9 @@ public interface ArrayHelper {
     
     static int[] addAll(final int array1[], final int... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final int joinedArray[] = new int[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2184,9 +2141,9 @@ public interface ArrayHelper {
     
     static long[] addAll(final long array1[], final long... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final long joinedArray[] = new long[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2195,9 +2152,9 @@ public interface ArrayHelper {
     
     static float[] addAll(final float array1[], final float... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final float joinedArray[] = new float[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2206,9 +2163,9 @@ public interface ArrayHelper {
     
     static double[] addAll(final double array1[], final double... array2) {
         if (array1 == null)
-            return clone(array2);
+            return array2.clone();
         else if (array2 == null)
-            return clone(array1);
+            return array1.clone();
         final double joinedArray[] = new double[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2294,7 +2251,7 @@ public interface ArrayHelper {
         return newArray;
     }
     
-    private static @Nullable Object copyArrayGrow1(final @Nullable Object array, final Class<?> newArrayComponentType) {
+    private static Object copyArrayGrow1(final @Nullable Object array, final Class<?> newArrayComponentType) {
         if (array != null) {
             final int arrayLength = Array.getLength(array);
             final Object newArray = Array.newInstance(array.getClass().getComponentType(), arrayLength + 1);
@@ -2310,7 +2267,7 @@ public interface ArrayHelper {
     static <T> T[] removeElement(final T array[], final Object element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2319,7 +2276,7 @@ public interface ArrayHelper {
     static boolean[] removeElement(final boolean array[], final boolean element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2328,7 +2285,7 @@ public interface ArrayHelper {
     static byte[] removeElement(final byte array[], final byte element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2337,7 +2294,7 @@ public interface ArrayHelper {
     static char[] removeElement(final char array[], final char element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2346,7 +2303,7 @@ public interface ArrayHelper {
     static double[] removeElement(final double array[], final double element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2355,7 +2312,7 @@ public interface ArrayHelper {
     static float[] removeElement(final float array[], final float element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2364,7 +2321,7 @@ public interface ArrayHelper {
     static int[] removeElement(final int array[], final int element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2373,7 +2330,7 @@ public interface ArrayHelper {
     static long[] removeElement(final long array[], final long element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2382,7 +2339,7 @@ public interface ArrayHelper {
     static short[] removeElement(final short array[], final short element) {
         final int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         return remove(array, index);
     }
     
@@ -2421,7 +2378,7 @@ public interface ArrayHelper {
     private static Object removeAll(final Object array, final int... indices) {
         final int length = getLength(array);
         int diff = 0; // number of distinct indexes, i.e. number of entries that will be removed
-        final int clonedIndices[] = clone(indices);
+        final int clonedIndices[] = indices.clone();
         Arrays.sort(clonedIndices);
         // identify length of result array
         if (isNotEmpty(clonedIndices)) {
@@ -2613,7 +2570,7 @@ public interface ArrayHelper {
     static boolean[] removeAllOccurrences(final boolean array[], final boolean element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2625,7 +2582,7 @@ public interface ArrayHelper {
     static char[] removeAllOccurrences(final char array[], final char element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2637,7 +2594,7 @@ public interface ArrayHelper {
     static byte[] removeAllOccurrences(final byte array[], final byte element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2649,7 +2606,7 @@ public interface ArrayHelper {
     static short[] removeAllOccurrences(final short array[], final short element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2661,7 +2618,7 @@ public interface ArrayHelper {
     static int[] removeAllOccurrences(final int array[], final int element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2673,7 +2630,7 @@ public interface ArrayHelper {
     static long[] removeAllOccurrences(final long array[], final long element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2685,7 +2642,7 @@ public interface ArrayHelper {
     static float[] removeAllOccurrences(final float array[], final float element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2697,7 +2654,7 @@ public interface ArrayHelper {
     static double[] removeAllOccurrences(final double array[], final double element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2709,7 +2666,7 @@ public interface ArrayHelper {
     static <T> T[] removeAllOccurrences(final T array[], final T element) {
         int index = indexOf(array, element);
         if (index == INDEX_NOT_FOUND)
-            return clone(array);
+            return array.clone();
         final int indices[] = new int[array.length - index];
         indices[0] = index;
         int count = 1;
@@ -2722,7 +2679,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final boolean result[] = new boolean[array.length + values.length];
@@ -2738,7 +2695,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final byte result[] = new byte[array.length + values.length];
@@ -2754,7 +2711,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final char result[] = new char[array.length + values.length];
@@ -2770,7 +2727,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final double result[] = new double[array.length + values.length];
@@ -2786,7 +2743,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final float result[] = new float[array.length + values.length];
@@ -2802,7 +2759,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final int result[] = new int[array.length + values.length];
@@ -2818,7 +2775,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final long result[] = new long[array.length + values.length];
@@ -2834,7 +2791,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final short result[] = new short[array.length + values.length];
@@ -2851,7 +2808,7 @@ public interface ArrayHelper {
         if (array == null)
             return null;
         if (isEmpty(values))
-            return clone(array);
+            return array.clone();
         if (index < 0 || index > array.length)
             throw new IndexOutOfBoundsException(STR."Index: \{index}, Length: \{array.length}");
         final Class<?> type = array.getClass().getComponentType();
@@ -2864,47 +2821,47 @@ public interface ArrayHelper {
         return result;
     }
     
-    static void shuffle(final Object array[], final Random random) {
+    static void shuffle(final Object array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final boolean array[], final Random random) {
+    static void shuffle(final boolean array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final byte array[], final Random random) {
+    static void shuffle(final byte array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final char array[], final Random random) {
+    static void shuffle(final char array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final short array[], final Random random) {
+    static void shuffle(final short array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final int array[], final Random random) {
+    static void shuffle(final int array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final long array[], final Random random) {
+    static void shuffle(final long array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final float array[], final Random random) {
+    static void shuffle(final float array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }
     
-    static void shuffle(final double array[], final Random random) {
+    static void shuffle(final double array[], final RandomGenerator random) {
         for (int i = array.length; i > 1; i--)
             swap(array, i - 1, random.nextInt(i), 1);
     }

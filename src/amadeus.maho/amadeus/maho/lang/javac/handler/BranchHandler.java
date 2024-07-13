@@ -10,10 +10,12 @@ import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.tools.javac.code.Kinds;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.comp.AttrContext;
+import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.MatchBindingsComputer;
 import com.sun.tools.javac.jvm.Code;
@@ -25,14 +27,17 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeCopier;
 import com.sun.tools.javac.util.Assert;
 import com.sun.tools.javac.util.DefinedBy;
+import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
 import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.lang.javac.handler.base.Syntax;
@@ -46,6 +51,7 @@ import amadeus.maho.util.dynamic.Wrapper;
 
 import static amadeus.maho.lang.javac.handler.BranchHandler.PRIORITY;
 import static amadeus.maho.util.bytecode.Bytecodes.INVOKEVIRTUAL;
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static com.sun.tools.javac.code.Flags.STATIC;
 import static com.sun.tools.javac.code.Kinds.Kind.TYP;
 import static com.sun.tools.javac.code.TypeTag.BOT;
@@ -70,13 +76,37 @@ public class BranchHandler extends BaseSyntaxHandler {
         return wrapper.defineHiddenWrapperClass(MethodHandles.Lookup.ClassOption.NESTMATE, MethodHandles.Lookup.ClassOption.STRONG);
     }
     
-    public static Type voidMark(final Type type) = type == null || type instanceof Type.JCVoidType || type instanceof VoidMark ? type : (Type) Cloner.copyFields(voidMarkLocal[type.getClass()], type);
+    public static @Nullable Type voidMark(final @Nullable Type type) = type == null || type instanceof Type.JCVoidType || type instanceof VoidMark ? type : (Type) Cloner.copyFields(voidMarkLocal[type.getClass()], type);
     
-    public interface SafeExpression { }
+    public interface SafeExpression {
+        
+        boolean allowed();
+        
+        static void allow(final @Nullable JCTree tree) = switch (tree) {
+            case JCTree.JCFieldAccess access            -> {
+                if (access instanceof SafeFieldAccess safeFieldAccess)
+                    safeFieldAccess.allowed = true;
+                allow(access.selected);
+            }
+            case JCTree.JCMethodInvocation invocation   -> {
+                if (invocation instanceof SafeMethodInvocation safeMethodInvocation)
+                    safeMethodInvocation.allowed = true;
+                allow(invocation.meth);
+            }
+            case JCTree.JCTypeCast typeCast             -> allow(typeCast.expr);
+            case JCTree.JCExpressionStatement statement -> allow(statement.expr);
+            case null,
+                 default                                -> { }
+        };
+        
+    }
     
     @NoArgsConstructor
     @FieldDefaults(level = AccessLevel.PUBLIC)
     public static class SafeMethodInvocation extends JCTree.JCMethodInvocation implements SafeExpression {
+        
+        @Getter
+        boolean allowed = false;
         
         public SafeMethodInvocation(final JCMethodInvocation invocation) = this(invocation.typeargs, invocation.meth, invocation.args);
         
@@ -85,6 +115,9 @@ public class BranchHandler extends BaseSyntaxHandler {
     @NoArgsConstructor
     @FieldDefaults(level = AccessLevel.PUBLIC)
     public static class SafeFieldAccess extends JCTree.JCFieldAccess implements SafeExpression {
+        
+        @Getter
+        boolean allowed = false;
         
         public SafeFieldAccess(final JCFieldAccess access) = this(access.selected, access.name, access.sym);
         
@@ -130,6 +163,7 @@ public class BranchHandler extends BaseSyntaxHandler {
     public static <P> Hook.Result visitMethodInvocation(final TreeCopier<P> $this, final MethodInvocationTree node, final P p) {
         if (node instanceof SafeMethodInvocation invocation) {
             final SafeMethodInvocation result = { $this.copy(invocation.typeargs, p), $this.copy(invocation.meth, p), $this.copy(invocation.args, p) };
+            result.allowed = invocation.allowed;
             result.pos = invocation.pos;
             return { result };
         }
@@ -140,11 +174,18 @@ public class BranchHandler extends BaseSyntaxHandler {
     public static <P> Hook.Result visitMemberSelect(final TreeCopier<P> $this, final MemberSelectTree node, final P p) {
         if (node instanceof SafeFieldAccess access) {
             final SafeFieldAccess result = { $this.copy(access.selected, p), access.name, null };
+            result.allowed = access.allowed;
             result.pos = access.pos;
             return { result };
         }
         return Hook.Result.VOID;
     }
+    
+    @Hook
+    private static void visitExec(final Attr $this, final JCTree.JCExpressionStatement statement) = SafeExpression.allow(statement.expr);
+    
+    @Hook
+    private static void visitLambda(final Attr $this, final JCTree.JCLambda lambda) = SafeExpression.allow(lambda.body);
     
     /*
         a ?? b
@@ -158,18 +199,23 @@ public class BranchHandler extends BaseSyntaxHandler {
         return Hook.Result.VOID;
     }
     
-    @Privilege
     private static void attrNullOrExpr(final Attr attr, final JCTree.JCBinary binary) {
-        final Type left = attr.chk.checkNonVoid(binary.lhs.pos(), attr.attribExpr(binary.lhs, attr.env));
-        final Type right = attr.chk.checkNonVoid(binary.rhs.pos(), attr.attribExpr(binary.rhs, attr.env, binary.rhs instanceof JCTree.JCLambda || binary.rhs instanceof JCTree.JCMemberReference ? left : Type.noType));
+        final Env<AttrContext> env = env(attr);
+        final Check check = (Privilege) attr.chk;
+        final Symtab symtab = (Privilege) attr.syms;
+        SafeExpression.allow(binary.lhs);
+        final Type left = (Privilege) check.checkNonVoid(binary.lhs.pos(), attr.attribExpr(binary.lhs, env));
+        if (binary.rhs instanceof JCTree.JCLambda || binary.rhs instanceof JCTree.JCMemberReference || binary.rhs instanceof JCTree.JCParens)
+            binary.rhs = instance(BranchHandler.class).maker.TypeCast(left, binary.rhs);
+        final Type right = (Privilege) check.checkNonVoid(binary.rhs.pos(), attr.attribExpr(binary.rhs, env));
         final List<Type> types = List.of(left, right);
-        final Type owner = attr.condType(List.of(binary.lhs.pos(), binary.rhs.pos()), types);
+        final Type owner = (Privilege) attr.condType(List.of(binary.lhs.pos(), binary.rhs.pos()), types);
         final NullOrBinary tree = { binary };
         tree.pos = binary.pos;
-        final List<Type> argTypes = left.isPrimitive() == right.isPrimitive() ? types : types.map(attr.types::boxedTypeOrType);
-        tree.operator = { instance(BranchHandler.class).nullOrName, new Type.MethodType(argTypes, owner, List.nil(), attr.syms.noSymbol), -1, attr.syms.noSymbol };
-        attr.result = attr.check(tree, owner, Kinds.KindSelector.VAL, attr.resultInfo);
-        attr.matchBindings = MatchBindingsComputer.EMPTY;
+        final List<Type> argTypes = left.isPrimitive() == right.isPrimitive() ? types : types.map(((Privilege) attr.types)::boxedTypeOrType);
+        tree.operator = { instance(BranchHandler.class).nullOrName, new Type.MethodType(argTypes, owner, List.nil(), symtab.noSymbol), -1, symtab.noSymbol };
+        (Privilege) (attr.result = (Privilege) attr.check(tree, owner, Kinds.KindSelector.VAL, (Privilege) attr.resultInfo));
+        (Privilege) (attr.matchBindings = MatchBindingsComputer.EMPTY);
         throw new ReAttrException(() -> binary.type = tree.type, false, tree, binary);
     }
     
@@ -186,27 +232,26 @@ public class BranchHandler extends BaseSyntaxHandler {
     private static Hook.Result error(final Code.State $this) = instance(BranchHandler.class).errorTypeResult;
     
     @Hook
-    @Privilege
     private static Hook.Result visitExec(final Gen $this, final JCTree.JCExpressionStatement statement) {
-        final Env<Gen.GenContext> localEnv = $this.env.dup(statement, new Gen.GenContext());
+        final Env<Gen.GenContext> localEnv = ((Privilege) $this.env).dup(statement, (Privilege) new Gen.GenContext());
         try {
-            $this.env = localEnv;
+            (Privilege) ($this.env = localEnv);
             final JCTree.JCExpression expr = statement.expr;
             if (expr instanceof JCTree.JCUnary unary)
                 switch (expr.getTag()) {
                     case POSTINC -> unary.setTag(PREINC);
                     case POSTDEC -> unary.setTag(PREDEC);
                 }
-            final Code code = $this.code;
+            final Code code = (Privilege) $this.code;
             Assert.check(code.isStatementStart());
             if (statement.expr instanceof JCTree.JCMethodInvocation invocation)
-                statement.expr.type = ((Symbol.MethodSymbol) symbol(invocation.meth)).getReturnType();
+                statement.expr.type = ((Symbol.MethodSymbol) requireNonNull(symbol(invocation.meth))).getReturnType();
             final Items.Item result = $this.genExpr(statement.expr, statement.expr.type);
             @Nullable Code.Chain thenExit = null;
-            @Nullable final Code.Chain exit = localEnv.info.exit;
+            @Nullable final Code.Chain exit = (Privilege) localEnv.info.exit;
             if (exit != null) {
-                switch (result.typecode) {
-                    case VOIDcode      -> thenExit = code.branch(goto_);
+                switch ((Privilege) result.typecode) {
+                    case VOIDcode   -> thenExit = code.branch(goto_);
                     case INTcode,
                          FLOATcode,
                          BYTEcode,
@@ -223,14 +268,15 @@ public class BranchHandler extends BaseSyntaxHandler {
                 }
                 code.resolve(exit);
                 code.resolvePending();
-                code.state.stack[code.state.stacksize - 1] = $this.syms.objectType;
+                final Code.State state = (Privilege) code.state;
+                ((Privilege) state.stack)[(Privilege) state.stacksize - 1] = ((Privilege) $this.syms).objectType;
                 code.emitop0(pop);
                 if (thenExit != null)
                     code.resolve(thenExit);
             } else
-                result.drop();
+                (Privilege) result.drop();
             Assert.check(code.isStatementStart());
-        } finally { $this.env = localEnv.next; }
+        } finally { (Privilege) ($this.env = localEnv.next); }
         return Hook.Result.NULL;
     }
     
@@ -246,26 +292,27 @@ public class BranchHandler extends BaseSyntaxHandler {
         return Hook.Result.VOID;
     }
     
-    @Privilege
     private static void genNullOrExpr(final Gen gen, final NullOrBinary nullOr) {
-        final Code code = gen.code;
+        final Code code = (Privilege) gen.code;
+        final Symtab symtab = (Privilege) gen.syms;
+        final Items items = (Privilege) gen.items;
         code.statBegin(nullOr.pos);
-        if (nullOr.lhs.type == gen.syms.botType)
-            if (nullOr.rhs.type == gen.syms.botType) { // null ?? null => null
-                gen.code.emit1(aconst_null);
-                gen.result = gen.items.makeStackItem(nullOr.type);
+        if (nullOr.lhs.type == symtab.botType)
+            if (nullOr.rhs.type == symtab.botType) { // null ?? null => null
+                (Privilege) code.emit1(aconst_null);
+                (Privilege) (gen.result = (Privilege) items.makeStackItem(nullOr.type));
             } else // null ?? b => b
-                gen.result = gen.genExpr(nullOr.rhs, nullOr.type).load();
+                (Privilege) (gen.result = (Privilege) gen.genExpr(nullOr.rhs, nullOr.type).load());
         else {
-            final Env<Gen.GenContext> localEnv = gen.env.dup(nullOr.lhs, new Gen.GenContext());
-            gen.env = localEnv;
-            final boolean genCrt = gen.genCrt;
+            final Env<Gen.GenContext> localEnv = ((Privilege) gen.env).dup(nullOr.lhs, (Privilege) new Gen.GenContext());
+            (Privilege) (gen.env = localEnv);
+            final boolean genCrt = (Privilege) gen.genCrt;
             final int startPc = genCrt ? code.curCP() : 0;
-            final Items.Item lhs = gen.genExpr(nullOr.lhs, nullOr.type).load();
+            final Items.Item lhs = (Privilege) gen.genExpr(nullOr.lhs, nullOr.type).load();
             if (genCrt)
                 code.crt.put(lhs, CRT_FLOW_CONTROLLER, startPc, code.curCP());
             @Nullable Code.Chain thenExit = null;
-            @Nullable final Code.Chain whenNull = localEnv.info.exit;
+            @Nullable final Code.Chain whenNull = (Privilege) localEnv.info.exit;
             if (nullOr.lhs.type instanceof Type.JCPrimitiveType) {
                 if (whenNull != null)
                     thenExit = code.branch(goto_);
@@ -274,19 +321,19 @@ public class BranchHandler extends BaseSyntaxHandler {
                 thenExit = code.branch(if_acmp_nonnull);
             }
             code.resolve(whenNull);
-            gen.env = localEnv.next;
+            (Privilege) (gen.env = localEnv.next);
             if (thenExit != null) {
                 final int rhsStartPc = genCrt ? code.curCP() : 0;
                 final JCTree.JCExpression rhs = nullOr.rhs;
                 code.statBegin(rhs.pos);
                 code.emitop0(pop); // ref
-                gen.genExpr(rhs, nullOr.type).load();
-                code.state.forceStackTop(nullOr.type);
+                (Privilege) gen.genExpr(rhs, nullOr.type).load();
+                (Privilege) ((Privilege) code.state).forceStackTop(nullOr.type);
                 if (genCrt)
                     code.crt.put(rhs, CRT_FLOW_TARGET, rhsStartPc, code.curCP());
                 code.resolve(thenExit);
             }
-            gen.result = gen.items.makeStackItem(nullOr.type);
+            (Privilege) (gen.result = (Privilege) items.makeStackItem(nullOr.type));
         }
     }
     
@@ -324,11 +371,12 @@ public class BranchHandler extends BaseSyntaxHandler {
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void visitSelect(final Attr $this, final JCTree.JCFieldAccess access) = markVoid($this, access);
     
-    @Privilege
     private static void markVoid(final Attr attr, final JCTree.JCExpression expression) {
-        if (expression instanceof SafeExpression)
+        if (expression instanceof SafeExpression safeExpression) {
             expression.type = voidMark(expression.type);
-        else {
+            if (!safeExpression.allowed())
+                instance().log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, expression, new JCDiagnostic.Error(MahoJavac.KEY, "safe.access.not.allowed"));
+        } else {
             @Nullable final JCTree.JCFieldAccess access = expression instanceof JCTree.JCFieldAccess it ? it : expression instanceof JCTree.JCMethodInvocation invocation && invocation.meth instanceof JCTree.JCFieldAccess it ? it : null;
             if (access != null && access.selected.type instanceof VoidMark)
                 expression.type = voidMark(expression.type);
@@ -340,13 +388,13 @@ public class BranchHandler extends BaseSyntaxHandler {
                 if (!(prev.getTag() == AdditionalOperators.TAG_NULL_OR ||
                       prev instanceof JCTree.JCFieldAccess access && access.selected == expression ||
                       prev instanceof JCTree.JCMethodInvocation invocation && invocation.meth == expression))
-                    expression.type = attr.syms.voidType;
+                    expression.type = ((Privilege) attr.syms).voidType;
         }
     }
     
     @Hook
     private static Hook.Result visitApply(final Gen $this, final JCTree.JCMethodInvocation invocation) {
-        if (invocation instanceof SafeMethodInvocation safeMethodInvocation && noneMatch(symbol(safeMethodInvocation.meth).flags_field, STATIC)) {
+        if (invocation instanceof SafeMethodInvocation safeMethodInvocation && noneMatch(requireNonNull(symbol(safeMethodInvocation.meth)).flags_field, STATIC)) {
             genSafeExpression($this, safeMethodInvocation);
             return Hook.Result.NULL;
         }
@@ -368,27 +416,27 @@ public class BranchHandler extends BaseSyntaxHandler {
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void visitSelect_$Return(final Gen $this, final JCTree.JCFieldAccess access) = dropResult($this, access);
     
-    @Privilege
     private static <T extends JCTree.JCExpression> void dropResult(final Gen gen, final T expression) {
-        if (gen.result.typecode != VOIDcode && expression.type instanceof VoidMark) {
+        if ((Privilege) ((Privilege) gen.result).typecode != VOIDcode && expression.type instanceof VoidMark) {
             final JCTree prev = HandlerSupport.genContext()[-2];
             if (prev != null)
                 if (!(prev.getTag() == AdditionalOperators.TAG_NULL_OR || prev instanceof JCTree.JCFieldAccess || prev instanceof JCTree.JCMethodInvocation invocation && invocation.meth == expression)) {
-                    gen.result.drop();
-                    gen.result = gen.items.makeVoidItem();
+                    (Privilege) ((Privilege) gen.result).drop();
+                    (Privilege) (gen.result = (Privilege) ((Privilege) gen.items).makeVoidItem());
                 }
         }
     }
     
-    @Privilege
     private static <T extends JCTree.JCExpression> void genSafeExpression(final Gen gen, final T expression) {
-        gen.setTypeAnnotationPositions(expression.pos);
-        final Code code = gen.code;
+        (Privilege) gen.setTypeAnnotationPositions(expression.pos);
+        final Code code = (Privilege) gen.code;
+        final Env<Gen.GenContext> env = (Privilege) gen.env;
+        final Symtab symtab = (Privilege) gen.syms;
         code.statBegin(expression.pos);
-        final boolean genCrt = gen.genCrt;
+        final boolean genCrt = (Privilege) gen.genCrt;
         final int startPc = genCrt ? code.curCP() : 0;
         final JCTree.JCFieldAccess meth = (JCTree.JCFieldAccess) (expression instanceof JCTree.JCMethodInvocation invocation ? invocation.meth : expression);
-        final Items.Item item = expression instanceof JCTree.JCMethodInvocation ? gen.genExpr(meth, gen.methodType) : gen.genExpr(meth.selected, meth.selected.type).load();
+        final Items.Item item = expression instanceof JCTree.JCMethodInvocation ? gen.genExpr(meth, (Privilege) gen.methodType) : (Privilege) gen.genExpr(meth.selected, meth.selected.type).load();
         code.emitop0(dup);
         final Code.Chain whenNull = code.branch(if_acmp_null);
         if (genCrt)
@@ -396,24 +444,26 @@ public class BranchHandler extends BaseSyntaxHandler {
         final int invokeStartPc = genCrt ? code.curCP() : 0;
         final Items.Item result;
         if (expression instanceof JCTree.JCMethodInvocation invocation) {
-            final Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol(invocation.meth);
-            gen.genArgs(invocation.args, method.externalType(gen.types).getParameterTypes());
+            final Symbol.MethodSymbol method = (Symbol.MethodSymbol) requireNonNull(symbol(invocation.meth));
+            gen.genArgs(invocation.args, method.externalType((Privilege) gen.types).getParameterTypes());
             code.statBegin(expression.pos);
-            result = item.invoke();
+            result = (Privilege) item.invoke();
         } else {
             final Symbol baseSymbol = symbol(meth.selected);
             final Symbol.VarSymbol varSymbol = (Symbol.VarSymbol) symbol(meth);
-            final boolean selectSuper = baseSymbol != null && (baseSymbol.kind == TYP || baseSymbol.name == gen.names._super), accessSuper = gen.isAccessSuper(gen.env.enclMethod);
-            if (varSymbol == gen.syms.lengthVar) {
+            final boolean selectSuper = baseSymbol != null && (baseSymbol.kind == TYP || baseSymbol.name == ((Privilege) gen.names)._super), accessSuper = (Privilege) gen.isAccessSuper(env.enclMethod);
+            // extract items
+            final Items items = (Privilege) gen.items;
+            if (varSymbol == symtab.lengthVar) {
                 code.emitop0(arraylength);
-                result = gen.items.makeStackItem(gen.syms.intType).load();
+                result = (Privilege) ((Privilege) items.makeStackItem(symtab.intType)).load();
             } else
-                result = gen.items.makeMemberItem(varSymbol, gen.nonVirtualForPrivateAccess(varSymbol) || selectSuper || accessSuper).load();
+                result = (Privilege) ((Privilege) items.makeMemberItem(varSymbol, (Privilege) gen.nonVirtualForPrivateAccess(varSymbol) || selectSuper || accessSuper)).load();
         }
         if (genCrt)
             code.crt.put(expression, CRT_FLOW_TARGET, invokeStartPc, code.curCP());
-        gen.env.info.addExit(whenNull);
-        gen.result = result;
+        (Privilege) env.info.addExit(whenNull);
+        (Privilege) (gen.result = result);
     }
     
 }

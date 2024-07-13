@@ -24,7 +24,8 @@ public class EventDispatcher {
     public static final class OrdinalWrapper implements Comparable<OrdinalWrapper> {
         
         Listener.Ordinal ordinal;
-        MethodHandle     handle;
+        
+        MethodHandle handle;
         
         @Override
         public int compareTo(final self target) = ordinal.ordinal() - target.ordinal.ordinal();
@@ -33,6 +34,7 @@ public class EventDispatcher {
     
     @Getter
     @Nullable EventDispatcher parent;
+    
     @Getter
     MethodHandle throwableHandler;
     
@@ -48,8 +50,8 @@ public class EventDispatcher {
         callChain = { MethodType.methodType(void.class, eventType) };
         callChain.setTarget(MethodHandles.empty(callChain.type()));
         MethodHandle dynamicInvoker = callChain.dynamicInvoker();
-        if (parent() != null)
-            dynamicInvoker = MethodHandles.foldArguments(dynamicInvoker, MethodHandles.explicitCastArguments(parent().methodHandle(), callChain.type()));
+        if (parent != null)
+            dynamicInvoker = MethodHandles.foldArguments(dynamicInvoker, MethodHandles.explicitCastArguments(parent.methodHandle(), callChain.type()));
         methodHandle = MethodHandles.explicitCastArguments(dynamicInvoker, dynamicInvoker.type().changeParameterType(0, Event.class));
     }
     

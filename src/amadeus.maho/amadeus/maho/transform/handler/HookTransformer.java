@@ -77,7 +77,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
         public @Nullable ClassNode transform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
             for (final MethodNode methodNode : node.methods)
                 if (methodNode.name.equals(sourceMethod.name) && methodNode.desc.equals(sourceMethod.desc) && Metadata.Guard.missing(methodNode.visibleAnnotations, ReferenceTransformer.class)) {
-                    context.markModified().markCompute(methodNode, ComputeType.MAX);
+                    context.markModified().markCompute(methodNode);
                     TransformerManager.transform("hook.reference", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}");
                     for (final AbstractInsnNode insn : methodNode.instructions)
                         if (insn instanceof MethodInsnNode methodInsnNode && methodInsnNode.owner.equals(TYPE_HOOK_RESULT.getInternalName()) && methodInsnNode.name.equals(ASMHelper._INIT_)) {
@@ -122,7 +122,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
     
     @TransformTarget(targetClass = ClassLoader.class, selector = "findNative")
     private static MethodNode remapNativeEntryName(final TransformContext context, final ClassNode node, final MethodNode methodNode) {
-        context.markModified().compute(methodNode, ComputeType.MAX);
+        context.markModified().markCompute(methodNode);
         final InsnList insnList = { };
         final MethodGenerator generator = MethodGenerator.fromShadowMethodNode(methodNode, insnList);
         generator.loadArg(1);
@@ -279,7 +279,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
     }
     
     public void hookTarget(final TransformContext context, final ClassNode node, final MethodNode methodNode, final Type returnType, final int returnOpcode, final @Nullable AbstractInsnNode insn) {
-        context.markModified().markCompute(methodNode, ComputeType.MAX, ComputeType.FRAME);
+        context.markModified().markCompute(methodNode);
         final MethodNode injectMethod = { methodNode.access, methodNode.name, methodNode.desc, methodNode.signature, methodNode.exceptions.toArray(String[]::new) };
         final MethodGenerator generator = MethodGenerator.fromMethodNode(injectMethod);
         @Nullable Label avoidRecursionLabel = null;

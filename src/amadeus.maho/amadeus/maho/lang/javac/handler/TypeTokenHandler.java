@@ -22,6 +22,8 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.type.TypeToken;
 
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
+
 @TransformProvider
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -34,29 +36,30 @@ public class TypeTokenHandler extends JavacContext {
             runtimeTypeName         = name(LookupHelper.<String, Type>method1(TypeToken::runtimeType).getName()),
             runtimeTypeVariableName = name(LookupHelper.<String, Integer, TypeVariable<?>>method2(TypeToken::runtimeTypeVariable).getName());
     
-    SignatureGenerator signatureGenerator = { types };
-    
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void visitApply(final Attr $this, final JCTree.JCMethodInvocation tree) {
         if (tree.args.isEmpty()) {
-            final Symbol symbol = symbol(tree.meth);
+            final Symbol symbol = requireNonNull(symbol(tree.meth));
             final TypeTokenHandler instance = instance(TypeTokenHandler.class);
-            if (symbol instanceof Symbol.MethodSymbol methodSymbol && methodSymbol.owner.getQualifiedName() == instance.typeTokenName)
+            if (symbol instanceof Symbol.MethodSymbol methodSymbol && methodSymbol.owner.getQualifiedName() == instance.typeTokenName) {
+                final SignatureGenerator signatureGenerator = instance.signatureGenerator;
                 if (methodSymbol.name == instance.captureName) {
                     if (tree.typeargs.head != null) {
-                        instance.signatureGenerator.reset().assembleSig(tree.typeargs.head.type);
-                        final TreeMaker maker = instance.maker.at(tree);
-                        tree.args = tree.args.prepend(maker.Apply(List.nil(), maker.Select(instance.IdentQualifiedName(TypeToken.class), instance.runtimeTypeName), List.of(maker.Literal(instance.signatureGenerator.toString()))));
+                        final TreeMaker maker = instance.maker.at(tree.pos);
+                        tree.args = tree.args.prepend(maker.Apply(List.nil(), maker.Select(instance.IdentQualifiedName(TypeToken.class), instance.runtimeTypeName),
+                                List.of(maker.Literal(signatureGenerator.signature(tree.typeargs.head.type)))));
                         throw new ReAttrException(tree, tree);
                     } else
                         instance.log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "type-token.missing.type-arg"));
                 } else if (methodSymbol.name == instance.locateName) {
                     if (tree.typeargs.size() == 2) {
+                        // noinspection DataFlowIssue
                         if (tree.typeargs[1].type instanceof com.sun.tools.javac.code.Type.ClassType classType && classType.typarams_field != null && !classType.typarams_field.isEmpty()) {
                             final Symbol.TypeSymbol typeVarSymbol = tree.typeargs.head.type.tsym;
                             int index = -1;
                             final List<com.sun.tools.javac.code.Type> typeVars = classType.typarams_field;
                             for (int i = 0; i < typeVars.size(); i++) {
+                                // noinspection DataFlowIssue
                                 if (typeVars[i].tsym == typeVarSymbol)
                                     if (index == -1)
                                         index = i;
@@ -66,10 +69,9 @@ public class TypeTokenHandler extends JavacContext {
                             if (index < 0)
                                 instance.log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "type-token.unable.locate"));
                             else {
-                                instance.signatureGenerator.reset().assembleSig(tree.typeargs.tail.head.type);
-                                final TreeMaker maker = instance.maker.at(tree);
+                                final TreeMaker maker = instance.maker.at(tree.pos);
                                 tree.args = tree.args.prepend(maker.Apply(List.nil(), maker.Select(instance.IdentQualifiedName(TypeToken.class), instance.runtimeTypeVariableName),
-                                        List.of(maker.Literal(instance.signatureGenerator.toString()), maker.Literal(index))));
+                                        List.of(maker.Literal(signatureGenerator.signature(tree.typeargs.tail.head.type)), maker.Literal(index))));
                                 throw new ReAttrException(tree, tree);
                             }
                         } else
@@ -77,6 +79,8 @@ public class TypeTokenHandler extends JavacContext {
                     } else
                         instance.log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "type-token.missing.type-arg"));
                 }
+                
+            }
         }
     }
     

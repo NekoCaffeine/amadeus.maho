@@ -26,7 +26,6 @@ public class TypeOwner {
     
     private static class TOP { }
     
-    // @formatter:off
     public static final TypeOwner
             INTEGER       = { Type.INT_TYPE },
             LONG          = { Type.LONG_TYPE },
@@ -37,7 +36,6 @@ public class TypeOwner {
             METHOD_HANDLE = { ASMHelper.TYPE_METHOD_HANDLE },
             NULL          = { Type.getType(NULL.class) },
             INVALID       = { Type.getType(TOP.class) };
-    // @formatter:on
     
     @Getter
     final Type type;

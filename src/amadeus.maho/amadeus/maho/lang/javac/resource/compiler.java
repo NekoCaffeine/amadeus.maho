@@ -9,7 +9,11 @@ import amadeus.maho.util.runtime.ArrayHelper;
 class compiler {
     
     private static Object[][] injectContents() = {
+            { "amadeus.maho.lang.err.safe.access.not.allowed", "?. expressions are not allowed here, they must be in the context of a ?? expression" },
             { "amadeus.maho.lang.err.reference.mark.nesting", "Reference mark nesting" },
+            { "amadeus.maho.lang.err.delegate.hard.static", "The target of a hard delegate must be a non-static member" },
+            { "amadeus.maho.lang.err.delegate.primitive.type.not.allowed", "primitive type not allowed for delegate" },
+            { "amadeus.maho.lang.err.delegate.array.type.not.allowed", "array type not allowed for delegate" },
             { "amadeus.maho.lang.err.delegate.method.must.have.no.parameters", "The delegate method {0} must have no parameters" },
             { "amadeus.maho.lang.err.getter.method.lazy", "The @Getter marked on the method does not support the 'lazy' attribute" },
             { "amadeus.maho.lang.err.lazy.getter.must.not.interface", "The fields marked with @Getter(lazy = true) do not support declarations in interfaces" },

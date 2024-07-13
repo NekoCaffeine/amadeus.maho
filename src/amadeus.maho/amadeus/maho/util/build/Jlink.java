@@ -55,7 +55,6 @@ import amadeus.maho.transform.mark.base.Transformer;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ClassWriter;
 import amadeus.maho.util.container.MapTable;
-import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.resource.ResourcePath;
 import amadeus.maho.util.runtime.ArrayHelper;
@@ -88,12 +87,12 @@ public interface Jlink {
         
         List<ClassFileTransformer> transformers = new ArrayList<>(List.of(manager(), AllClassesPublic.instance(), ReflectionInjector.instance(), UnsafeInjector.instance(), HookResultInjector.instance()));
         
-        MapTable<String, String, Set<String>> moduleOpensTable = MapTable.newHashMapTable();
+        MapTable<String, String, Set<String>> moduleOpensTable = MapTable.ofHashMapTable();
         
         List<String> changedClasses = new ArrayList<>();
         
         public void open(final String moduleName, final String packageName, final String... targets)
-                = moduleOpensTable().row(moduleName).computeIfAbsent(packageName.replace('.', '/'), FunctionHelper.abandon(HashSet::new)) *= List.of(targets);
+                = moduleOpensTable().row(moduleName).computeIfAbsent(packageName.replace('.', '/'), _ -> new HashSet<>()) *= List.of(targets);
         
         @Override
         @SneakyThrows

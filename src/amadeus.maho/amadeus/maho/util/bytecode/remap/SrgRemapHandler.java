@@ -10,7 +10,7 @@ import amadeus.maho.util.throwable.AbnormalFormatException;
 public interface SrgRemapHandler extends MapTableRemapHandler {
     
     static SrgRemapHandler of(final Path path) throws IOException, AbnormalFormatException {
-        final MapTable<String, String, String> mapperTable = MapTable.newHashMapTable();
+        final MapTable<String, String, String> mapperTable = MapTable.ofHashMapTable();
         final int lineCounter[] = { -1 };
         Files.lines(path).forEach(line -> {
             line = line.strip();

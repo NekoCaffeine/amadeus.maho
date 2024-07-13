@@ -40,8 +40,10 @@ import amadeus.maho.lang.javac.handler.base.Syntax;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.util.runtime.ObjectHelper;
 
 import static amadeus.maho.lang.javac.handler.DefaultValueHandler.PRIORITY;
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.parser.Tokens.TokenKind.EQ;
 
@@ -188,21 +190,22 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                                 .peek(decl -> decl.type = attr.attribType(decl.vartype, methodEnv))
                                 .peek(decl -> { // Allowing default parameters to be declared as an array can be done using only curly braces without full declaration.
                                     if (decl.init instanceof JCTree.JCNewArray newArray && newArray.elemtype == null)
-                                        if (decl.type instanceof Type.ArrayType arrayType)
+                                        if (decl.type instanceof Type.ArrayType arrayType) {
                                             newArray.elemtype = maker.at(methodDecl.pos).Type(arrayType.elemtype);
-                                        else
+                                            decl.init = AssignHandler.transform(maker.at(newArray.pos), newArray, arrayType);
+                                        } else
                                             AssignHandler.lower(decl, newArray, decl.type);
                                 })
                                 .collect(Collectors.toMap(Function.identity(), decl -> decl.init));
                         params.forEach(DefaultValueHandler::eraseInitialization);
                         final boolean def = noneMatch(methodDecl.mods.flags, PRIVATE | STATIC) && anyMatch(modifiers(owner).flags, INTERFACE);
                         if (def)
-                            modifiers(owner).flags |= DEFAULT;
-                        list.forEach(defaultParameters -> injectMember(env, derivedMethod(maker, maker.at(methodDecl.pos).Modifiers(methodDecl.mods.flags & removeFlags | (def ? DEFAULT : 0), methodDecl.mods.annotations),
+                            requireNonNull(modifiers(owner)).flags |= DEFAULT;
+                        list.forEach(defaultParameters -> injectMember(env, derivedMethod(maker.at(methodDecl.pos), maker.at(methodDecl.pos).Modifiers(methodDecl.mods.flags & removeFlags | (def ? DEFAULT : 0), methodDecl.mods.annotations),
                                 methodDecl.name, methodDecl.restype, methodDecl.typarams, params.stream()
                                         .filter(parameter -> defaultParameters.stream().noneMatch(defaultParameter -> defaultParameter == parameter))
                                         .map(parameter -> maker.at(parameter.pos).VarDef(parameter.mods, parameter.name, parameter.vartype, null))
-                                        .collect(List.collector()), methodDecl.thrown, body(maker, methodDecl, params, initMapping, defaultParameters, env), null, methodDecl)));
+                                        .collect(List.collector()), methodDecl.thrown, body(maker.at(methodDecl.body?.pos ?? methodDecl.pos), methodDecl, params, initMapping, defaultParameters, env), null, methodDecl)));
                         
                     }
                 }
@@ -217,12 +220,12 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
     protected JCTree.JCBlock body(final TreeMaker maker, final JCTree.JCMethodDecl methodDecl, final List<JCTree.JCVariableDecl> params, final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping,
             final Collection<JCTree.JCVariableDecl> defaultParameters, final Env<AttrContext> env) {
         final TreeCopier copier = { maker };
-        final JCTree.JCMethodInvocation apply = maker.Apply(null, maker.Ident(methodDecl.name.equals(names.init) ? names._this : methodDecl.name), params.map(parameter -> maker.Ident(parameter.name)));
+        final JCTree.JCMethodInvocation apply = maker.Apply(null, maker.Ident(methodDecl.name.equals(names.init) ? names._this : methodDecl.name), params.map(parameter -> maker.at(parameter.pos).Ident(parameter.name)));
         return maker.Block(0L, new LinkedList<>(defaultParameters).descendingStream()
-                .map(parameter -> new DefaultVariable(maker.Modifiers(FINAL), parameter.name, (JCTree.JCExpression) copier.copy(parameter.vartype), (JCTree.JCExpression) copier.copy(initMapping[parameter]), null)
+                .map(parameter -> new DefaultVariable(maker.at(parameter.mods.pos).Modifiers(FINAL), parameter.name, (JCTree.JCExpression) copier.copy(parameter.vartype), (JCTree.JCExpression) copier.copy(initMapping[parameter]), null)
                         .let(it -> it.type = parameter.sym.type))
                 .collect(List.<JCTree.JCStatement>collector())
-                .append(methodDecl.sym.getReturnType() instanceof Type.JCVoidType ? maker.at(methodDecl.pos).Exec(apply) : maker.at(methodDecl.pos).Return(apply)));
+                .append(methodDecl.sym.getReturnType() instanceof Type.JCVoidType ? maker.at(methodDecl.body?.pos ?? methodDecl.pos).Exec(apply) : maker.at(methodDecl.body?.pos ?? methodDecl.pos).Return(apply)));
     }
     
 }

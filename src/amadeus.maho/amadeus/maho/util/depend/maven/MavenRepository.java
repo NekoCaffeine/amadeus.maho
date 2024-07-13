@@ -294,7 +294,7 @@ public class MavenRepository extends CacheableHttpRepository {
     
     ConcurrentHashMap<Project, Collection<SnapshotVersion>> snapshotVersionsCache = { };
     
-    MapTable<String, String, VersionInfo> versionInfoCache = MapTable.newConcurrentHashMapTable();
+    MapTable<String, String, VersionInfo> versionInfoCache = MapTable.ofConcurrentHashMapTable();
     
     public String projectDir(final Project project) = STR."\{project.group().replace('.', '/')}/\{project.artifact()}/\{project.version()}/";
     

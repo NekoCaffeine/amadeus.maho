@@ -4,12 +4,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.objectweb.asm.ConstantDynamic;
@@ -46,7 +44,6 @@ import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ClassWriter;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.FrameHelper;
 import amadeus.maho.util.bytecode.traverser.exception.ComputeException;
 import amadeus.maho.util.bytecode.type.IntTypeRange;
@@ -69,7 +66,8 @@ public interface MethodTraverser {
         
         boolean mark = false;
         
-        @Nullable Frame result = null;
+        @Nullable
+        Frame result = null;
         
         HashSet<Frame.Snapshot> snapshots = { };
         
@@ -101,19 +99,30 @@ public interface MethodTraverser {
                             return;
                         instructions.insertBefore(next, snapshot.diff(snapshot = computeLabel.result.snapshot()));
                     } else {
-                        AbstractInsnNode prev = next;
-                        while ((next = next.getNext()) != null)
-                            if (next.getType() == LABEL && ((LabelNode) next).labelGet() instanceof ComputeLabel nextLabel && nextLabel.result != null)
-                                break;
-                            else {
-                                instructions.remove(prev);
-                                prev = next;
-                            }
-                        instructions.remove(prev);
+                        next = removeDeadInstructions(instructions, next, next);
                         continue;
                     }
+                else if (isStop(next.getOpcode())) {
+                    next = removeDeadInstructions(instructions, next, null);
+                    continue;
+                }
                 next = next.getNext();
             }
+        }
+        
+        @Nullable
+        private static AbstractInsnNode removeDeadInstructions(final InsnList instructions, AbstractInsnNode next, @Nullable AbstractInsnNode prev) {
+            while ((next = next.getNext()) != null)
+                if (next.getType() == LABEL && ((LabelNode) next).labelGet() instanceof ComputeLabel nextLabel && nextLabel.result != null)
+                    break;
+                else {
+                    if (prev != null)
+                        instructions.remove(prev);
+                    prev = next;
+                }
+            if (prev != null && (prev.getType() != LABEL || prev.getNext() != null))
+                instructions.remove(prev);
+            return next;
         }
         
         public static boolean preMark(final MethodNode methodNode, final BinaryOperator<String> getCommonSuperClass) {
@@ -244,10 +253,8 @@ public interface MethodTraverser {
     @Getter
     Sampler<String> sampler = MahoProfile.sampler();
     
-    default void compute(final MethodNode methodNode, final ClassWriter writer, final @Nullable Consumer<Frame> peek = null, final ComputeType... computeTypes) = compute(methodNode, writer, peek, Set.of(computeTypes));
-    
-    default void compute(final MethodNode methodNode, final ClassWriter writer, final @Nullable Consumer<Frame> peek = null, final Set<ComputeType> computeTypes) {
-        try (final var _ = sampler()[STR."\{writer.name()}#\{methodNode.name}\{methodNode.desc} -> \{computeTypes.stream().sorted(Enum::compareTo).map(Enum::name).collect(Collectors.joining(" | "))}"]) {
+    default void compute(final MethodNode methodNode, final ClassWriter writer, final @Nullable Consumer<Frame> peek = null) {
+        try (final var _ = sampler()[STR."\{writer.name()}#\{methodNode.name}\{methodNode.desc}"]) {
             methodNode.maxLocals = methodNode.maxStack = 0;
             final InsnList instructions = methodNode.instructions;
             final Frame initFrame = { };
@@ -266,7 +273,7 @@ public interface MethodTraverser {
                     ((ComputeLabel) labelNode.labelGet()).mark(firstFrame, firstFrame.snapshot(), getCommonSuperClass);
                 queue += firstFrame;
                 while (!queue.isEmpty()) {
-                    final Frame frame = queue.remove(queue.size() - 1);
+                    final Frame frame = queue.removeLast();
                     int stackSize = frame.stackSize();
                     @Nullable AbstractInsnNode next = frame.insn();
                     int opcode = next.getOpcode();
@@ -316,7 +323,7 @@ public interface MethodTraverser {
                             }
                         }
                     } while (!isStop(opcode) && (next = next.getNext()) != null &&
-                            ((opcode = next.getOpcode()) != -1 || next.getType() != LABEL || ((ComputeLabel) ((LabelNode) next).labelGet()).mark(frame, frame.snapshot(), getCommonSuperClass)));
+                             ((opcode = next.getOpcode()) != -1 || next.getType() != LABEL || ((ComputeLabel) ((LabelNode) next).labelGet()).mark(frame, frame.snapshot(), getCommonSuperClass)));
                     if (queue.isEmpty())
                         if (handlers == null)
                             break;
@@ -348,14 +355,15 @@ public interface MethodTraverser {
         }
     }
     
-    @Nullable BiConsumer<Frame, ComputeException> handler();
+    @Nullable
+    BiConsumer<Frame, ComputeException> handler();
     
     default void safeCompute(final Frame frame, final int opcode) {
         switch (opcode) {
             case -1,
-                    NOP,
-                    GOTO -> compute(frame, opcode);
-            default      -> {
+                 NOP,
+                 GOTO -> compute(frame, opcode);
+            default   -> {
                 final @Nullable BiConsumer<Frame, ComputeException> handler = handler();
                 if (handler != null) {
                     final Frame dup = frame.dup();
@@ -376,165 +384,164 @@ public interface MethodTraverser {
     private static void compute(final Frame frame, final int opcode) {
         switch (opcode) {
             case -1,
-                    NOP,
-                    GOTO          -> {
-            }
-            case ACONST_NULL      -> pushNull(frame);
+                 NOP,
+                 GOTO           -> { }
+            case ACONST_NULL    -> pushNull(frame);
             case ICONST_M1,
-                    ICONST_0,
-                    ICONST_1,
-                    ICONST_2,
-                    ICONST_3,
-                    ICONST_4,
-                    ICONST_5,
-                    LCONST_0,
-                    LCONST_1,
-                    FCONST_0,
-                    FCONST_1,
-                    FCONST_2,
-                    DCONST_0,
-                    DCONST_1,
-                    BIPUSH,
-                    SIPUSH,
-                    LDC           -> pushConstant(frame);
+                 ICONST_0,
+                 ICONST_1,
+                 ICONST_2,
+                 ICONST_3,
+                 ICONST_4,
+                 ICONST_5,
+                 LCONST_0,
+                 LCONST_1,
+                 FCONST_0,
+                 FCONST_1,
+                 FCONST_2,
+                 DCONST_0,
+                 DCONST_1,
+                 BIPUSH,
+                 SIPUSH,
+                 LDC            -> pushConstant(frame);
             case ILOAD,
-                    LLOAD,
-                    FLOAD,
-                    DLOAD,
-                    ALOAD         -> load(frame);
+                 LLOAD,
+                 FLOAD,
+                 DLOAD,
+                 ALOAD          -> load(frame);
             case ISTORE,
-                    LSTORE,
-                    FSTORE,
-                    DSTORE,
-                    ASTORE        -> store(frame);
+                 LSTORE,
+                 FSTORE,
+                 DSTORE,
+                 ASTORE         -> store(frame);
             case IALOAD,
-                    LALOAD,
-                    FALOAD,
-                    DALOAD,
-                    AALOAD,
-                    BALOAD,
-                    CALOAD,
-                    SALOAD        -> arrayLoad(frame);
+                 LALOAD,
+                 FALOAD,
+                 DALOAD,
+                 AALOAD,
+                 BALOAD,
+                 CALOAD,
+                 SALOAD         -> arrayLoad(frame);
             case IASTORE,
-                    LASTORE,
-                    FASTORE,
-                    DASTORE,
-                    AASTORE,
-                    BASTORE,
-                    CASTORE,
-                    SASTORE       -> arrayStore(frame);
+                 LASTORE,
+                 FASTORE,
+                 DASTORE,
+                 AASTORE,
+                 BASTORE,
+                 CASTORE,
+                 SASTORE        -> arrayStore(frame);
             case POP,
-                    POP2          -> pop(frame);
+                 POP2           -> pop(frame);
             case DUP,
-                    DUP_X1,
-                    DUP_X2,
-                    DUP2,
-                    DUP2_X1,
-                    DUP2_X2       -> dup(frame);
-            case SWAP             -> swap(frame);
+                 DUP_X1,
+                 DUP_X2,
+                 DUP2,
+                 DUP2_X1,
+                 DUP2_X2        -> dup(frame);
+            case SWAP           -> swap(frame);
             case IADD,
-                    LADD,
-                    FADD,
-                    DADD,
-                    ISUB,
-                    LSUB,
-                    FSUB,
-                    DSUB,
-                    IMUL,
-                    LMUL,
-                    FMUL,
-                    DMUL,
-                    IDIV,
-                    LDIV,
-                    FDIV,
-                    DDIV,
-                    IREM,
-                    LREM,
-                    FREM,
-                    DREM,
-                    ISHL,
-                    LSHL,
-                    ISHR,
-                    LSHR,
-                    IUSHR,
-                    LUSHR,
-                    IAND,
-                    LAND,
-                    IOR,
-                    LOR,
-                    IXOR,
-                    LXOR,
-                    LCMP,
-                    FCMPL,
-                    FCMPG,
-                    DCMPL,
-                    DCMPG         -> binary(frame);
+                 LADD,
+                 FADD,
+                 DADD,
+                 ISUB,
+                 LSUB,
+                 FSUB,
+                 DSUB,
+                 IMUL,
+                 LMUL,
+                 FMUL,
+                 DMUL,
+                 IDIV,
+                 LDIV,
+                 FDIV,
+                 DDIV,
+                 IREM,
+                 LREM,
+                 FREM,
+                 DREM,
+                 ISHL,
+                 LSHL,
+                 ISHR,
+                 LSHR,
+                 IUSHR,
+                 LUSHR,
+                 IAND,
+                 LAND,
+                 IOR,
+                 LOR,
+                 IXOR,
+                 LXOR,
+                 LCMP,
+                 FCMPL,
+                 FCMPG,
+                 DCMPL,
+                 DCMPG          -> binary(frame);
             case INEG,
-                    LNEG,
-                    FNEG,
-                    DNEG          -> unary(frame);
-            case IINC             -> inc(frame);
+                 LNEG,
+                 FNEG,
+                 DNEG           -> unary(frame);
+            case IINC           -> inc(frame);
             case I2L,
-                    I2F,
-                    I2D,
-                    L2I,
-                    L2F,
-                    L2D,
-                    F2I,
-                    F2L,
-                    F2D,
-                    D2I,
-                    D2L,
-                    D2F,
-                    I2B,
-                    I2C,
-                    I2S           -> cast(frame);
-            case CHECKCAST        -> checkCast(frame);
+                 I2F,
+                 I2D,
+                 L2I,
+                 L2F,
+                 L2D,
+                 F2I,
+                 F2L,
+                 F2D,
+                 D2I,
+                 D2L,
+                 D2F,
+                 I2B,
+                 I2C,
+                 I2S            -> cast(frame);
+            case CHECKCAST      -> checkCast(frame);
             case IFEQ,
-                    IFNE,
-                    IFLT,
-                    IFGE,
-                    IFGT,
-                    IFLE,
-                    IFNULL,
-                    IFNONNULL     -> ifJump(frame);
+                 IFNE,
+                 IFLT,
+                 IFGE,
+                 IFGT,
+                 IFLE,
+                 IFNULL,
+                 IFNONNULL      -> ifJump(frame);
             case IF_ICMPEQ,
-                    IF_ICMPNE,
-                    IF_ICMPLT,
-                    IF_ICMPGE,
-                    IF_ICMPGT,
-                    IF_ICMPLE,
-                    IF_ACMPEQ,
-                    IF_ACMPNE     -> ifCmpJump(frame);
-            case JSR              -> jsr(frame);
-            case RET              -> ret(frame);
+                 IF_ICMPNE,
+                 IF_ICMPLT,
+                 IF_ICMPGE,
+                 IF_ICMPGT,
+                 IF_ICMPLE,
+                 IF_ACMPEQ,
+                 IF_ACMPNE      -> ifCmpJump(frame);
+            case JSR            -> jsr(frame);
+            case RET            -> ret(frame);
             case TABLESWITCH,
-                    LOOKUPSWITCH  -> switchJump(frame);
+                 LOOKUPSWITCH   -> switchJump(frame);
             case IRETURN,
-                    LRETURN,
-                    FRETURN,
-                    DRETURN,
-                    ARETURN,
-                    RETURN        -> returnType(frame);
+                 LRETURN,
+                 FRETURN,
+                 DRETURN,
+                 ARETURN,
+                 RETURN         -> returnType(frame);
             case GETSTATIC,
-                    PUTSTATIC,
-                    GETFIELD,
-                    PUTFIELD      -> field(frame);
+                 PUTSTATIC,
+                 GETFIELD,
+                 PUTFIELD       -> field(frame);
             case INVOKEVIRTUAL,
-                    INVOKESPECIAL,
-                    INVOKESTATIC,
-                    INVOKEINTERFACE,
-                    INVOKEDYNAMIC -> invoke(frame);
-            case NEW              -> newInstance(frame);
+                 INVOKESPECIAL,
+                 INVOKESTATIC,
+                 INVOKEINTERFACE,
+                 INVOKEDYNAMIC  -> invoke(frame);
+            case NEW            -> newInstance(frame);
             case NEWARRAY,
-                    ANEWARRAY     -> newArray(frame);
-            case ARRAYLENGTH      -> arrayLength(frame);
-            case ATHROW           -> athrow(frame);
-            case INSTANCEOF       -> instanceOf(frame);
+                 ANEWARRAY      -> newArray(frame);
+            case ARRAYLENGTH    -> arrayLength(frame);
+            case ATHROW         -> athrow(frame);
+            case INSTANCEOF     -> instanceOf(frame);
             case MONITORENTER,
-                    MONITOREXIT   -> monitor(frame);
-            case MULTIANEWARRAY   -> multiNewArray(frame);
-            default               -> throw new IllegalArgumentException(STR."Unsupported opcode: \{frame.insn().getOpcode()}");
+                 MONITOREXIT    -> monitor(frame);
+            case MULTIANEWARRAY -> multiNewArray(frame);
+            default             -> throw new IllegalArgumentException(STR."Unsupported opcode: \{frame.insn().getOpcode()}");
         }
     }
     
@@ -542,29 +549,29 @@ public interface MethodTraverser {
     
     private static void pushConstant(final Frame frame) = frame.push(switch (frame.insn().getOpcode()) {
         case ICONST_M1,
-                ICONST_5,
-                ICONST_4,
-                ICONST_3,
-                ICONST_2,
-                ICONST_1,
-                ICONST_0,
-                BIPUSH,
-                SIPUSH   -> TypeOwner.INTEGER;
+             ICONST_5,
+             ICONST_4,
+             ICONST_3,
+             ICONST_2,
+             ICONST_1,
+             ICONST_0,
+             BIPUSH,
+             SIPUSH   -> TypeOwner.INTEGER;
         case LCONST_0,
-                LCONST_1 -> TypeOwner.LONG;
+             LCONST_1 -> TypeOwner.LONG;
         case FCONST_0,
-                FCONST_1,
-                FCONST_2 -> TypeOwner.FLOAT;
+             FCONST_1,
+             FCONST_2 -> TypeOwner.FLOAT;
         case DCONST_0,
-                DCONST_1 -> TypeOwner.DOUBLE;
-        case LDC         -> switch (frame.<LdcInsnNode>insn().cst) {
+             DCONST_1 -> TypeOwner.DOUBLE;
+        case LDC      -> switch (frame.<LdcInsnNode>insn().cst) {
             case Integer ignored         -> TypeOwner.INTEGER;
             case Type type               -> type.getSort() == Type.METHOD ? TypeOwner.METHOD_TYPE : TypeOwner.CLASS;
             case Handle ignored          -> TypeOwner.METHOD_HANDLE;
             case ConstantDynamic dynamic -> TypeOwner.of(Type.getType(dynamic.getDescriptor()));
             case Object cst              -> TypeOwner.of(Type.getType(TypeHelper.unboxType(cst.getClass())));
         };
-        default          -> throw unreachableArea();
+        default       -> throw unreachableArea();
     });
     
     private static void load(final Frame frame) = frame.push(checkTargetType(frame, targetType(frame.insn().getOpcode()), frame.load(frame.<VarInsnNode>insn().var)));
@@ -704,7 +711,7 @@ public interface MethodTraverser {
         final Type returnType = Type.getReturnType(desc);
         if (returnType.getSort() != Type.VOID)
             frame.push(TypeOwner.of(returnType));
-        if (frame.insn().getOpcode() == INVOKESPECIAL && ASMHelper.isInit(frame.insn()))
+        if (target != null && frame.insn().getOpcode() == INVOKESPECIAL && ASMHelper.isInit(frame.insn()))
             frame.erase(target.flag());
     }
     
@@ -732,7 +739,7 @@ public interface MethodTraverser {
     
     private static void multiNewArray(final Frame frame) {
         final MultiANewArrayInsnNode insn = frame.insn();
-        IntStream.range(0, insn.dims).forEach(length -> checkTargetType(frame, Type.INT_TYPE, frame.pop()));
+        IntStream.range(0, insn.dims).forEach(_ -> checkTargetType(frame, Type.INT_TYPE, frame.pop()));
         frame.push(TypeOwner.of(Type.getObjectType(insn.desc)));
     }
     

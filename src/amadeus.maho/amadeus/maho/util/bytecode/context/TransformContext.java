@@ -2,7 +2,7 @@ package amadeus.maho.util.bytecode.context;
 
 import java.nio.ByteBuffer;
 import java.util.EnumSet;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,20 +45,16 @@ public class TransformContext {
     
     boolean modified;
     
-    final Map<MethodNode, Set<ComputeType>> markComputeTypes = new HashMap<>();
+    final Set<MethodNode> shouldComputeMethods = new HashSet<>();
     
     public self markModified() = modified = true;
     
-    public self markCompute(final ClassNode node, final ComputeType... computeTypes) = node.methods.forEach(methodNode -> markCompute(methodNode, computeTypes));
+    public self markCompute(final ClassNode node) = shouldComputeMethods() *= node.methods;
     
-    public self markCompute(final MethodNode methodNode, final ComputeType... computeTypes) = markComputeTypes().computeIfAbsent(methodNode, _ -> EnumSet.noneOf(ComputeType.class)) *= List.of(computeTypes);
+    public self markCompute(final MethodNode methodNode) = shouldComputeMethods() += methodNode;
     
-    public self compute() = markComputeTypes().let(it -> it.forEach(this::compute)).let(Map::clear);
+    public self compute() = shouldComputeMethods().let(it -> it.forEach(this::compute)).let(Set::clear);
     
-    public self compute(final ClassNode node, final ComputeType... computeTypes) = node.methods.forEach(methodNode -> compute(methodNode, computeTypes));
-    
-    public self compute(final MethodNode methodNode, final ComputeType... computeTypes) = compute(methodNode, Set.of(computeTypes));
-    
-    public self compute(final MethodNode methodNode, final Set<ComputeType> computeTypes) = MethodTraverser.instance().compute(methodNode, writer(), computeTypes);
+    public self compute(final MethodNode methodNode) = MethodTraverser.instance().compute(methodNode, writer());
     
 }

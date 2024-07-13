@@ -12,7 +12,7 @@ public interface ClassTransformer extends TransformRange {
     
     interface Limited extends ClassTransformer {
     
-        @Nullable ClassNode transform(TransformContext context, ClassNode node, @Nullable ClassLoader loader, @Nullable Class<?> clazz, @Nullable ProtectionDomain domain);
+        @Nullable ClassNode transform(TransformContext context, @Nullable ClassNode node, @Nullable ClassLoader loader, @Nullable Class<?> clazz, @Nullable ProtectionDomain domain);
         
         default boolean limited() = true;
         

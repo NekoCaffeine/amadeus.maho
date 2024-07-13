@@ -23,7 +23,7 @@ public class ConcurrentTypeEnvs extends TypeEnvs {
     public @Nullable Env<AttrContext> get(final @Nullable Symbol.TypeSymbol sym) = sym == null ? null : map.get(sym);
     
     @Override
-    public Env<AttrContext> put(final Symbol.TypeSymbol sym, final Env<AttrContext> env) = map.put(sym, env);
+    public @Nullable Env<AttrContext> put(final Symbol.TypeSymbol sym, final Env<AttrContext> env) = map.put(sym, env);
     
     @Override
     public @Nullable Env<AttrContext> remove(final @Nullable Symbol.TypeSymbol sym) = sym == null ? null : map.remove(sym);

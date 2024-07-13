@@ -2,6 +2,7 @@ package amadeus.maho.util.function;
 
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -27,42 +28,73 @@ public interface FunctionHelper {
     interface Ext {
         
         @Extension.Operator(">")
-        static Runnable then(final @Nullable Runnable runnable, final @Nullable Runnable after) {
-            if (runnable == null)
-                return after;
-            if (after == null)
-                return runnable;
-            return () -> {
+        static @Nullable Runnable then(final @Nullable Runnable runnable, final @Nullable Runnable after)
+            = runnable == null ? after : after == null ? runnable : () -> {
                 after.run();
                 runnable.run();
             };
-        }
         
         @Extension.Operator("~")
-        static void safeRun(final @Nullable Runnable runnable) {
-            if (runnable != null)
-                runnable.run();
-        }
+        static void safeRun(final @Nullable Runnable runnable) = runnable?.run();
         
         @Extension.Operator("^")
         static void safeRun(final @Nullable Runnable runnable, final Consumer<Throwable> handler) {
             try {
-                if (runnable != null)
-                    runnable.run();
+                runnable?.run();
             } catch (final Throwable t) { handler.accept(t); }
         }
         
         @Extension.Operator(">")
-        static <T> Consumer<T> then(final @Nullable Consumer<? super T> consumer, final @Nullable Consumer<? super T> after) {
-            if (consumer == null)
-                return (Consumer<T>) after;
-            if (after == null)
-                return (Consumer<T>) consumer;
-            return t -> {
+        static <T> @Nullable Consumer<T> then(final @Nullable Consumer<? super T> consumer, final @Nullable Consumer<? super T> after)
+            = consumer == null ? (Consumer<T>) after : after == null ? (Consumer<T>) consumer : t -> {
                 consumer.accept(t);
                 after.accept(t);
             };
-        }
+        
+        @Extension.Operator(">")
+        static <A, B> @Nullable BiConsumer<A, B> then(final @Nullable BiConsumer<? super A, ? super B> consumer, final @Nullable BiConsumer<? super A, ? super B> after)
+            = consumer == null ? (BiConsumer<A, B>) after : after == null ? (BiConsumer<A, B>) consumer : (a, b) -> {
+                consumer.accept(a, b);
+                after.accept(a, b);
+            };
+        
+        @Extension.Operator(">")
+        static <T> Consumer<T> ifThen(final Predicate<? super T> predicate, final @Nullable Consumer<? super T> consumer)
+            = consumer == null ? _ -> { } : t -> {
+                if (predicate.test(t))
+                    consumer.accept(t);
+            };
+        
+        @Extension.Operator(">")
+        static <A, B> BiConsumer<A, B> ifThen(final BiPredicate<? super A, ? super B> predicate, final @Nullable BiConsumer<? super A, ? super B> consumer)
+            = consumer == null ? (a, b) -> { } : (a, b) -> {
+                if (predicate.test(a, b))
+                    consumer.accept(a, b);
+            };
+        
+        @Extension.Operator("&")
+        static <T> @Nullable Predicate<T> and(final @Nullable Predicate<? super T> predicate, final @Nullable Predicate<? super T> other)
+            = predicate == null ? (Predicate<T>) other : other == null ? (Predicate<T>) predicate : t -> predicate.test(t) && other.test(t);
+        
+        @Extension.Operator("|")
+        static <T> @Nullable Predicate<T> or(final @Nullable Predicate<? super T> predicate, final @Nullable Predicate<? super T> other)
+            = predicate == null ? (Predicate<T>) other : other == null ? (Predicate<T>) predicate : t -> predicate.test(t) || other.test(t);
+        
+        @Extension.Operator("!")
+        static <T> @Nullable Predicate<T> not(final @Nullable Predicate<? super T> predicate)
+            = predicate == null ? null : (Predicate<T>) predicate.negate();
+        
+        @Extension.Operator("&")
+        static <A, B> @Nullable BiPredicate<A, B> and(final @Nullable BiPredicate<? super A, ? super B> predicate, final @Nullable BiPredicate<? super A, ? super B> other)
+            = predicate == null ? (BiPredicate<A, B>) other : other == null ? (BiPredicate<A, B>) predicate : (a, b) -> predicate.test(a, b) && other.test(a, b);
+        
+        @Extension.Operator("|")
+        static <A, B> @Nullable BiPredicate<A, B> or(final @Nullable BiPredicate<? super A, ? super B> predicate, final @Nullable BiPredicate<? super A, ? super B> other)
+            = predicate == null ? (BiPredicate<A, B>) other : other == null ? (BiPredicate<A, B>) predicate : (a, b) -> predicate.test(a, b) || other.test(a, b);
+        
+        @Extension.Operator("!")
+        static <A, B> @Nullable BiPredicate<A, B> not(final @Nullable BiPredicate<? super A, ? super B> predicate)
+            = predicate == null ? null : (a, b) -> !predicate.test(a, b);
         
         static int TILDE(final IntSupplier supplier) = supplier.getAsInt();
         
@@ -88,7 +120,9 @@ public interface FunctionHelper {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     class LazySupplier<T> implements Supplier<T> {
         
+        // @formatter:off
         /* non-volatile */ @Nullable T instance;
+        // @formatter:on
         
         @Default
         volatile @Nullable Supplier<T> supplier;
@@ -98,10 +132,12 @@ public interface FunctionHelper {
             if (supplier != null) // acquire
                 synchronized (this) {
                     if (supplier != null) {
+                        // noinspection DataFlowIssue
                         instance = supplier.get(); // happen-before
                         supplier = null; // release
                     }
                 }
+            // noinspection DataFlowIssue
             return instance;
         }
         

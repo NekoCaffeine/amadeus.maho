@@ -29,6 +29,7 @@ import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
+import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.UnsafeHelper;
@@ -149,13 +150,17 @@ public enum JIT {
                     return false;
                 })));
         
-        public Map<Class<?>, Map<Method, Level>> measure() {
-            final HashMap<Class<?>, Map<Method, Level>> result = { };
-            memory.forEach(clazz -> Stream.of(clazz.getDeclaredMethods()).forEach(method -> result.computeIfAbsent(clazz, _ -> new HashMap<>())[method] = Level.values()[Compiler.WB.getMethodCompilationLevel(method)]));
+        public MapTable<Class<?>, Method, Level> measure() {
+            final MapTable<Class<?>, Method, Level> result = MapTable.ofHashMapTable();
+            memory.forEach(clazz -> Stream.of(clazz.getDeclaredMethods()).forEach(method -> result[clazz][method] = Level.values()[Compiler.WB.getMethodCompilationLevel(method)]));
             return result;
         }
         
-        public List<Method> measure(final Predicate<Level> predicate) = measure().values().stream().map(Map::entrySet).flatMap(Collection::stream).filter(entry -> predicate.test(entry.getValue())).map(Map.Entry::getKey).toList();
+        public List<Method> measure(final Predicate<Level> predicate) = measure().backingMap().entrySet().stream()
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .filter(entry -> predicate.test(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .toList();
         
         public List<Method> measure(final Level target) = measure(level -> level < target);
         

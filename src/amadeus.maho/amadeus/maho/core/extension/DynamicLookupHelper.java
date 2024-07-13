@@ -35,11 +35,11 @@ public interface DynamicLookupHelper {
     
     static MethodType methodType(final String desc, final @Nullable ClassLoader loader) = ASMHelper.loadMethodType(desc, loader);
     
-    Indexed.Default<ClassLoader> loaderIndexed = { };
+    Indexed<ClassLoader> loaderIndexed = Indexed.ofConcurrent();
     
-    static int submit(final @Nullable ClassLoader loader) = loaderIndexed.submit(loader == null ? ClassLoader.getPlatformClassLoader() : loader);
+    static int submit(final @Nullable ClassLoader loader) = loaderIndexed.id(loader == null ? ClassLoader.getPlatformClassLoader() : loader);
     
-    static ClassLoader fetch(final int id) = loaderIndexed.fetch(id);
+    static ClassLoader fetch(final int id) = loaderIndexed.value(id);
     
     @SneakyThrows
     static Class<?> loadClass(final int id, final String name) {

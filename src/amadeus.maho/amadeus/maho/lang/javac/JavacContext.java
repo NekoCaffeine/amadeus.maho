@@ -81,7 +81,6 @@ import amadeus.maho.lang.inspection.ConstructorContract;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.inspection.TestOnly;
 import amadeus.maho.lang.javac.handler.base.AnnotationProxyMaker;
-import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.Proxy;
@@ -102,6 +101,7 @@ import amadeus.maho.util.tuple.Tuple2;
 import amadeus.maho.util.tuple.Tuple3;
 
 import static amadeus.maho.util.bytecode.Bytecodes.NEW;
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
 import static org.objectweb.asm.Opcodes.*;
@@ -111,11 +111,19 @@ import static org.objectweb.asm.Opcodes.*;
 @FieldDefaults(level = AccessLevel.PUBLIC)
 public class JavacContext {
     
-    @NoArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class SignatureGenerator extends Types.SignatureGenerator {
         
-        StringBuilder builder = { };
+        public static final Context.Key<SignatureGenerator> signatureGeneratorKey = { };
+        
+        public static SignatureGenerator instance(final Context context) = context.get(signatureGeneratorKey) ?? new SignatureGenerator(context);
+
+        public SignatureGenerator(final Context context) {
+            super(Types.instance(context));
+            context.put(signatureGeneratorKey, this);
+        }
+        
+        StringBuilder builder = { 1 << 6 };
         
         @Override
         protected void append(final char c) = builder.append(c);
@@ -124,12 +132,17 @@ public class JavacContext {
         protected void append(final byte bytes[]) = builder.append(new String(bytes));
         
         @Override
-        protected void append(final Name name) = builder.append(name.toString());
+        protected void append(final Name name) = builder.append(name);
         
         @Override
         public String toString() = builder.toString();
         
         public self reset() = builder.setLength(0);
+        
+        public String signature(final Type type) {
+            reset().assembleSig(type);
+            return toString();
+        }
         
     }
     
@@ -225,7 +238,7 @@ public class JavacContext {
         int debugCount[] = { 0 };
         
         @Override
-        public <T extends JCTree> @Nullable T translate(final T tree) {
+        public <T extends JCTree> @Nullable T translate(final @Nullable T tree) {
             if (tree == null)
                 return null;
             final T value = (T) mapping.getOrDefault(tree, tree);
@@ -282,7 +295,7 @@ public class JavacContext {
         Map<String, Class<? extends Annotation>> cache = new HashMap<>();
         
         @SafeVarargs
-        public ClassAnnotationFinder(final Function<Class<? extends Annotation>, AnnotationVisitor> mapper = null, final Class<? extends Annotation>... annotationTypes) {
+        public ClassAnnotationFinder(final @Nullable Function<Class<? extends Annotation>, AnnotationVisitor> mapper = null, final Class<? extends Annotation>... annotationTypes) {
             super(MahoExport.asmAPIVersion());
             this.mapper = mapper;
             this.annotationTypes = Stream.of(annotationTypes).map(clazz -> {
@@ -452,11 +465,12 @@ public class JavacContext {
         
         @Redirect(slice = @Slice(@At(method = @At.MethodInsn(name = "get"))), target = TK)
         private static @InvisibleType(TK) Object tokenKindToTK(final EnumMap<Tokens.TokenKind, Object> map, final Tokens.TokenKind kind) {
+            // noinspection ConstantValue
             if (TK_MAP == null) // jdk.jshell.CompletenessAnalyzer$TK#<clinit>
                 // noinspection UnreachableCode
                 return map.get(kind);
             final @Nullable @InvisibleType(TK) Enum result = TK_MAP[kind];
-            return result == null ? map[kind] : result;
+            return result == null ? requireNonNull(map[kind]) : result;
         }
         
         // # hack ast tag
@@ -563,7 +577,9 @@ public class JavacContext {
     
     private static final ThreadLocal<JavacContext> contextLocal = { };
     
-    public static @Nullable JavacContext instance() = contextLocal.get();
+    public static @Nullable JavacContext instanceMayNull() = contextLocal.get();
+    
+    public static JavacContext instance() = requireNonNull(contextLocal.get());
     
     public static void drop() = contextLocal.remove();
     
@@ -603,6 +619,8 @@ public class JavacContext {
     TypeEnvs     typeEnvs;
     ConstFold    constFold;
     
+    SignatureGenerator signatureGenerator;
+    
     HandlerSupport marker;
     
     Symbol.ModuleSymbol transientModule, mahoModule;
@@ -631,10 +649,12 @@ public class JavacContext {
         memberEnter = MemberEnter.instance(context);
         typeEnvs = TypeEnvs.instance(context);
         constFold = ConstFold.instance(context);
+        signatureGenerator = SignatureGenerator.instance(context);
         context.put((Class<? super JavacContext>) getClass(), this);
         marker = this instanceof HandlerSupport handlerMarker ? handlerMarker : context.get(HandlerSupport.class);
         if (marker == null)
             context.put(HandlerSupport.class, marker = { context });
+        assert symtab != null;
         transientModule = symtab.enterModule(name("amadeus.maho.lang.javac.runtime"));
         mahoModule = symtab.enterModule(name("amadeus.maho"));
     }
@@ -683,20 +703,6 @@ public class JavacContext {
     
     @Proxy(GETFIELD)
     public static native TreeMaker F(JavacParser $this);
-    
-    @Proxy(INVOKEVIRTUAL)
-    public static native Symbol findMethodInScope(
-            Resolve $this,
-            Env<AttrContext> env,
-            Type site,
-            Name name,
-            List<Type> argTypes,
-            List<Type> typeArgTypes,
-            Scope sc,
-            Symbol bestSoFar,
-            boolean allowBoxing,
-            boolean useVarargs,
-            boolean abstractok);
     
     @Proxy(GETFIELD)
     public static native Env<AttrContext> env(Attr $this);
@@ -762,7 +768,7 @@ public class JavacContext {
             .map(variableDecl -> variableDecl.type.tsym.getQualifiedName())
             .toArray(Name[]::new);
     
-    public boolean nonGenerating(final JCTree tree) = !name(tree).toString().startsWith("$");
+    public boolean nonGenerating(final JCTree tree) = !requireNonNull(name(tree)).toString().startsWith("$");
     
     public boolean requiresTypeDeclaration(final JCTree tree) = tree instanceof JCTree.JCLambda || tree instanceof JCTree.JCMemberReference;
     
@@ -782,7 +788,7 @@ public class JavacContext {
             .filter(type::isInstance)
             .map(type::cast)
             .filter(checker)
-            .filter(member -> hasAnnotation(modifiers(member), env, mark) == reverse)
+            .filter(member -> hasAnnotation(requireNonNull(modifiers(member)), env, mark) == reverse)
             .collect(List.collector());
     
     public List<JCTree> mapGetter(final Env<AttrContext> env, final List<? extends JCTree> list) = list.map(tree -> tree instanceof JCTree.JCVariableDecl variable ?

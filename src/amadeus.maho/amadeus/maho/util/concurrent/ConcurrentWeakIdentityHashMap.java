@@ -40,7 +40,7 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
     
     @Getter
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-    protected static class Key<K> extends WeakReference<K> {
+    public static class Key<K> extends WeakReference<K> {
         
         int hashCode;
         
@@ -106,7 +106,10 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
             public Map.Entry<K, V> next() {
                 if (!hasNext())
                     throw new NoSuchElementException();
-                try { return nextEntry; } finally { nextEntry = null; }
+                try {
+                    // noinspection DataFlowIssue
+                    return nextEntry;
+                } finally { nextEntry = null; }
             }
             
             @Override
@@ -171,7 +174,12 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
             }
     }
     
-    public ConcurrentWeakIdentityHashMap(final int initialCapacity, final float loadFactor = 0.75F, final int concurrencyLevel = 1) = this(new ConcurrentHashMap<>(initialCapacity, loadFactor, concurrencyLevel));
+    public ConcurrentWeakIdentityHashMap(final int initialCapacity, final float loadFactor = 0.75F, final int concurrencyLevel = 1) = this(new ConcurrentHashMap<K, V>(initialCapacity, loadFactor, concurrencyLevel));
+    
+    public ConcurrentWeakIdentityHashMap(final Map<K, V> map) {
+        this();
+        putAll(map);
+    }
     
     @Override
     public void collect(final Reference<? extends K> reference) = map.remove(reference);

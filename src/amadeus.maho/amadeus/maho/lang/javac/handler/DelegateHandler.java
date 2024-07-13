@@ -42,6 +42,7 @@ import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.util.bytecode.Bytecodes.IRETURN;
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static amadeus.maho.util.throwable.BreakException.*;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.Kind.*;
@@ -91,29 +92,56 @@ public class DelegateHandler extends BaseHandler<Delegate> {
     }
     
     public void delayProcessIfNeeded(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final Delegate annotation, final JCTree.JCAnnotation annotationTree) {
+        final @Nullable Symbol symbol = symbol(tree);
+        final @Nullable Type type = switch (symbol) {
+            case Symbol.VarSymbol varSymbol       -> varSymbol.type;
+            case Symbol.MethodSymbol methodSymbol -> methodSymbol.getReturnType();
+            case null,
+                 default                    -> null;
+        };
+        if (type != null) {
+            if (type.isPrimitive()) {
+                final JCDiagnostic.Error error = new JCDiagnostic.Error(MahoJavac.KEY, "delegate.primitive.type.not.allowed", symbol);
+                log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, error);
+                return;
+            }
+            if (type instanceof Type.ArrayType) {
+                final JCDiagnostic.Error error = new JCDiagnostic.Error(MahoJavac.KEY, "delegate.array.type.not.allowed", symbol);
+                log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, error);
+                return;
+            }
+        }
         if (annotation.hard())
-            instance(DelayedContext.class).todos() += context -> instance(context, DelegateHandler.class).tryDelegate(env, tree, annotationTree);
+            if (anyMatch(requireNonNull(modifiers(tree)).flags, STATIC)) {
+                final JCDiagnostic.Error error = { MahoJavac.KEY, "delegate.hard.static", symbol(tree) };
+                log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, error);
+            } else
+                instance(DelayedContext.class).todos() += context -> instance(context, DelegateHandler.class).tryDelegate(env, tree, owner, annotationTree);
     }
     
-    public void tryDelegate(final Env<AttrContext> env, final JCTree tree, final JCTree.JCAnnotation annotationTree) {
-        final Symbol symbol = symbol(tree);
-        final HashSet<String> context = { };
-        delegateTypes(types, true, symbol).forEach(delegateType -> delegateType.tsym.members()
-                .getSymbols(member -> noneMatch(member.flags(), STATIC | BRIDGE) && anyMatch(member.flags(), PUBLIC) && member.name != member.name.table.names.init)
-                .fromIterable()
-                .cast(Symbol.MethodSymbol.class)
-                .filter(methodSymbol -> !shared.skip(methodSymbol, context) && shouldInjectMethod(env, methodSymbol.name, methodSymbol.params.map(parameter -> parameter.type.tsym.getQualifiedName()).toArray(Name[]::new)))
-                .forEach(methodSymbol -> {
-                    final TreeMaker maker = this.maker.forToplevel(env.toplevel).at(annotationTree.pos);
-                    final JCTree.JCExpression qualifier = tree instanceof JCTree.JCMethodDecl ? maker.Apply(List.nil(), maker.Ident(name(tree)), List.nil()) : maker.Ident(name(tree));
-                    final JCTree.JCMethodInvocation apply = maker.Apply(List.nil(), maker.Select(qualifier, methodSymbol.name), methodSymbol.params.stream().map(maker::Ident).collect(List.collector()));
-                    final JCTree.JCMethodDecl methodDecl = maker.MethodDef(methodSymbol, maker.Block(0L, List.of(methodSymbol.getReturnType() instanceof Type.JCVoidType ? maker.Exec(apply) : maker.Return(apply))));
-                    // noinspection DataFlowIssue
-                    methodDecl.sym = null;
-                    methodDecl.mods.flags &= DefaultValueHandler.removeFlags;
-                    followAnnotation(annotationTree, "on", methodDecl.mods);
-                    injectMember(env, methodDecl);
-                }));
+    public void tryDelegate(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final JCTree.JCAnnotation annotationTree) {
+        final @Nullable Symbol symbol = symbol(tree);
+        if (symbol != null) {
+            final HashSet<String> context = { };
+            delegateTypes(types, true, symbol).forEach(delegateType -> delegateType.tsym.members()
+                    .getSymbols(member -> noneMatch(member.flags(), STATIC | BRIDGE) && anyMatch(member.flags(), PUBLIC) && member.name != member.name.table.names.init)
+                    .fromIterable()
+                    .cast(Symbol.MethodSymbol.class)
+                    .filter(methodSymbol -> !shared.skip(methodSymbol, context) && shouldInjectMethod(env, methodSymbol.name, methodSymbol.params.map(parameter -> parameter.type.tsym.getQualifiedName()).toArray(Name[]::new)))
+                    .forEach(methodSymbol -> {
+                        final TreeMaker maker = this.maker.forToplevel(env.toplevel).at(annotationTree.pos);
+                        final JCTree.JCExpression qualifier = tree instanceof JCTree.JCMethodDecl ? maker.Apply(List.nil(), maker.Ident(name(tree)), List.nil()) : maker.Ident(name(tree));
+                        final JCTree.JCMethodInvocation apply = maker.Apply(List.nil(), maker.Select(qualifier, methodSymbol.name), methodSymbol.params.stream().map(maker::Ident).collect(List.collector()));
+                        final JCTree.JCMethodDecl methodDecl = maker.MethodDef(methodSymbol, maker.Block(0L, List.of(methodSymbol.getReturnType() instanceof Type.JCVoidType ? maker.Exec(apply) : maker.Return(apply))));
+                        // noinspection DataFlowIssue
+                        methodDecl.sym = null;
+                        methodDecl.mods.flags &= DefaultValueHandler.removeFlags;
+                        if (owner instanceof JCTree.JCClassDecl decl && anyMatch(decl.mods.flags, INTERFACE))
+                            methodDecl.mods.flags |= DEFAULT;
+                        followAnnotation(annotationTree, "on", methodDecl.mods);
+                        injectMember(env, methodDecl);
+                    }));
+        }
     }
     
     public static Stream<Type> delegateTypes(final Types types, final boolean hard, final Symbol symbol) = symbol.getAnnotationMirrors().stream()
@@ -234,7 +262,7 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                         }));
                     if (p_result[0].kind != MTH)
                         IncludeHandler.includeTypes(target).forEach(type -> {
-                            if ((p_result[0] = findMethodInScope($this, env, type, name, argTypes, typeArgTypes, new IncludeHandler.IncludeScope(type.tsym.members()), p_result[0], allowBoxing, useVarargs, false)).kind == MTH)
+                            if ((p_result[0] = (Privilege) $this.findMethodInScope(env, type, name, argTypes, typeArgTypes, new IncludeHandler.IncludeScope(type.tsym.members()), p_result[0], allowBoxing, useVarargs, false)).kind == MTH)
                                 throw BREAK;
                         });
                 }));

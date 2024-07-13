@@ -1,6 +1,7 @@
 package amadeus.maho.lang.javac;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -64,7 +65,7 @@ public class MahoJavac {
     
     @Hook
     private static void close(final JavaCompiler $this) {
-        final @Nullable JavacContext instance = JavacContext.instance();
+        final @Nullable JavacContext instance = JavacContext.instanceMayNull();
         if (instance != null && JavaCompiler.instance(instance.context) == $this)
             JavacContext.drop();
     }
@@ -145,7 +146,8 @@ public class MahoJavac {
         return key.startsWith("compiler.note.");
     }
     
-    public static final Set<String> disableErrorKeys = new HashSet<>(java.util.List.of(
+    public static final Set<String> disableErrorKeys = new HashSet<>(List.of(
+            "compiler.err.class.public.should.be.in.file",
             "compiler.err.module.not.found",
             "compiler.err.use.of.underscore.not.allowed",
             "compiler.err.initializer.not.allowed",
@@ -160,7 +162,7 @@ public class MahoJavac {
             "compiler.warn.has.been.deprecated.for.removal"
     ));
     
-    public static final Set<Class<?>> skipClasses = new HashSet<>(java.util.List.of(DeferredAttr.class, SourceCodeAnalysisImpl.class, ExpressionToTypeInfo.class));
+    public static final Set<Class<?>> skipClasses = new HashSet<>(List.of(DeferredAttr.class, SourceCodeAnalysisImpl.class, ExpressionToTypeInfo.class));
     
     private static boolean skipFrame(final StackWalker.StackFrame frame) = skipClasses.contains(frame.getDeclaringClass()) || frame.getDeclaringClass() == JavacContext.class && frame.getMethodName().equals("discardDiagnostic");
     

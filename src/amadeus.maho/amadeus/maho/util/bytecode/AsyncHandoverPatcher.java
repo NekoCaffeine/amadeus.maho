@@ -62,7 +62,7 @@ public interface AsyncHandoverPatcher {
         generator.mark(label);
         target.instructions.insert(list);
         context.markModified();
-        context.compute(target, ComputeType.MAX, ComputeType.FRAME);
+        context.markCompute(target);
     }
     
 }
