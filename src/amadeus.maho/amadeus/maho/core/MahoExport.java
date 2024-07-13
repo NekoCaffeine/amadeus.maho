@@ -61,7 +61,7 @@ public final class MahoExport {
         
     }
     
-    public static final String VERSION = Maho.class.getModule()?.getDescriptor().version().map(Object::toString).orElse("DEV") ?? "DEV";
+    public static final String VERSION = Maho.class.getModule().getDescriptor()?.version().map(Object::toString).orElse("DEV") ?? "DEV";
     
     public static final String
             MAHO_WORK_DIRECTORY           = "amadeus.maho.work.directory", // string
