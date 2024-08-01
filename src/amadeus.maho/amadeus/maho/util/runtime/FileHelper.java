@@ -165,27 +165,32 @@ public interface FileHelper {
     }
     
     static Path GTGT(final byte data[], final Path path) {
-        ~-path;
+        createDirectoriesIfNotNull(path.getParent());
         Files.write(path, data);
         return path;
     }
     
     static Path GTGTGT(final byte data[], final Path path) {
-        ~-path;
+        createDirectoriesIfNotNull(path.getParent());
         Files.write(path, data, APPEND);
         return path;
     }
     
     static Path GTGT(final CharSequence sequence, final Path path) {
-        ~-path;
+        createDirectoriesIfNotNull(path.getParent());
         Files.writeString(path, sequence, StandardCharsets.UTF_8);
         return path;
     }
     
     static Path GTGTGT(final CharSequence sequence, final Path path) {
-        ~-path;
+        createDirectoriesIfNotNull(path.getParent());
         Files.writeString(path, sequence, StandardCharsets.UTF_8, APPEND);
         return path;
+    }
+    
+    static void createDirectoriesIfNotNull(final @Nullable Path path) {
+        if (path != null)
+            Files.createDirectories(path);
     }
     
     static String fileName(final Path path) {

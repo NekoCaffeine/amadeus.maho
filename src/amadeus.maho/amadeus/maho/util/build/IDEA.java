@@ -43,7 +43,7 @@ public interface IDEA {
                 = { new Repository[] { new MavenRepository(cacheDir, SNAPSHOTS, setting, true, true), new MavenRepository(cacheDir, RELEASES, setting, true, false) } };
         
         @SneakyThrows
-        static LinkedHashSet<Module.Dependency> attachLocalInstance(final Path instanceHome, final Set<String> plugins = Set.of(), final Predicate<Path> shouldInCompile = path -> true,
+        static LinkedHashSet<Module.Dependency> attachLocalInstance(final Path instanceHome, final Set<String> plugins = Set.of(), final Predicate<Path> shouldInCompile = _ -> true,
                 final Tuple2<String, String> metadata = inferInstanceMetadata(instanceHome), final Path sources = resolveSources(repository(), metadata)) = Stream.concat(
                         Stream.of(new Module.DependencySet(STR."IntelliJ IDEA \{metadata.v1}-\{metadata.v2}", allDependencies(instanceHome, sources, shouldInCompile))),
                         plugins.stream()
