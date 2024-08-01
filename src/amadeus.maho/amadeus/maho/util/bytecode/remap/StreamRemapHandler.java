@@ -2,6 +2,8 @@ package amadeus.maho.util.bytecode.remap;
 
 import java.util.stream.Stream;
 
+import amadeus.maho.lang.inspection.Nullable;
+
 public interface StreamRemapHandler extends RemapHandler {
     
     Stream<RemapHandler> remapHandlers();
@@ -49,7 +51,7 @@ public interface StreamRemapHandler extends RemapHandler {
     }
     
     @Override
-    default String mapMethodName(final String owner, final String name, final String descriptor) {
+    default String mapMethodName(final String owner, final String name, final @Nullable String descriptor) {
         if (hasRemapHandlers()) {
             final String closure[] = { name };
             remapHandlers().forEach(remapHandler -> closure[0] = remapHandler.mapMethodName(owner, closure[0], descriptor));

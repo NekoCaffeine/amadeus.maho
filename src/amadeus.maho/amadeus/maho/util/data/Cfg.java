@@ -99,11 +99,14 @@ public enum Cfg implements Converter {
                     }
                     case '{', '[' -> {
                         final @Nullable Type nextType = switch (layer) {
+                            case null             -> null;
                             case ArrayAgent agent -> agent.innerGenericType();
                             default               -> {
                                 final @Nullable Tuple3<Field, MethodHandle, MethodHandle> tuple = Converter.handle()[layer.getClass()][key];
+                                if (tuple == null)
+                                    yield null;
                                 setters << tuple.v2;
-                                yield tuple == null ? null : TypeInferer.infer(tuple.v1.getGenericType(), typesContext.peekLast());
+                                yield TypeInferer.infer(tuple.v1.getGenericType(), typesContext.peekLast());
                             }
                         };
                         typesContext << nextType;

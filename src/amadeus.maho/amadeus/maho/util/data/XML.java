@@ -22,8 +22,6 @@ import amadeus.maho.lang.VisitorChain;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.language.parsing.Tokenizer;
-import amadeus.maho.util.tuple.Tuple;
-import amadeus.maho.util.tuple.Tuple2;
 
 import static amadeus.maho.util.language.parsing.Tokenizer.*;
 
@@ -240,8 +238,8 @@ public interface XML {
     private static Charset scanXMLDeclaration(final Visitor visitor, final Context context) {
         Charset charset = StandardCharsets.UTF_8;
         final String version = scanKeyValue(context.skip("<?xml "), "version", Tokenizer::isNumberOrDot);
-        String encoding = null;
-        String standalone = null;
+        @Nullable String encoding = null;
+        @Nullable String standalone = null;
         switch (version) {
             case "1.0" -> {
                 if (context.skip(S) > 0) {
@@ -270,7 +268,8 @@ public interface XML {
     
     @SneakyThrows
     private static void scanXMLBody(final Visitor visitor, final Context context) {
-        final LinkedList<Tuple2<String, StringBuilder>> stack = { };
+        record TagWithBuffer(String tag, StringBuilder buffer) { }
+        final LinkedList<TagWithBuffer> stack = { };
         final StringBuilder outerData = { };
         int c;
         context.skip(S);
@@ -287,27 +286,27 @@ public interface XML {
                     case '!' -> {
                         if (context.match("--")) {
                             context.offset(2);
-                            visitor.visitComment(context.scanString(it -> true, 0, "--"));
+                            visitor.visitComment(context.scanString(_ -> true, 0, "--"));
                             context.skip(">");
                         } else if (context.match("<![CDATA["))
-                            (!stack.isEmpty() ? stack.getFirst().v2 : outerData).append(context.scanString(it -> true, 0, "]]>"));
+                            (!stack.isEmpty() ? stack.getFirst().buffer : outerData).append(context.scanString(_ -> true, 0, "]]>"));
                         else
                             throw new UnsupportedOperationException();
                     }
                     case '/' -> {
                         if (stack.isEmpty())
                             throw context.invalid();
-                        final Tuple2<String, StringBuilder> tag = stack.pop();
-                        context.skip(tag.v1);
+                        final TagWithBuffer tagWithBuffer = stack.pop();
+                        context.skip(tagWithBuffer.tag);
                         context.skip(">");
-                        visitor.visitCharData(tag.v2.toString());
-                        visitor.visitTagEnd(tag.v1);
+                        visitor.visitCharData(tagWithBuffer.buffer.toString());
+                        visitor.visitTagEnd(tagWithBuffer.tag);
                     }
                     default  -> {
                         final String tag = context.rollback().scanString(nameChecker(), 1);
                         final LinkedHashMap<String, String> attr = { };
                         final StringBuilder charData = { };
-                        stack.push(Tuple.tuple(tag, charData));
+                        stack.push(new TagWithBuffer(tag, charData));
                         while (context.skip(S) > 0) {
                             final String attrName = context.scanString(nameChecker());
                             if (!attrName.isEmpty()) {
@@ -329,7 +328,7 @@ public interface XML {
                 }
                 context.skip(S);
             } else if (!stack.isEmpty())
-                stack.getFirst().v2.appendCodePoint(c);
+                stack.getFirst().buffer.appendCodePoint(c);
             else
                 outerData.appendCodePoint(c);
         }

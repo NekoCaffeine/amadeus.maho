@@ -157,6 +157,9 @@ public interface MapTable<R, C, V> {
     
     default void forEach(final Consumer3<R, C, V> consumer) = backingMap().forEach((row, map) -> map.forEach((column, value) -> consumer.accept(row, column, value)));
     
+    default void forEachParallel(final Consumer3<R, C, V> consumer) = backingMap().entrySet().stream().parallel().forEach(entry ->
+            entry.getValue().entrySet().stream().parallel().forEach(next -> consumer.accept(entry.getKey(), next.getKey(), next.getValue())));
+    
     default Stream<R> rowKeys() = backingMap().keySet().stream();
     
     default Stream<C> columnKeys() = backingMap().values().stream().map(Map::keySet).flatMap(Set::stream).distinct();

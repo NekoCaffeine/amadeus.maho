@@ -18,7 +18,7 @@ public class AugmentVisitorTransformer implements ClassTransformer.Limited {
     @Override
     public @Nullable ClassNode transform(final TransformContext context, @Nullable final ClassNode node, @Nullable final ClassLoader loader, @Nullable final Class<?> clazz, @Nullable final ProtectionDomain domain) {
         context.markModified();
-        node.methods.stream()
+        node?.methods.stream()
                 .filter(method -> method.name.equals("augment"))
                 .forEach(method -> method.access |= ACC_SYNCHRONIZED);
         return node;

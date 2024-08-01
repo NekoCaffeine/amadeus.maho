@@ -82,7 +82,7 @@ public interface ConstantPoolHelper {
     }
     
     static @Nullable Method lastMethodWithoutBoxed(final ConstantPool pool) {
-        Method last = null;
+        @Nullable Method last = null;
         for (int i = pool.getSize() - 1; i > -1; i--) {
             if (switch (pool.getTagAt(i)) {
                 case METHODREF, INTERFACEMETHODREF -> pool.getMethodAt(i);
@@ -103,7 +103,7 @@ public interface ConstantPoolHelper {
     }
     
     static @Nullable Executable lastExecutableWithoutBoxed(final ConstantPool pool) {
-        Method last = null;
+        @Nullable Method last = null;
         for (int i = pool.getSize() - 1; i > -1; i--) {
             switch (switch (pool.getTagAt(i)) {
                 case METHODREF, INTERFACEMETHODREF -> pool.getMethodAt(i);

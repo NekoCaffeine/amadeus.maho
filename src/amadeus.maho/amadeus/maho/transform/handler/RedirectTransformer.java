@@ -31,6 +31,7 @@ import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.vm.JDWP;
 
 import static amadeus.maho.core.extension.DynamicLookupHelper.*;
+import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static org.objectweb.asm.Opcodes.*;
 
 @NoArgsConstructor
@@ -41,7 +42,7 @@ public final class RedirectTransformer extends MethodTransformer<Redirect> imple
     
     {
         if (handler.isNotDefault(Redirect::targetClass))
-            target = handler.<Type>lookupSourceValue(Redirect::targetClass).getClassName();
+            target = requireNonNull(handler.<Type>lookupSourceValue(Redirect::targetClass)).getClassName();
         else
             target = annotation.target();
         if (target.isEmpty())
@@ -104,7 +105,7 @@ public final class RedirectTransformer extends MethodTransformer<Redirect> imple
                 TransformerManager.transform("redirect", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{annotation.target()}#\{sourceMethod.name}\{sourceMethod.desc}");
                 hit = true;
             }
-        if (!hit && metadata.important()) {
+        if (!hit && important()) {
             final String debugInfo = STR."Missing: \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}";
             TransformerManager.transform("redirect", debugInfo);
             final JDWP.IDECommand.Notification notification = { JDWP.IDECommand.Notification.Type.WARNING, getClass().getSimpleName(), debugInfo };

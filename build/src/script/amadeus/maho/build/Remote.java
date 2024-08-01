@@ -27,8 +27,8 @@ public interface Remote {
     
     Github.Repo repo = github["NekoCaffeine"]["amadeus.maho"];
     
-    static void release(final Path distributive = aotBuild()) = Distributive.release(workspace, module, repo, List.of(distributive));
+    static void release(final Path distributive = build()) = Distributive.release(workspace, module, repo, List.of(distributive));
     
-    static void releasePush(final Path distributive = aotBuild()) = push(distributive.let(Remote::release));
+    static void releasePush(final Path distributive = build()) = push(distributive.let(Remote::release));
     
 }

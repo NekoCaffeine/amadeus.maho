@@ -131,7 +131,8 @@ public class PrivilegeHandler extends JavacContext {
         
         ArgumentAttr attr;
         
-        public TypeCastParensType(final ArgumentAttr argumentAttr, final JCTree.JCExpression tree, final Env<AttrContext> env, final JCTree.JCTypeCast speculativeTree, final Map<Attr.ResultInfo, Type> speculativeTypes = new HashMap<>()) {
+        public TypeCastParensType(final ArgumentAttr argumentAttr, final JCTree.JCExpression tree, final Env<AttrContext> env,
+                final JCTree.JCTypeCast speculativeTree, final Map<Attr.ResultInfo, Type> speculativeTypes = new HashMap<>()) {
             argumentAttr.super(tree, env, speculativeTree, speculativeTypes);
             attr = argumentAttr;
         }
@@ -417,7 +418,8 @@ public class PrivilegeHandler extends JavacContext {
     private static Symbol findMethod(final Symbol capture, final Resolve $this, final Env<AttrContext> env, final Type site, final Name name, final List<Type> argTypes, final List<Type> typeArgTypes,
             final boolean allowBoxing, final boolean useVarargs) = name.table.names.init == name ? findNew(capture, $this, env, site, argTypes, typeArgTypes, allowBoxing, useVarargs) : capture;
     
-    private static Symbol findNew(final Symbol capture, final Resolve $this, final Env<AttrContext> env, final Type site, final List<Type> argTypes, final List<Type> typeArgTypes, final boolean allowBoxing, final boolean useVarargs) {
+    private static Symbol findNew(final Symbol capture, final Resolve $this, final Env<AttrContext> env, final Type site, final List<Type> argTypes, final List<Type> typeArgTypes,
+            final boolean allowBoxing, final boolean useVarargs) {
         if (capture.kind == MTH)
             return capture;
         final PrivilegeHandler handler = instance(PrivilegeHandler.class);

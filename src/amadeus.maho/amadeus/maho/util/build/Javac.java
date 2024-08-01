@@ -250,7 +250,7 @@ public interface Javac {
         final ArrayList<String> javacOpts = { }, needAddModules = { List.of("ALL-MODULE-PATH", "ALL-SYSTEM") };
         for (int i = 0; i < runtimeArgs.length; i++) {
             final String arg = runtimeArgs[i];
-            String opt = arg, value = null;
+            @Nullable String opt = arg, value = null;
             if (arg.startsWith("--")) {
                 final int eq = arg.indexOf('=');
                 if (eq > 0) {
@@ -322,7 +322,7 @@ public interface Javac {
     
     @SneakyThrows
     static void compile(final Collection<Path> paths, final List<String> options, final Charset charset = StandardCharsets.UTF_8, final Locale locale = Locale.getDefault(),
-            final DiagnosticListener<? super JavaFileObject> listener = null, final PrintWriter writer = { new OutputStreamWriter(System.out), true }) throws Failure {
+            final @Nullable DiagnosticListener<? super JavaFileObject> listener = null, final PrintWriter writer = { new OutputStreamWriter(System.out), true }) throws Failure {
         final Request request = { paths, options, locale, charset, listener, writer };
         request.compile(parallelStrategy.get()?.booleanValue() ?? (paths.size() > 8));
     }

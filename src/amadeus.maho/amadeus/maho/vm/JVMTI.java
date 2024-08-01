@@ -1861,7 +1861,7 @@ public interface JVMTI extends Library {
         }
     }
     
-    @Structure.FieldOrder("functions")
+    @SuppressWarnings("DataFlowIssue") @Structure.FieldOrder("functions")
     class Env extends Structure {
         
         @Structure.FieldOrder({

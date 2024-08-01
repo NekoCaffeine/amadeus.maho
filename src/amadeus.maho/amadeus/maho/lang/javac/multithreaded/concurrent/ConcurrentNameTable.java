@@ -1,12 +1,12 @@
 package amadeus.maho.lang.javac.multithreaded.concurrent;
 
-import com.sun.tools.javac.util.Convert;
-import com.sun.tools.javac.util.InvalidUtfException;
-import com.sun.tools.javac.util.Name;
-
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.sun.tools.javac.util.Convert;
+import com.sun.tools.javac.util.InvalidUtfException;
+import com.sun.tools.javac.util.Name;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;

@@ -123,7 +123,9 @@ public interface FileHelper {
             else if (Files.isDirectory(dst))
                 Files.copy(src, dst / src.getFileName().toString(), StandardCopyOption.REPLACE_EXISTING);
             else {
-                ~-dst;
+                final @Nullable Path parent = -dst;
+                if (parent != null)
+                    ~parent;
                 Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING);
             }
         return dst;
@@ -153,13 +155,12 @@ public interface FileHelper {
     
     static Path LT(final Path path, final String other) = path.resolveSibling(other);
     
-    static Path MINUS(final Path path) = path.getParent();
+    static @Nullable Path MINUS(final Path path) = path.getParent();
     
     static Path PLUS(final Path path) = path;
     
-    static @Nullable Path TILDE(final @Nullable Path path) {
-        if (path != null)
-            Files.createDirectories(path);
+    static Path TILDE(final Path path) {
+        Files.createDirectories(path);
         return path;
     }
     
@@ -207,6 +208,7 @@ public interface FileHelper {
                 break;
             } catch (final IOException e) { // Perhaps another process is holding the file lock so needs to wait for it to be released.
                 if (logIOE) {
+                    e.printStackTrace();
                     System.out.println(logWhenIOE);
                     logIOE = false;
                 }

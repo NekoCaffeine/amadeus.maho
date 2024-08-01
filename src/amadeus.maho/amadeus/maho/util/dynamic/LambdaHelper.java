@@ -13,6 +13,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.FieldNode;
 
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
@@ -104,7 +105,7 @@ public interface LambdaHelper {
     @IndirectCaller
     static <T> T lambda(final MethodHandle handle, final Class<T> lambdaType) {
         if (handle.argsCount() == 1) {
-            final Object bindArgLast = MethodHandleHelper.atLast(handle);
+            final @Nullable Object bindArgLast = MethodHandleHelper.atLast(handle);
             if (lambdaType.isInstance(bindArgLast))
                 return (T) bindArgLast;
         }

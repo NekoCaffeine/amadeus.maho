@@ -83,8 +83,8 @@ interface DynamicLookup {
                 throw new IllegalArgumentException(STR."\{sourceType} -> \{methodType}");
         }
         final MethodType sourceRealType = methodType;
-        Class<?> returnType = null;
-        List<Map.Entry<Class<?>, Class<?>>> parametersType = null;
+        @Nullable Class<?> returnType = null;
+        @Nullable List<Map.Entry<Class<?>, Class<?>>> parametersType = null;
         if (envClassLoader != loader) {
             returnType = methodType.returnType().isPrimitive() ? methodType.returnType() : Class.forName(methodType.returnType().getName(), false, loader);
             if (returnType != methodType.returnType())

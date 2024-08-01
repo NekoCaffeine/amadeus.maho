@@ -242,7 +242,7 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
     });
     
     @Override
-    public V computeIfPresent(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = purgeKeys().computeIfPresent(new Key<>(key), (_, value) -> remappingFunction.apply(key, value));
+    public @Nullable V computeIfPresent(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = purgeKeys().computeIfPresent(new Key<>(key), (_, value) -> remappingFunction.apply(key, value));
     
     @Override
     public V computeIfAbsent(final K key, final Function<? super K, ? extends V> mappingFunction) {

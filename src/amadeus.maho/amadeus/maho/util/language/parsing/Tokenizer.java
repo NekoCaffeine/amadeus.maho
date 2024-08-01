@@ -45,7 +45,7 @@ public class Tokenizer {
         final MapTable<Integer, Parser<?>, Object> cache;
         
         @Default
-        final StringBuilder builder = { };
+        final StringBuilder builder = { 2 << 5 };
     
         public StringBuilder builder() {
             builder.setLength(0);
@@ -185,13 +185,13 @@ public class Tokenizer {
     
     public <R> R parsing(final Class<R> type, final Context context = root()) throws ParseException = parsing(parser(type), context);
     
-    public static Tokenizer tokenization(final String source, final @Nullable String debugInformation = null, final Function<Class<?>, Parser<?>> parserProvider = type -> null)
+    public static Tokenizer tokenization(final String source, final @Nullable String debugInformation = null, final Function<Class<?>, Parser<?>> parserProvider = _ -> null)
             = { source.codePoints().filter(it -> it != '\r').toArray(), debugInformation, parserProvider };
     
-    public static Tokenizer tokenization(final IntStream codePoints, final @Nullable String debugInformation = null, final Function<Class<?>, Parser<?>> parserProvider = type -> null)
+    public static Tokenizer tokenization(final IntStream codePoints, final @Nullable String debugInformation = null, final Function<Class<?>, Parser<?>> parserProvider = _ -> null)
             = { codePoints.toArray(), debugInformation, parserProvider };
     
-    public static Tokenizer tokenization(final int codePoints[], final @Nullable String debugInformation = null, final Function<Class<?>, Parser<?>> parserProvider = type -> null)
+    public static Tokenizer tokenization(final int codePoints[], final @Nullable String debugInformation = null, final Function<Class<?>, Parser<?>> parserProvider = _ -> null)
             = { codePoints, debugInformation, parserProvider };
     
     public static boolean isNumber(final int c) = c >= '0' && c < '9';

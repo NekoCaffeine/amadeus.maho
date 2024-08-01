@@ -35,7 +35,7 @@ public class Range<T extends Comparable<T>> extends Tuple2<T, T> {
     
     public @Nullable Range<T> intersect(final T lowerInclusive, final T upperInclusive) = intersect(new Range<>(lowerInclusive, upperInclusive));
     
-    public boolean contains(final T t) = t != null && (v1 == null || v1.compareTo(t) <= 0) && (v2 == null || v2.compareTo(t) >= 0);
+    public boolean contains(final @Nullable T t) = t != null && (v1 == null || v1.compareTo(t) <= 0) && (v2 == null || v2.compareTo(t) >= 0);
     
     public boolean contains(final Range<T> other) = (other.v1 == null && v1 == null || contains(other.v1)) && (other.v2 == null && v2 == null || contains(other.v2));
     

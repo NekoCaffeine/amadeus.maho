@@ -74,9 +74,9 @@ public final class Maho {
     
     public static synchronized void instrumentation(final Instrumentation instrumentation) = Maho.instrumentation = instrumentation;
     
-    public static Instrumentation instrumentation() = instrumentation == null ? injectAgent() : instrumentation;
+    public static Instrumentation instrumentation() = instrumentation ?? injectAgent();
     
-    private static synchronized @Nullable Instrumentation injectAgent() {
+    private static synchronized Instrumentation injectAgent() {
         if (instrumentation == null)
             try {
                 final @Nullable String provider = System.getProperty("amadeus.maho.instrumentation.provider");
@@ -84,8 +84,7 @@ public final class Maho {
                     try {
                         final Class<?> providerClass = Class.forName(provider, true, ClassLoader.getSystemClassLoader());
                         final Field fieldInstrumentation = providerClass.getDeclaredField("instrumentation");
-                        installation(null, (Instrumentation) fieldInstrumentation.get(null));
-                        return instrumentation;
+                        return installation(null, (Instrumentation) fieldInstrumentation.get(null));
                     } catch (final Throwable throwable) {
                         System.err.println(STR."Unable to load instrumentation from instrumentation provider: \{provider}");
                         throwable.printStackTrace();
@@ -95,8 +94,9 @@ public final class Maho {
                 // Maho may not be loaded by SystemClassLoader
                 final Class<LiveInjector> classLiveInjector = (Class<LiveInjector>) ClassLoader.getSystemClassLoader().loadClass(LiveInjector.class.getName());
                 final Field fieldInstrumentation = classLiveInjector.getField("instrumentation");
-                installation(null, (Instrumentation) fieldInstrumentation.get(null));
-            } catch (final Exception e) { throw new InternalError("can't inject instrumentation instance", e); }
+                return installation(null, (Instrumentation) fieldInstrumentation.get(null));
+            } catch (final Throwable e) { throw new InternalError("can't inject instrumentation instance", e); }
+        // noinspection DataFlowIssue
         return instrumentation;
     }
     
@@ -230,7 +230,8 @@ public final class Maho {
     @SneakyThrows
     private static void setupTransformer() {
         stage("setupTransformer");
-        final Predicate<ResourcePath.ClassInfo> filter = info -> info.className().startsWith(MAHO_PACKAGE_NAME) && !info.className().startsWith(MAHO_SHADOW_PACKAGE_NAME), exportFilter = Setup.setupFilter();
+        final Predicate<ResourcePath.ClassInfo> filter = info -> info.className().startsWith(MAHO_PACKAGE_NAME) && !info.className().startsWith(MAHO_SHADOW_PACKAGE_NAME);
+        final @Nullable Predicate<ResourcePath.ClassInfo> exportFilter = Setup.setupFilter();
         setupFromClass(Maho.class, exportFilter == null ? filter : filter.and(exportFilter));
     }
     
@@ -253,7 +254,7 @@ public final class Maho {
     }
     
     @SneakyThrows
-    public static void installation(final @Nullable String agentArgs = null, final Instrumentation instrumentation) {
+    public static Instrumentation installation(final @Nullable String agentArgs = null, final Instrumentation instrumentation) {
         instrumentation(ObjectHelper.requireNonNull(instrumentation));
         new ArrayList<String>().let(result -> dump(result, " ".repeat(4))).forEach(Maho::debug);
         loadJavaSupport(instrumentation);
@@ -261,9 +262,10 @@ public final class Maho {
         setupTransformer();
         if (hotswap())
             HotSwap.watch();
+        return instrumentation;
     }
     
-    public static void setupFromClass(final Class<?> clazz = CallerContext.caller(), final Predicate<ResourcePath.ClassInfo> filter = info -> true) {
+    public static void setupFromClass(final Class<?> clazz = CallerContext.caller(), final Predicate<ResourcePath.ClassInfo> filter = _ -> true) {
         instrumentation();
         try (final var path = ResourcePath.of(clazz)) {
             final Module module = clazz.getModule();
@@ -307,21 +309,24 @@ public final class Maho {
     
     public static @Nullable MethodNode getMethodNodeFromMethod(final Method method) = getMethodNodeFromClass(method.getDeclaringClass(), method.getName(), Type.getMethodDescriptor(method));
     
-    public static @Nullable MethodNode getMethodNodeFromMethodNonNull(final Method method) = getMethodNodeFromClassNonNull(method.getDeclaringClass(), method.getName(), Type.getMethodDescriptor(method));
+    public static MethodNode getMethodNodeFromMethodNonNull(final Method method) = getMethodNodeFromClassNonNull(method.getDeclaringClass(), method.getName(), Type.getMethodDescriptor(method));
     
-    public static @Nullable MethodNode getMethodNodeFromClass(final Class<?> target, final String name, final String desc, final boolean mustRetransform = false)
-            = Stream.ofNullable(ASMHelper.newClassNode(getBytecodeFromClass(target, mustRetransform)))
-            .map(node -> node.methods)
-            .flatMap(List::stream)
-            .filter(targetMethod -> targetMethod.name.equals(name) && targetMethod.desc.equals(desc))
-            .findAny()
-            .orElse(null);
+    public static @Nullable MethodNode getMethodNodeFromClass(final Class<?> target, final String name, final String desc, final boolean mustRetransform = false) {
+        final @Nullable byte bytecode[] = getBytecodeFromClass(target, mustRetransform);
+        return bytecode == null ? null : ~Stream.ofNullable(ASMHelper.newClassNode(bytecode))
+                .map(node -> node.methods)
+                .flatMap(List::stream)
+                .filter(targetMethod -> targetMethod.name.equals(name) && targetMethod.desc.equals(desc));
+    }
     
     public static MethodNode getMethodNodeFromClassNonNull(final Class<?> target, final String name, final String desc, final boolean mustRetransform = false)
             = Optional.ofNullable(getMethodNodeFromClass(target, name, desc, mustRetransform))
             .orElseThrow(() -> DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException(STR."Unable to get MethodNode form: \{target}#\{name}\{desc}")));
     
-    public static @Nullable ClassNode getClassNodeFromClass(final Class<?> target, final boolean mustRetransform = false) = ASMHelper.newClassNode(getBytecodeFromClass(target, mustRetransform));
+    public static @Nullable ClassNode getClassNodeFromClass(final Class<?> target, final boolean mustRetransform = false) {
+        final @Nullable byte bytecode[] = getBytecodeFromClass(target, mustRetransform);
+        return bytecode != null ? ASMHelper.newClassNode(bytecode) : null;
+    }
     
     public static ClassNode getClassNodeFromClassNonNull(final Class<?> target, final boolean mustRetransform = false)
             = Optional.ofNullable(getClassNodeFromClass(target, mustRetransform))

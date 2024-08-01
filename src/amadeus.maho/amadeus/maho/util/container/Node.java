@@ -19,15 +19,15 @@ public class Node<T> {
     @Default
     final @Nullable Node<T> parent = null;
     
-    @Nullable T value;
+    T value;
     
     final LinkedList<Node<T>> nodes = { };
     
-    public Node<T> sub(final @Nullable T value) = { this, value };
+    public Node<T> sub(final T value) = { this, value };
     
     public int depth() {
         int result = 0;
-        self self = parent();
+        @Nullable self self = parent();
         while (self != null) {
             result++;
             self = self.parent;

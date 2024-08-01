@@ -199,7 +199,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         } finally { read.unlock(); }
     }
     
-    public static Predicate<ClassTransformer> filter(final @Nullable Class<?> clazz, final @Nullable ClassLoader loader, final @Nullable String name)
+    public static Predicate<ClassTransformer> filter(final @Nullable Class<?> clazz, final @Nullable ClassLoader loader, final String name)
             = clazz != null ? transformer -> transformer.isTarget(clazz) : transformer -> transformer.isTarget(loader, name);
     
     volatile boolean ready;
@@ -355,7 +355,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 = await(scanMayCachedList(path, "transform-marks").filter(filter).map(info -> async(() -> scanMarks(info, ASMHelper.newClassNode(info.readAll(), ClassReader.SKIP_CODE)), Setup.executor())));
         
         protected void scanMarks(final ResourcePath.ClassInfo info, final ClassNode node) throws IOException {
-            final TransformMark mark = ASMHelper.findAnnotation(node, TransformMark.class, loader);
+            final @Nullable TransformMark mark = ASMHelper.findAnnotation(node, TransformMark.class, loader);
             if (mark != null) {
                 final Class<? extends Annotation> annotationType = (Class<? extends Annotation>) info.load(false, loader);
                 for (final Class<? extends BaseTransformer<?>> handlerType : mark.value()) {
@@ -545,10 +545,10 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     
     @Override
     public @Nullable byte[] transform(final @Nullable ClassLoader loader, final @Nullable String name, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain, final @Nullable byte bytecode[]) {
-        String srcName = name;
+        @Nullable String srcName = name;
         List<ClassTransformer> transformers = List.of();
         try {
-            final @Nullable ClassReader reader = ASMHelper.newClassReader(bytecode);
+            final @Nullable ClassReader reader = bytecode == null ? null : new ClassReader(bytecode);
             final @Nullable String internalName = reader != null ? reader.getClassName() : clazz != null ? ASMHelper.className(clazz) : name != null ? ASMHelper.className(name) : null;
             if (internalName == null) {
                 if (srcName != null)
@@ -559,7 +559,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             transformers = lookupTransformer(clazz, loader, srcName).toList();
             if (transformers.isEmpty())
                 return null;
-            final ClassNode p_node[] = { ASMHelper.newClassNode(reader, 0) };
+            final ClassNode p_node[] = { reader == null ? null : ASMHelper.newClassNode(reader) };
             final ClassWriter writer = { loader };
             final TransformContext.WithSource context = writer.mark(p_node[0]).context(bytecode);
             transformers.forEach(transformer -> p_node[0] = transform(context, p_node[0], transformer, loader, clazz, domain));
@@ -589,7 +589,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final String name = ASMHelper.sourceName(reader.getClassName());
             final List<ClassTransformer> transformers = lookupTransformer(null, loader, name).filter(ClassTransformer::canAOT).toList();
             if (!transformers.isEmpty()) {
-                final ClassNode p_node[] = { ASMHelper.newClassNode(reader, 0) };
+                final ClassNode p_node[] = { ASMHelper.newClassNode(reader) };
                 final ClassWriter writer = { loader };
                 final TransformContext.WithSource context = writer.mark(p_node[0]).context(true, bytecode);
                 transformers.forEach(transformer -> p_node[0] = transform(context, p_node[0], transformer, loader));
@@ -609,8 +609,9 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final @Nullable ClassNode result = transformer.transform(context, node, loader, clazz, domain);
             return result == null ? node : result;
         } catch (final Throwable throwable) {
-            Maho.error(STR."Throwable in transform \{ASMHelper.sourceName(node.name)} : \{transformer}");
-            throwable.addSuppressed(new ExtraInformationThrowable(STR."Class: \{ASMHelper.sourceName(node.name)}"));
+            final String name = node == null ? "?" :ASMHelper.sourceName(node.name);
+            Maho.error(STR."Throwable in transform \{name} : \{transformer}");
+            throwable.addSuppressed(new ExtraInformationThrowable(STR."Class: \{name}"));
             throwable.addSuppressed(new ExtraInformationThrowable(STR."Transformer: \{transformer.toString()}"));
             throw DebugHelper.breakpointBeforeThrow(TransformException.of(throwable));
         }

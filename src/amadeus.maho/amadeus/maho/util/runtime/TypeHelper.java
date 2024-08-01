@@ -192,7 +192,7 @@ public interface TypeHelper {
             default      -> null;
         };
         
-        public <T> T zero(final Class<T> type) = type.cast(zero());
+        public <T> @Nullable T zero(final Class<T> type) = type.cast(zero());
         
         public @Nullable Object wrap(final int value) = switch (this) {
             case VOID    -> null;
@@ -209,8 +209,8 @@ public interface TypeHelper {
         public @Nullable Object wrap(final Object value) = switch (this) {
             case VOID -> null;
             default   -> {
-                final Number number = numberValue(value);
-                yield switch (this) {
+                final @Nullable Number number = numberValue(value);
+                yield number == null ? zero() : switch (this) {
                     case INT     -> number.intValue();
                     case LONG    -> number.longValue();
                     case FLOAT   -> number.floatValue();

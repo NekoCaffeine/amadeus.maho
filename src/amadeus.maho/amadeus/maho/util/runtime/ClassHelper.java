@@ -1,11 +1,9 @@
 package amadeus.maho.util.runtime;
 
-import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.jar.Manifest;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.Extension;
@@ -38,7 +36,7 @@ public interface ClassHelper {
         } catch (final Throwable ex) { return (T) lookup.findConstructor($this, MethodType.methodType(void.class)).invoke(); }
     }
     
-    static @Nullable Class<?> tryLoad(final ClassLoader loader = CallerContext.caller().getClassLoader(), final String name, final boolean initialize = true) {
+    static @Nullable Class<?> tryLoad(final @Nullable ClassLoader loader = CallerContext.caller().getClassLoader(), final String name, final boolean initialize = true) {
         try { return Class.forName(name, initialize, loader); } catch (final ClassNotFoundException e) { return null; }
     }
     

@@ -9,14 +9,14 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Setter;
+import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.inspection.RegularExpression;
-import amadeus.maho.util.tuple.Tuple;
-import amadeus.maho.util.tuple.Tuple2;
 
 @Setter
 @Getter
@@ -24,7 +24,11 @@ import amadeus.maho.util.tuple.Tuple2;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Switch<T, R> {
     
-    final List<Tuple2<Predicate<T>, Function<T, R>>> cases = new CopyOnWriteArrayList<>();
+    @ToString
+    @EqualsAndHashCode
+    public record Case<T, R>(Predicate<T> predicate, Function<T, R> function) { }
+    
+    final List<Case<T, R>> cases = new CopyOnWriteArrayList<>();
     
     volatile @Nullable Function<T, R> defaultHandler;
     
@@ -35,7 +39,7 @@ public class Switch<T, R> {
         return null;
     };
     
-    public self whenF(final Predicate<T> predicate, final Function<T, R> function) = cases().add(Tuple.tuple(predicate, function));
+    public self whenF(final Predicate<T> predicate, final Function<T, R> function) = cases() += new Case<>(predicate, function);
     
     public self whenC(final Predicate<T> predicate, final Consumer<T> consumer) = whenF(predicate, function(consumer));
     
@@ -65,22 +69,22 @@ public class Switch<T, R> {
     
     public self regexC(final @RegularExpression String regex, final Consumer<T> consumer) = regexF(regex, function(consumer));
     
-    public boolean match(final @Nullable T target, final boolean includeDefault = true) = cases.stream().anyMatch(tuple -> tuple.v1.test(target)) || includeDefault && defaultHandler() != null;
+    public boolean match(final @Nullable T target, final boolean includeDefault = true) = cases.stream().anyMatch(c -> c.predicate().test(target)) || includeDefault && defaultHandler() != null;
     
-    public boolean parallelMatch(final @Nullable T target, final boolean includeDefault = true) = cases.stream().parallel().anyMatch(tuple -> tuple.v1.test(target)) || includeDefault && defaultHandler() != null;
+    public boolean parallelMatch(final @Nullable T target, final boolean includeDefault = true) = cases.stream().parallel().anyMatch(c -> c.predicate().test(target)) || includeDefault && defaultHandler() != null;
     
     public Optional<R> apply(final @Nullable T target) = cases.stream()
-            .filter(tuple -> tuple.v1.test(target))
+            .filter(c -> c.predicate().test(target))
             .findFirst()
-            .map(Tuple2::v2)
+            .map(Case::function)
             .or(this::rollback)
             .map(function -> function.apply(target));
     
     public Optional<R> parallelApply(final @Nullable T target) = cases.stream()
             .parallel()
-            .filter(tuple -> tuple.v1.test(target))
+            .filter(c -> c.predicate().test(target))
             .findFirst()
-            .map(Tuple2::v2)
+            .map(Case::function)
             .or(this::rollback)
             .map(function -> function.apply(target));
     

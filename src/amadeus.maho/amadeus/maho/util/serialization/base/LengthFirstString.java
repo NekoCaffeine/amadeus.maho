@@ -36,6 +36,7 @@ public class LengthFirstString implements BinaryMapper {
     public void write(final Serializable.Output output) throws IOException {
         assert value != null;
         ensureIdentity();
+        // noinspection DataFlowIssue
         output.writeVarInt(cacheBuffer.length);
         output.write(cacheBuffer);
     }
@@ -57,6 +58,7 @@ public class LengthFirstString implements BinaryMapper {
     
     public int size() throws IOException {
         ensureIdentity();
+        // noinspection DataFlowIssue
         return cacheBuffer.length + VarHelper.varIntSize(cacheBuffer.length);
     }
     

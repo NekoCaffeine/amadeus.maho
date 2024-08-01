@@ -25,6 +25,7 @@ import com.sun.tools.javac.parser.JavacParser;
 import com.sun.tools.javac.parser.Tokens;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeCopier;
+import com.sun.tools.javac.tree.TreeInfo;
 import com.sun.tools.javac.util.Assert;
 import com.sun.tools.javac.util.DefinedBy;
 import com.sun.tools.javac.util.JCDiagnostic;
@@ -37,6 +38,7 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseSyntaxHandler;
 import amadeus.maho.lang.javac.handler.base.HandlerSupport;
@@ -47,7 +49,9 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.ClassLocal;
 import amadeus.maho.util.dynamic.Cloner;
+import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.dynamic.Wrapper;
+import amadeus.maho.util.runtime.ObjectHelper;
 
 import static amadeus.maho.lang.javac.handler.BranchHandler.PRIORITY;
 import static amadeus.maho.util.bytecode.Bytecodes.INVOKEVIRTUAL;
@@ -83,20 +87,25 @@ public class BranchHandler extends BaseSyntaxHandler {
         boolean allowed();
         
         static void allow(final @Nullable JCTree tree) = switch (tree) {
-            case JCTree.JCFieldAccess access            -> {
+            case JCTree.JCBinary binary
+                    when binary.hasTag(AdditionalOperators.TAG_NULL_OR) -> {
+                allow(binary.lhs);
+                allow(binary.rhs);
+            }
+            case JCTree.JCFieldAccess access                            -> {
                 if (access instanceof SafeFieldAccess safeFieldAccess)
                     safeFieldAccess.allowed = true;
                 allow(access.selected);
             }
-            case JCTree.JCMethodInvocation invocation   -> {
+            case JCTree.JCMethodInvocation invocation                   -> {
                 if (invocation instanceof SafeMethodInvocation safeMethodInvocation)
                     safeMethodInvocation.allowed = true;
                 allow(invocation.meth);
             }
-            case JCTree.JCTypeCast typeCast             -> allow(typeCast.expr);
-            case JCTree.JCExpressionStatement statement -> allow(statement.expr);
+            case JCTree.JCTypeCast typeCast                             -> allow(typeCast.expr);
+            case JCTree.JCExpressionStatement statement                 -> allow(statement.expr);
             case null,
-                 default                                -> { }
+                 default                                                -> { }
         };
         
     }
@@ -120,6 +129,14 @@ public class BranchHandler extends BaseSyntaxHandler {
         boolean allowed = false;
         
         public SafeFieldAccess(final JCFieldAccess access) = this(access.selected, access.name, access.sym);
+        
+    }
+    
+    @NoArgsConstructor
+    @FieldDefaults(level = AccessLevel.PUBLIC)
+    public static class AssertFieldAccess extends JCTree.JCFieldAccess {
+        
+        public AssertFieldAccess(final JCFieldAccess access) = this(access.selected, access.name, access.sym);
         
     }
     
@@ -157,7 +174,35 @@ public class BranchHandler extends BaseSyntaxHandler {
         
     }
     
-    Name nullOrName = name("??");
+    public static final String requireNonNull = LookupHelper.method1(ObjectHelper::requireNonNull).getName();
+    
+    Name ObjectHelperName = name(ObjectHelper.class), nullOrName = name("??"), requireNonNullName = name(requireNonNull);
+    
+    @Hook(at = @At(field = @At.FieldInsn(name = "SUBSUB"), ordinal = 0, offset = 1), capture = true)
+    private static boolean term3Rest(final boolean capture, final JavacParser $this, final JCTree.JCExpression t, final List<JCTree.JCExports> typeArgs) = capture || $this.token().kind == Tokens.TokenKind.BANG;
+    
+    @Hook(at = @At(field = @At.FieldInsn(name = "POSTDEC"), ordinal = 0), before = false, capture = true)
+    private static JCTree.Tag term3Rest(final JCTree.Tag capture, final JavacParser $this, final JCTree.JCExpression t, final List<JCTree.JCExports> typeArgs)
+        = $this.token().kind == Tokens.TokenKind.BANG ? JavacContext.AdditionalOperators.TAG_POST_ASSERT_ACCESS : capture;
+    
+    @Hook(value = TreeInfo.class, isStatic = true)
+    private static Hook.Result getStartPos(final JCTree tree) {
+        if (tree.getTag() == JavacContext.AdditionalOperators.TAG_POST_ASSERT_ACCESS)
+            return new Hook.Result(TreeInfo.getStartPos(((JCTree.JCUnary) tree).arg));
+        return Hook.Result.VOID;
+    }
+    
+    @Hook(value = TreeInfo.class, isStatic = true, at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    private static boolean isExpressionStatement(final boolean capture, final JCTree.JCExpression tree) = capture || tree instanceof JCTree.JCUnary unary && unary.getTag() == JavacContext.AdditionalOperators.TAG_POST_ASSERT_ACCESS;
+    
+    @Hook
+    private static void visitUnary(final Attr $this, final JCTree.JCUnary unary) {
+        if (unary.getTag() == JavacContext.AdditionalOperators.TAG_POST_ASSERT_ACCESS)
+            throw new ReAttrException(instance(BranchHandler.class).requireNonNullInvocation(unary.arg, unary.pos), unary);
+    }
+    
+    public JCTree.JCMethodInvocation requireNonNullInvocation(final JCTree.JCExpression expression, final int at = expression.pos)
+        = maker.at(at).Apply(List.nil(), maker.Select(IdentQualifiedName(ObjectHelper.class), requireNonNullName), List.of(expression));
     
     @Hook
     public static <P> Hook.Result visitMethodInvocation(final TreeCopier<P> $this, final MethodInvocationTree node, final P p) {
@@ -175,6 +220,11 @@ public class BranchHandler extends BaseSyntaxHandler {
         if (node instanceof SafeFieldAccess access) {
             final SafeFieldAccess result = { $this.copy(access.selected, p), access.name, null };
             result.allowed = access.allowed;
+            result.pos = access.pos;
+            return { result };
+        }
+        if (node instanceof AssertFieldAccess access) {
+            final AssertFieldAccess result = { $this.copy(access.selected, p), access.name, null };
             result.pos = access.pos;
             return { result };
         }
@@ -221,7 +271,7 @@ public class BranchHandler extends BaseSyntaxHandler {
     
     @Hook
     private static Hook.Result isBooleanOrNumeric_$Hook(final Attr $this, final Env<AttrContext> env, final JCTree.JCExpression tree)
-            = tree instanceof NullOrBinary binary ? new Hook.Result(isBooleanOrNumeric($this, env, binary.lhs) && isBooleanOrNumeric($this, env, binary.rhs)) : Hook.Result.VOID;
+        = tree instanceof NullOrBinary binary ? new Hook.Result(isBooleanOrNumeric($this, env, binary.lhs) && isBooleanOrNumeric($this, env, binary.rhs)) : Hook.Result.VOID;
     
     @Proxy(INVOKEVIRTUAL)
     private static native boolean isBooleanOrNumeric(Attr $this, Env<AttrContext> env, JCTree.JCExpression tree);
@@ -300,6 +350,7 @@ public class BranchHandler extends BaseSyntaxHandler {
         if (nullOr.lhs.type == symtab.botType)
             if (nullOr.rhs.type == symtab.botType) { // null ?? null => null
                 (Privilege) code.emit1(aconst_null);
+                (Privilege) ((Privilege) code.state).push(symtab.objectType);
                 (Privilege) (gen.result = (Privilege) items.makeStackItem(nullOr.type));
             } else // null ?? b => b
                 (Privilege) (gen.result = (Privilege) gen.genExpr(nullOr.rhs, nullOr.type).load());
@@ -342,7 +393,7 @@ public class BranchHandler extends BaseSyntaxHandler {
         var result = a?.b() ?? c;
      */
     @Hook(at = @At(method = @At.MethodInsn(name = "isEmpty"), offset = -1, ordinal = 0), jump = @At(method = @At.MethodInsn(name = "illegal"), offset = 2, ordinal = 0))
-    private static Hook.Result term3Rest(final JavacParser $this, @Hook.Reference JCTree.JCExpression t, @Hook.Reference List<JCTree.JCExpression> typeArgs) {
+    private static Hook.Result term3Rest(final JavacParser $this, @Hook.Reference JCTree.JCExpression t, @Hook.Reference @Nullable List<JCTree.JCExpression> typeArgs) {
         final Tokens.Token token = $this.token();
         if (token.kind == AdditionalOperators.KIND_SAFE_ACCESS) {
             final int pos = token.pos;
@@ -357,6 +408,23 @@ public class BranchHandler extends BaseSyntaxHandler {
                 (t = new SafeMethodInvocation(invocation)).pos = invocation.pos;
             else if (t instanceof JCTree.JCFieldAccess access)
                 (t = new SafeFieldAccess(access)).pos = access.pos;
+            else
+                throw new AssertionError(STR."\{t.getClass()}: \{t}");
+            typeArgs = null;
+            return new Hook.Result().jump();
+        } else if (token.kind == AdditionalOperators.KIND_ASSERT_ACCESS) {
+            final int pos = token.pos;
+            $this.nextToken();
+            typeArgs = (Privilege) $this.typeArgumentsOpt((Privilege) JavacParser.EXPR);
+            final var F = F($this).at(pos);
+            final Name ident = (Privilege) $this.ident(true);
+            t = toP($this, F.Select(t, ident));
+            final JCTree.JCExpression typeArgumentsOpt = (Privilege) $this.typeArgumentsOpt(t);
+            t = (Privilege) $this.argumentsOpt(typeArgs, typeArgumentsOpt);
+            if (t instanceof JCTree.JCMethodInvocation invocation && invocation.meth instanceof JCTree.JCFieldAccess access)
+                (invocation.meth = new AssertFieldAccess(access)).pos = invocation.pos;
+            else if (t instanceof JCTree.JCFieldAccess access)
+                (t = new AssertFieldAccess(access)).pos = access.pos;
             else
                 throw new AssertionError(STR."\{t.getClass()}: \{t}");
             typeArgs = null;
@@ -464,6 +532,17 @@ public class BranchHandler extends BaseSyntaxHandler {
             code.crt.put(expression, CRT_FLOW_TARGET, invokeStartPc, code.curCP());
         (Privilege) env.info.addExit(whenNull);
         (Privilege) (gen.result = result);
+    }
+    
+    @Hook(at = @At(method = @At.MethodInsn(name = "genExpr")), before = false, capture = true)
+    private static void visitSelect(final Items.Item capture, final Gen $this, final JCTree.JCFieldAccess access) {
+        if (access instanceof AssertFieldAccess assertFieldAccess)
+            instance(BranchHandler.class).genNullCheck((Privilege) $this.code, assertFieldAccess);
+    }
+    
+    private void genNullCheck(final Code code, final JCTree tree) {
+        code.statBegin(tree.pos);
+        (Privilege) gen.callMethod(tree.pos(), symtab.enterClass(mahoModule, ObjectHelperName).type, names.requireNonNull, List.of(symtab.objectType), true);
     }
     
 }

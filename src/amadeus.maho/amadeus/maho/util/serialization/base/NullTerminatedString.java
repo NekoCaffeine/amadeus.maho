@@ -34,16 +34,15 @@ public class NullTerminatedString implements BinaryMapper {
     
     @Override
     public void write(final Output output) throws IOException {
-        assert maxLength > 1;
         assert value != null;
         ensureIdentity();
+        // noinspection DataFlowIssue
         output.write(cacheBuffer, 0, Math.min(cacheBuffer.length, maxLength - 1));
         output.write('\0');
     }
     
     @Override
     public void read(final Input input) throws IOException {
-        assert maxLength > 1;
         final ByteArrayOutputStream buffer = { Math.min(2 << 12, maxLength - 1) };
         int b = 0;
         int count = 0;
@@ -58,6 +57,7 @@ public class NullTerminatedString implements BinaryMapper {
     }
     
     protected void ensureIdentity() throws IOException {
+        assert value != null;
         if (cacheIdentity != value) {
             cacheBuffer = value.getBytes(charset);
             assert cacheBuffer.length < maxLength;
@@ -67,6 +67,7 @@ public class NullTerminatedString implements BinaryMapper {
     
     public int size() throws IOException {
         ensureIdentity();
+        // noinspection DataFlowIssue
         return cacheBuffer.length + 1;
     }
     

@@ -21,11 +21,12 @@ public record RuntimeParameterizedType(Type actualTypeArguments[], Type rawType,
     public Type getRawType() = rawType;
     
     @Override
-    public Type getOwnerType() = ownerType;
+    public @Nullable Type getOwnerType() = ownerType;
     
     @Override
     public String toString() {
-        final Type ownerType = getOwnerType(), rawType = getRawType(), actualTypeArguments[] = getActualTypeArguments();
+        final @Nullable Type ownerType = getOwnerType();
+        final Type rawType = getRawType(), actualTypeArguments[] = getActualTypeArguments();
         final StringBuilder builder = { };
         if (ownerType != null) {
             if (ownerType instanceof Class<?> clazz)
@@ -39,7 +40,7 @@ public record RuntimeParameterizedType(Type actualTypeArguments[], Type rawType,
                 builder.append(rawType.getTypeName());
         } else
             builder.append(rawType.getTypeName());
-        if (actualTypeArguments != null && actualTypeArguments.length > 0)
+        if (actualTypeArguments.length > 0)
             builder.append(Stream.of(actualTypeArguments).map(type -> type == null ? "null" : type.getTypeName()).collect(Collectors.joining(", ", "<", ">")));
         return builder.toString();
     }

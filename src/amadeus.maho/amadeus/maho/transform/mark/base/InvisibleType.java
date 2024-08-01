@@ -13,6 +13,7 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeAnnotationNode;
 
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.TransformerManager;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.remap.RemapHandler;
@@ -37,14 +38,14 @@ public @interface InvisibleType {
         
         public static Type transformType(final RemapHandler.ASMRemapper remapper, final MethodNode node) = transformType(remapper, node.visibleTypeAnnotations, Type.getMethodType(node.desc));
         
-        public static Type transformType(final RemapHandler.ASMRemapper remapper, final List<TypeAnnotationNode> typeAnnotationNodes, final Type methodType) {
+        public static Type transformType(final RemapHandler.ASMRemapper remapper, final @Nullable List<TypeAnnotationNode> typeAnnotationNodes, final Type methodType) {
             if (typeAnnotationNodes == null)
                 return methodType;
             Type returnType = methodType.getReturnType();
             final Type argsTypes[] = methodType.getArgumentTypes();
             boolean changed = false;
             {
-                final InvisibleType invisibleType = ASMHelper.findAnnotation(ASMHelper.filterTypeReference(typeAnnotationNodes,
+                final @Nullable InvisibleType invisibleType = ASMHelper.findAnnotation(ASMHelper.filterTypeReference(typeAnnotationNodes,
                         TypeReference.newTypeReference(TypeReference.METHOD_RETURN), TypePathFilter.of()), InvisibleType.class, InvisibleType.class.getClassLoader());
                 if (invisibleType != null) {
                     returnType = Type.getObjectType(ASMHelper.className(invisibleType.value()));
@@ -52,7 +53,7 @@ public @interface InvisibleType {
                 }
             }
             for (int i = 0; i < argsTypes.length; i++) {
-                final InvisibleType invisibleType = ASMHelper.findAnnotation(ASMHelper.filterTypeReference(typeAnnotationNodes,
+                final @Nullable InvisibleType invisibleType = ASMHelper.findAnnotation(ASMHelper.filterTypeReference(typeAnnotationNodes,
                         TypeReference.newFormalParameterReference(i), TypePathFilter.of()), InvisibleType.class, InvisibleType.class.getClassLoader());
                 if (invisibleType != null) {
                     argsTypes[i] = Type.getObjectType(ASMHelper.className(invisibleType.value()));

@@ -6,39 +6,14 @@ import java.util.BitSet;
 import java.util.Comparator;
 import java.util.random.RandomGenerator;
 
-import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.Include;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.dynamic.ClassLocal;
 
 import static amadeus.maho.util.math.MathHelper.*;
 
-// @Include({ Array.class, Arrays.class })
 @Include(Arrays.class)
 public interface ArrayHelper {
-    
-    @Extension
-    interface Ext {
-        
-        static int length(final Object $this[]) = $this.length;
-        
-        static int length(final char $this[]) = $this.length;
-        
-        static int length(final int $this[]) = $this.length;
-        
-        static int length(final double $this[]) = $this.length;
-        
-        static int length(final float $this[]) = $this.length;
-        
-        static int length(final long $this[]) = $this.length;
-        
-        static int length(final short $this[]) = $this.length;
-        
-        static int length(final byte $this[]) = $this.length;
-        
-        static int length(final boolean $this[]) = $this.length;
-        
-    }
     
     static <T> T deepClone(final T array) {
         if (!array.getClass().isArray())
@@ -89,27 +64,18 @@ public interface ArrayHelper {
         return a.equals(b);
     }
     
-    static boolean deepArrayEquals(final Object a, final Object b) {
-        if (a instanceof Object[] && b instanceof Object[])
-            return Arrays.deepEquals((Object[]) a, (Object[]) b);
-        if (a instanceof byte[] && b instanceof byte[])
-            return Arrays.equals((byte[]) a, (byte[]) b);
-        if (a instanceof short[] && b instanceof short[])
-            return Arrays.equals((short[]) a, (short[]) b);
-        if (a instanceof int[] && b instanceof int[])
-            return Arrays.equals((int[]) a, (int[]) b);
-        if (a instanceof long[] && b instanceof long[])
-            return Arrays.equals((long[]) a, (long[]) b);
-        if (a instanceof char[] && b instanceof char[])
-            return Arrays.equals((char[]) a, (char[]) b);
-        if (a instanceof float[] && b instanceof float[])
-            return Arrays.equals((float[]) a, (float[]) b);
-        if (a instanceof double[] && b instanceof double[])
-            return Arrays.equals((double[]) a, (double[]) b);
-        if (a instanceof boolean[] && b instanceof boolean[])
-            return Arrays.equals((boolean[]) a, (boolean[]) b);
-        return ObjectHelper.equals(a, b);
-    }
+    static boolean deepArrayEquals(final Object a, final Object b) = switch (a) {
+        case Object[] objectsA when b instanceof Object[] objectsB    -> Arrays.deepEquals(objectsA, objectsB);
+        case byte[] bytes when b instanceof byte[] bytesB             -> Arrays.equals(bytes, bytesB);
+        case short[] shorts when b instanceof short[] shortsB         -> Arrays.equals(shorts, shortsB);
+        case int[] ints when b instanceof int[] intsB                 -> Arrays.equals(ints, intsB);
+        case long[] longs when b instanceof long[] longsB             -> Arrays.equals(longs, longsB);
+        case char[] chars when b instanceof char[] charsB             -> Arrays.equals(chars, charsB);
+        case float[] floats when b instanceof float[] floatsB         -> Arrays.equals(floats, floatsB);
+        case double[] doubles when b instanceof double[] doublesB     -> Arrays.equals(doubles, doublesB);
+        case boolean[] booleans when b instanceof boolean[] booleansB -> Arrays.equals(booleans, booleansB);
+        default                                                       -> ObjectHelper.equals(a, b);
+    };
     
     static String toString(final @Nullable Object obj) = switch (obj) {
         case byte[] bytes       -> Arrays.toString(bytes);
@@ -174,19 +140,7 @@ public interface ArrayHelper {
     
     int INDEX_NOT_FOUND = -1;
     
-    // nullToEmpty
-    static <T> T[] nullToEmpty(final @Nullable T array[], final Class<T[]> type) {
-        if (type == null)
-            throw new IllegalArgumentException("The type must not be null");
-        if (array == null)
-            return type.cast(Array.newInstance(type.getComponentType(), 0));
-        return array;
-    }
-    
-    // Sub arrays
-    static @Nullable <T> T[] sub(final @Nullable T array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static <T> T[] sub(final T array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -200,9 +154,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable long[] sub(final @Nullable long array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static long[] sub(final long array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -215,9 +167,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable int[] sub(final @Nullable int array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static int[] sub(final int array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -230,9 +180,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable short[] sub(final @Nullable short array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static short[] sub(final short array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -245,9 +193,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable char[] sub(final @Nullable char array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static char[] sub(final char array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -260,9 +206,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable byte[] sub(final @Nullable byte array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static byte[] sub(final byte array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -275,9 +219,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable double[] sub(final @Nullable double array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static double[] sub(final double array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -290,9 +232,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable float[] sub(final @Nullable float array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static float[] sub(final float array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -305,9 +245,7 @@ public interface ArrayHelper {
         return sub;
     }
     
-    static @Nullable boolean[] sub(final @Nullable boolean array[], int startIndexInclusive, int endIndexExclusive = array.length) {
-        if (array == null)
-            return null;
+    static boolean[] sub(final boolean array[], int startIndexInclusive, int endIndexExclusive = array.length) {
         if (startIndexInclusive < 0)
             startIndexInclusive = 0;
         if (endIndexExclusive > array.length)
@@ -320,91 +258,27 @@ public interface ArrayHelper {
         return sub;
     }
     
-    // Is same length
-    static boolean isSameLength(final Object array1[], final Object array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final Object array1[], final Object array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final long array1[], final long array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final long array1[], final long array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final int array1[], final int array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final int array1[], final int array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final short array1[], final short array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final short array1[], final short array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final char array1[], final char array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final char array1[], final char array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final byte array1[], final byte array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final byte array1[], final byte array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final double array1[], final double array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final double array1[], final double array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final float array1[], final float array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final float array1[], final float array2[]) = array1.length == array2.length;
     
-    static boolean isSameLength(final boolean array1[], final boolean array2[]) = getLength(array1) == getLength(array2);
+    static boolean isSameLength(final boolean array1[], final boolean array2[]) = array1.length == array2.length;
     
-    static int getLength(final Object array) = array == null ? 0 : Array.getLength(array);
+    static int getLength(final Object array) = Array.getLength(array);
     
-    static boolean isSameType(final Object array1, final Object array2) {
-        if (array1 == null || array2 == null)
-            throw new IllegalArgumentException("The Array must not be null");
-        return array1.getClass().getName().equals(array2.getClass().getName());
-    }
-    
-    // Reverse
-    static void reverse(final Object array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final long array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final int array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final short array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final char array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final byte array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final double array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final float array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final boolean array[]) {
-        if (array == null)
-            return;
-        reverse(array, 0, array.length);
-    }
-    
-    static void reverse(final boolean array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final boolean array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         boolean tmp;
@@ -417,9 +291,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final byte array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final byte array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         byte tmp;
@@ -432,9 +304,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final char array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final char array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         char tmp;
@@ -447,9 +317,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final double array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final double array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         double tmp;
@@ -462,9 +330,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final float array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final float array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         float tmp;
@@ -477,9 +343,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final int array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final int array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         int tmp;
@@ -492,9 +356,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final long array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final long array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         long tmp;
@@ -507,9 +369,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final Object array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final Object array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         Object tmp;
@@ -522,9 +382,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void reverse(final short array[], final int startIndexInclusive, final int endIndexExclusive) {
-        if (array == null)
-            return;
+    static void reverse(final short array[], final int startIndexInclusive = 0, final int endIndexExclusive = array.length) {
         int i = max(startIndexInclusive, 0);
         int j = min(array.length, endIndexExclusive) - 1;
         short tmp;
@@ -537,7 +395,6 @@ public interface ArrayHelper {
         }
     }
     
-    // Swap
     static void swap(final Object array[], final int offset1, final int offset2) {
         if (isEmpty(array))
             return;
@@ -729,67 +586,10 @@ public interface ArrayHelper {
         }
     }
     
-    // Shift
-    static void shift(final Object array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final long array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final int array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final short array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final char array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final byte array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final double array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final float array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
-    static void shift(final boolean array[], final int offset) {
-        if (array == null)
-            return;
-        shift(array, 0, array.length, offset);
-    }
-    
     // For algorithm explanations and proof of O(n) time complexity and O(1) space complexity
     // see https://beradrian.wordpress.com/2015/04/07/shift-an-array-in-on-in-place/
     
-    static void shift(final boolean array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final boolean array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -819,9 +619,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final byte array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final byte array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -851,9 +649,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final char array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final char array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -883,9 +679,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final double array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final double array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -915,9 +709,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final float array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final float array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -947,9 +739,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final int array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final int array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -979,9 +769,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final long array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final long array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -1011,9 +799,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final Object array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final Object array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -1043,9 +829,7 @@ public interface ArrayHelper {
         }
     }
     
-    static void shift(final short array[], int startIndexInclusive, int endIndexExclusive, int offset) {
-        if (array == null)
-            return;
+    static void shift(final short array[], int startIndexInclusive = 0, int endIndexExclusive = array.length, int offset) {
         if (startIndexInclusive >= array.length - 1 || endIndexExclusive <= 0)
             return;
         if (startIndexInclusive < 0)
@@ -1075,10 +859,7 @@ public interface ArrayHelper {
         }
     }
     
-    // IndexOf search
-    static int indexOf(final Object array[], final Object objectToFind, int startIndex = 0) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
+    static int indexOf(final Object array[], final @Nullable Object objectToFind, int startIndex = 0) {
         if (startIndex < 0)
             startIndex = 0;
         if (objectToFind == null) {
@@ -1093,9 +874,7 @@ public interface ArrayHelper {
         return INDEX_NOT_FOUND;
     }
     
-    static int lastIndexOf(final Object array[], final Object objectToFind, int startIndex = Integer.MAX_VALUE) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
+    static int lastIndexOf(final Object array[], final @Nullable Object objectToFind, int startIndex = Integer.MAX_VALUE) {
         if (startIndex < 0)
             return INDEX_NOT_FOUND;
         else if (startIndex >= array.length)
@@ -1112,9 +891,7 @@ public interface ArrayHelper {
         return INDEX_NOT_FOUND;
     }
     
-    static int indexOfRef(final Object array[], final Object objectToFind, int startIndex = 0) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
+    static int indexOfRef(final Object array[], final @Nullable Object objectToFind, int startIndex = 0) {
         if (startIndex < 0)
             startIndex = 0;
         if (objectToFind == null) {
@@ -1129,9 +906,7 @@ public interface ArrayHelper {
         return INDEX_NOT_FOUND;
     }
     
-    static int lastIndexOfRef(final Object array[], final Object objectToFind, int startIndex = Integer.MAX_VALUE) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
+    static int lastIndexOfRef(final Object array[], final @Nullable Object objectToFind, int startIndex = Integer.MAX_VALUE) {
         if (startIndex < 0)
             return INDEX_NOT_FOUND;
         else if (startIndex >= array.length)
@@ -1151,8 +926,6 @@ public interface ArrayHelper {
     static boolean contains(final Object array[], final Object objectToFind) = indexOf(array, objectToFind) != INDEX_NOT_FOUND;
     
     static int indexOf(final long array[], final long valueToFind, int startIndex = 0) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             startIndex = 0;
         for (int i = startIndex; i < array.length; i++)
@@ -1162,8 +935,6 @@ public interface ArrayHelper {
     }
     
     static int lastIndexOf(final long array[], final long valueToFind, int startIndex = Integer.MAX_VALUE) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             return INDEX_NOT_FOUND;
         else if (startIndex >= array.length)
@@ -1177,8 +948,6 @@ public interface ArrayHelper {
     static boolean contains(final long array[], final long valueToFind) = indexOf(array, valueToFind) != INDEX_NOT_FOUND;
     
     static int indexOf(final int array[], final int valueToFind, int startIndex = 0) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             startIndex = 0;
         for (int i = startIndex; i < array.length; i++)
@@ -1188,8 +957,6 @@ public interface ArrayHelper {
     }
     
     static int lastIndexOf(final int array[], final int valueToFind, int startIndex = Integer.MAX_VALUE) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             return INDEX_NOT_FOUND;
         else if (startIndex >= array.length)
@@ -1203,8 +970,6 @@ public interface ArrayHelper {
     static boolean contains(final int array[], final int valueToFind) = indexOf(array, valueToFind) != INDEX_NOT_FOUND;
     
     static int indexOf(final short array[], final short valueToFind, int startIndex = 0) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             startIndex = 0;
         for (int i = startIndex; i < array.length; i++)
@@ -1214,8 +979,6 @@ public interface ArrayHelper {
     }
     
     static int lastIndexOf(final short array[], final short valueToFind, int startIndex = Integer.MAX_VALUE) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             return INDEX_NOT_FOUND;
         else if (startIndex >= array.length)
@@ -1229,8 +992,6 @@ public interface ArrayHelper {
     static boolean contains(final short array[], final short valueToFind) = indexOf(array, valueToFind) != INDEX_NOT_FOUND;
     
     static int indexOf(final char array[], final char valueToFind, int startIndex = 0) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             startIndex = 0;
         for (int i = startIndex; i < array.length; i++)
@@ -1240,8 +1001,6 @@ public interface ArrayHelper {
     }
     
     static int lastIndexOf(final char array[], final char valueToFind, int startIndex = Integer.MAX_VALUE) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             return INDEX_NOT_FOUND;
         else if (startIndex >= array.length)
@@ -1255,8 +1014,6 @@ public interface ArrayHelper {
     static boolean contains(final char array[], final char valueToFind) = indexOf(array, valueToFind) != INDEX_NOT_FOUND;
     
     static int indexOf(final byte array[], final byte valueToFind, int startIndex = 0) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             startIndex = 0;
         for (int i = startIndex; i < array.length; i++)
@@ -1266,8 +1023,6 @@ public interface ArrayHelper {
     }
     
     static int lastIndexOf(final byte array[], final byte valueToFind, int startIndex = Integer.MAX_VALUE) {
-        if (array == null)
-            return INDEX_NOT_FOUND;
         if (startIndex < 0)
             return INDEX_NOT_FOUND;
         else if (startIndex >= array.length)
@@ -1388,9 +1143,8 @@ public interface ArrayHelper {
     
     static boolean contains(final boolean array[], final boolean valueToFind) = indexOf(array, valueToFind) != INDEX_NOT_FOUND;
     
-    // startsWith
     static boolean startsWith(final boolean array1[], final boolean array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1401,7 +1155,7 @@ public interface ArrayHelper {
     }
     
     static boolean startsWith(final byte array1[], final byte array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1412,7 +1166,7 @@ public interface ArrayHelper {
     }
     
     static boolean startsWith(final char array1[], final char array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1423,7 +1177,7 @@ public interface ArrayHelper {
     }
     
     static boolean startsWith(final double array1[], final double array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1434,7 +1188,7 @@ public interface ArrayHelper {
     }
     
     static boolean startsWith(final float array1[], final float array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1445,7 +1199,7 @@ public interface ArrayHelper {
     }
     
     static boolean startsWith(final int array1[], final int array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1456,7 +1210,7 @@ public interface ArrayHelper {
     }
     
     static boolean startsWith(final long array1[], final long array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1467,7 +1221,7 @@ public interface ArrayHelper {
     }
     
     static boolean startsWith(final short array1[], final short array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1478,7 +1232,7 @@ public interface ArrayHelper {
     }
     
     static <T> boolean startsWith(final T array1[], final T array2[], final int prefixLength = array2.length) {
-        if (array1 == null || array2 == null || prefixLength < 0)
+        if (prefixLength < 0)
             return false;
         if (array1.length < prefixLength || array2.length < prefixLength)
             return false;
@@ -1488,9 +1242,8 @@ public interface ArrayHelper {
         return true;
     }
     
-    // endsWith
     static boolean endsWith(final boolean array1[], final boolean array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1502,7 +1255,7 @@ public interface ArrayHelper {
     }
     
     static boolean endsWith(final byte array1[], final byte array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1514,7 +1267,7 @@ public interface ArrayHelper {
     }
     
     static boolean endsWith(final char array1[], final char array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1526,7 +1279,7 @@ public interface ArrayHelper {
     }
     
     static boolean endsWith(final double array1[], final double array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1538,7 +1291,7 @@ public interface ArrayHelper {
     }
     
     static boolean endsWith(final float array1[], final float array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1550,7 +1303,7 @@ public interface ArrayHelper {
     }
     
     static boolean endsWith(final int array1[], final int array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1562,7 +1315,7 @@ public interface ArrayHelper {
     }
     
     static boolean endsWith(final long array1[], final long array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1574,7 +1327,7 @@ public interface ArrayHelper {
     }
     
     static boolean endsWith(final short array1[], final short array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1586,7 +1339,7 @@ public interface ArrayHelper {
     }
     
     static <T> boolean endsWith(final T array1[], final T array2[], final int suffixLength = array2.length) {
-        if (array1 == null || array2 == null || suffixLength < 0)
+        if (suffixLength < 0)
             return false;
         if (array1.length < suffixLength || array2.length < suffixLength)
             return false;
@@ -1597,12 +1350,7 @@ public interface ArrayHelper {
         return true;
     }
     
-    // compareTo
     static int compareTo(final boolean array1[], final boolean array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Boolean.compare(array1[i], array2[i]);
@@ -1613,10 +1361,6 @@ public interface ArrayHelper {
     }
     
     static int compareTo(final byte array1[], final byte array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Byte.compare(array1[i], array2[i]);
@@ -1627,10 +1371,6 @@ public interface ArrayHelper {
     }
     
     static int compareTo(final char array1[], final char array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Character.compare(array1[i], array2[i]);
@@ -1641,10 +1381,6 @@ public interface ArrayHelper {
     }
     
     static int compareTo(final double array1[], final double array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Double.compare(array1[i], array2[i]);
@@ -1655,10 +1391,6 @@ public interface ArrayHelper {
     }
     
     static int compareTo(final float array1[], final float array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Float.compare(array1[i], array2[i]);
@@ -1669,10 +1401,6 @@ public interface ArrayHelper {
     }
     
     static int compareTo(final int array1[], final int array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Integer.compare(array1[i], array2[i]);
@@ -1683,10 +1411,6 @@ public interface ArrayHelper {
     }
     
     static int compareTo(final long array1[], final long array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Long.compare(array1[i], array2[i]);
@@ -1697,10 +1421,6 @@ public interface ArrayHelper {
     }
     
     static int compareTo(final short array1[], final short array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = Short.compare(array1[i], array2[i]);
@@ -1710,11 +1430,7 @@ public interface ArrayHelper {
         return Integer.compare(array1.length, array2.length);
     }
     
-    static <T extends Comparable<T>> int compareTo(final @Nullable T array1[], final @Nullable T array2[]) {
-        if (array1 == null)
-            return array2 == null ? 0 : -1;
-        if (array2 == null)
-            return 1;
+    static <T extends Comparable<T>> int compareTo(final T array1[], final T array2[]) {
         final int minLength = Math.min(array1.length, array2.length);
         for (int i = 0; i < minLength; i++) {
             final int cmp = array1[i].compareTo(array2[i]);
@@ -1724,23 +1440,14 @@ public interface ArrayHelper {
         return Integer.compare(array1.length, array2.length);
     }
     
-    // Primitive/Object array converters
-    static @Nullable char[] toPrimitive(final @Nullable Character array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_CHAR_ARRAY;
+    static char[] toPrimitive(final Character array[]) {
         final char result[] = new char[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable char[] toPrimitive(final @Nullable Character array[], final char valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_CHAR_ARRAY;
+    static char[] toPrimitive(final Character array[], final char valueForNull) {
         final char result[] = new char[array.length];
         for (int i = 0; i < array.length; i++) {
             final Character b = array[i];
@@ -1749,33 +1456,21 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Character[] toObject(final @Nullable char array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_CHARACTER_OBJECT_ARRAY;
+    static Character[] toObject(final char array[]) {
         final Character result[] = new Character[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable long[] toPrimitive(final @Nullable Long array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_LONG_ARRAY;
+    static long[] toPrimitive(final Long array[]) {
         final long result[] = new long[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable long[] toPrimitive(final @Nullable Long array[], final long valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_LONG_ARRAY;
+    static long[] toPrimitive(final Long array[], final long valueForNull) {
         final long result[] = new long[array.length];
         for (int i = 0; i < array.length; i++) {
             final Long b = array[i];
@@ -1784,33 +1479,21 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Long[] toObject(final @Nullable long array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_LONG_OBJECT_ARRAY;
+    static Long[] toObject(final long array[]) {
         final Long result[] = new Long[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable int[] toPrimitive(final @Nullable Integer array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_INT_ARRAY;
+    static int[] toPrimitive(final Integer array[]) {
         final int result[] = new int[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable int[] toPrimitive(final @Nullable Integer array[], final int valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_INT_ARRAY;
+    static int[] toPrimitive(final Integer array[], final int valueForNull) {
         final int result[] = new int[array.length];
         for (int i = 0; i < array.length; i++) {
             final Integer b = array[i];
@@ -1819,33 +1502,21 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Integer[] toObject(final @Nullable int array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_INTEGER_OBJECT_ARRAY;
+    static Integer[] toObject(final int array[]) {
         final Integer result[] = new Integer[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable short[] toPrimitive(final @Nullable Short array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_SHORT_ARRAY;
+    static short[] toPrimitive(final Short array[]) {
         final short result[] = new short[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable short[] toPrimitive(final @Nullable Short array[], final short valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_SHORT_ARRAY;
+    static short[] toPrimitive(final Short array[], final short valueForNull) {
         final short result[] = new short[array.length];
         for (int i = 0; i < array.length; i++) {
             final Short b = array[i];
@@ -1854,33 +1525,21 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Short[] toObject(final @Nullable short array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_SHORT_OBJECT_ARRAY;
+    static Short[] toObject(final short array[]) {
         final Short result[] = new Short[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable byte[] toPrimitive(final @Nullable Byte array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_BYTE_ARRAY;
+    static byte[] toPrimitive(final Byte array[]) {
         final byte result[] = new byte[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable byte[] toPrimitive(final @Nullable Byte array[], final byte valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_BYTE_ARRAY;
+    static byte[] toPrimitive(final Byte array[], final byte valueForNull) {
         final byte result[] = new byte[array.length];
         for (int i = 0; i < array.length; i++) {
             final Byte b = array[i];
@@ -1889,33 +1548,21 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Byte[] toObject(final @Nullable byte array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_BYTE_OBJECT_ARRAY;
+    static Byte[] toObject(final byte array[]) {
         final Byte result[] = new Byte[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable double[] toPrimitive(final @Nullable Double array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_DOUBLE_ARRAY;
+    static double[] toPrimitive(final Double array[]) {
         final double result[] = new double[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable double[] toPrimitive(final @Nullable Double array[], final double valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_DOUBLE_ARRAY;
+    static double[] toPrimitive(final Double array[], final double valueForNull) {
         final double result[] = new double[array.length];
         for (int i = 0; i < array.length; i++) {
             final Double b = array[i];
@@ -1924,33 +1571,21 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Double[] toObject(final @Nullable double array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_DOUBLE_OBJECT_ARRAY;
+    static Double[] toObject(final double array[]) {
         final Double result[] = new Double[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable float[] toPrimitive(final @Nullable Float array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_FLOAT_ARRAY;
+    static float[] toPrimitive(final Float array[]) {
         final float result[] = new float[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable float[] toPrimitive(final @Nullable Float array[], final float valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_FLOAT_ARRAY;
+    static float[] toPrimitive(final Float array[], final float valueForNull) {
         final float result[] = new float[array.length];
         for (int i = 0; i < array.length; i++) {
             final Float b = array[i];
@@ -1959,33 +1594,21 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Float[] toObject(final @Nullable float array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_FLOAT_OBJECT_ARRAY;
+    static Float[] toObject(final float array[]) {
         final Float result[] = new Float[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable boolean[] toPrimitive(final @Nullable Boolean array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_BOOLEAN_ARRAY;
+    static boolean[] toPrimitive(final Boolean array[]) {
         final boolean result[] = new boolean[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i];
         return result;
     }
     
-    static @Nullable boolean[] toPrimitive(final @Nullable Boolean array[], final boolean valueForNull) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_BOOLEAN_ARRAY;
+    static boolean[] toPrimitive(final Boolean array[], final boolean valueForNull) {
         final boolean result[] = new boolean[array.length];
         for (int i = 0; i < array.length; i++) {
             final Boolean b = array[i];
@@ -1994,20 +1617,14 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable Boolean[] toObject(final @Nullable boolean array[]) {
-        if (array == null)
-            return null;
-        else if (array.length == 0)
-            return EMPTY_BOOLEAN_OBJECT_ARRAY;
+    static Boolean[] toObject(final boolean array[]) {
         final Boolean result[] = new Boolean[array.length];
         for (int i = 0; i < array.length; i++)
             result[i] = array[i] ? Boolean.TRUE : Boolean.FALSE;
         return result;
     }
     
-    static @Nullable Object toPrimitive(final @Nullable Object array) {
-        if (array == null)
-            return null;
+    static Object toPrimitive(final Object array) {
         final Class<?> type = TypeHelper.unboxType(array.getClass().getComponentType());
         if (byte.class.equals(type))
             return toPrimitive((Byte[]) array);
@@ -2028,23 +1645,23 @@ public interface ArrayHelper {
         return array;
     }
     
-    static boolean isEmpty(final Object array[]) = getLength(array) == 0;
+    static boolean isEmpty(final Object array[]) = array.length == 0;
     
-    static boolean isEmpty(final long array[]) = getLength(array) == 0;
+    static boolean isEmpty(final long array[]) = array.length == 0;
     
-    static boolean isEmpty(final int array[]) = getLength(array) == 0;
+    static boolean isEmpty(final int array[]) = array.length == 0;
     
-    static boolean isEmpty(final short array[]) = getLength(array) == 0;
+    static boolean isEmpty(final short array[]) = array.length == 0;
     
-    static boolean isEmpty(final char array[]) = getLength(array) == 0;
+    static boolean isEmpty(final char array[]) = array.length == 0;
     
-    static boolean isEmpty(final byte array[]) = getLength(array) == 0;
+    static boolean isEmpty(final byte array[]) = array.length == 0;
     
-    static boolean isEmpty(final double array[]) = getLength(array) == 0;
+    static boolean isEmpty(final double array[]) = array.length == 0;
     
-    static boolean isEmpty(final float array[]) = getLength(array) == 0;
+    static boolean isEmpty(final float array[]) = array.length == 0;
     
-    static boolean isEmpty(final boolean array[]) = getLength(array) == 0;
+    static boolean isEmpty(final boolean array[]) = array.length == 0;
     
     static <T> boolean isNotEmpty(final T array[]) = !isEmpty(array);
     
@@ -2066,10 +1683,6 @@ public interface ArrayHelper {
     
     @SafeVarargs
     static <T> T[] addAll(final T array1[], final T... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final Class<?> type1 = array1.getClass().getComponentType();
         final T joinedArray[] = (T[]) Array.newInstance(type1, array1.length + array2.length);
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
@@ -2079,16 +1692,12 @@ public interface ArrayHelper {
             final Class<?> type2 = array2.getClass().getComponentType();
             if (!type1.isAssignableFrom(type2))
                 throw new IllegalArgumentException(STR."Cannot store \{type2.getName()} in an array of \{type1.getName()}", ase);
-            throw ase; // No, so rethrow original
+            throw ase;
         }
         return joinedArray;
     }
     
     static boolean[] addAll(final boolean array1[], final boolean... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final boolean joinedArray[] = new boolean[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2096,10 +1705,6 @@ public interface ArrayHelper {
     }
     
     static char[] addAll(final char array1[], final char... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final char joinedArray[] = new char[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2107,10 +1712,6 @@ public interface ArrayHelper {
     }
     
     static byte[] addAll(final byte array1[], final byte... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final byte joinedArray[] = new byte[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2118,10 +1719,6 @@ public interface ArrayHelper {
     }
     
     static short[] addAll(final short array1[], final short... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final short joinedArray[] = new short[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2129,10 +1726,6 @@ public interface ArrayHelper {
     }
     
     static int[] addAll(final int array1[], final int... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final int joinedArray[] = new int[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2140,10 +1733,6 @@ public interface ArrayHelper {
     }
     
     static long[] addAll(final long array1[], final long... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final long joinedArray[] = new long[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2151,10 +1740,6 @@ public interface ArrayHelper {
     }
     
     static float[] addAll(final float array1[], final float... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final float joinedArray[] = new float[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
@@ -2162,106 +1747,73 @@ public interface ArrayHelper {
     }
     
     static double[] addAll(final double array1[], final double... array2) {
-        if (array1 == null)
-            return array2.clone();
-        else if (array2 == null)
-            return array1.clone();
         final double joinedArray[] = new double[array1.length + array2.length];
         System.arraycopy(array1, 0, joinedArray, 0, array1.length);
         System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
         return joinedArray;
     }
     
-    static <T> T[] add(final @Nullable T array[], final @Nullable T element) {
-        final Class<?> type;
-        if (array != null)
-            type = array.getClass().getComponentType();
-        else if (element != null)
-            type = element.getClass();
-        else
-            throw new IllegalArgumentException("Arguments cannot both be null");
-        final T newArray[] = (T[]) copyArrayGrow1(array, type);
+    static <T> T[] add(final T array[], final @Nullable T element) {
+        final T newArray[] = (T[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable boolean[] insert(final @Nullable boolean array[], final boolean element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable byte[] insert(final @Nullable byte array[], final byte element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable char[] insert(final @Nullable char array[], final char element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable double[] insert(final @Nullable double array[], final double element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable float[] insert(final @Nullable float array[], final float element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable int[] insert(final @Nullable int array[], final int element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable long[] insert(final @Nullable long array[], final long element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable short[] insert(final @Nullable short array[], final short element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable <T> T[] insert(final @Nullable T array[], final T element) = array == null ? add(array, element) : insert(0, array, element);
-    
-    static @Nullable boolean[] add(final @Nullable boolean array[], final boolean element) {
-        final boolean newArray[] = (boolean[]) copyArrayGrow1(array, Boolean.TYPE);
+    static boolean[] add(final boolean array[], final boolean element) {
+        final boolean newArray[] = (boolean[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable byte[] add(final @Nullable byte array[], final byte element) {
-        final byte newArray[] = (byte[]) copyArrayGrow1(array, Byte.TYPE);
+    static byte[] add(final byte array[], final byte element) {
+        final byte newArray[] = (byte[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable char[] add(final @Nullable char array[], final char element) {
-        final char newArray[] = (char[]) copyArrayGrow1(array, Character.TYPE);
+    static char[] add(final char array[], final char element) {
+        final char newArray[] = (char[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable double[] add(final @Nullable double array[], final double element) {
-        final double newArray[] = (double[]) copyArrayGrow1(array, Double.TYPE);
+    static double[] add(final double array[], final double element) {
+        final double newArray[] = (double[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable float[] add(final @Nullable float array[], final float element) {
-        final float newArray[] = (float[]) copyArrayGrow1(array, Float.TYPE);
+    static float[] add(final float array[], final float element) {
+        final float newArray[] = (float[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable int[] add(final @Nullable int array[], final int element) {
-        final int newArray[] = (int[]) copyArrayGrow1(array, Integer.TYPE);
+    static int[] add(final int array[], final int element) {
+        final int newArray[] = (int[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable long[] add(final @Nullable long array[], final long element) {
-        final long newArray[] = (long[]) copyArrayGrow1(array, Long.TYPE);
+    static long[] add(final long array[], final long element) {
+        final long newArray[] = (long[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    static @Nullable short[] add(final @Nullable short array[], final short element) {
-        final short newArray[] = (short[]) copyArrayGrow1(array, Short.TYPE);
+    static short[] add(final short array[], final short element) {
+        final short newArray[] = (short[]) copyArrayGrow1(array);
         newArray[newArray.length - 1] = element;
         return newArray;
     }
     
-    private static Object copyArrayGrow1(final @Nullable Object array, final Class<?> newArrayComponentType) {
-        if (array != null) {
-            final int arrayLength = Array.getLength(array);
-            final Object newArray = Array.newInstance(array.getClass().getComponentType(), arrayLength + 1);
-            System.arraycopy(array, 0, newArray, 0, arrayLength);
-            return newArray;
-        }
-        return Array.newInstance(newArrayComponentType, 1);
+    private static Object copyArrayGrow1(final Object array) {
+        final int arrayLength = Array.getLength(array);
+        final Object newArray = Array.newInstance(array.getClass().getComponentType(), arrayLength + 1);
+        System.arraycopy(array, 0, newArray, 0, arrayLength);
+        return newArray;
     }
     
-    // remove() always creates an array of the same type as its input
     static <T> T[] remove(final T array[], final int index) = (T[]) remove((Object) array, index);
     
     static <T> T[] removeElement(final T array[], final Object element) {
@@ -2351,12 +1903,10 @@ public interface ArrayHelper {
         final Object result = Array.newInstance(array.getClass().getComponentType(), length - 1);
         System.arraycopy(array, 0, result, 0, index);
         if (index < length - 1)
-            
             System.arraycopy(array, index + 1, result, index, length - index - 1);
         return result;
     }
     
-    // removeAll() always creates an array of the same type as its input
     static <T> T[] removeAll(final T array[], final int... indices) = (T[]) removeAll((Object) array, indices);
     
     static byte[] removeAll(final byte array[], final int... indices) = (byte[]) removeAll((Object) array, indices);
@@ -2377,10 +1927,9 @@ public interface ArrayHelper {
     
     private static Object removeAll(final Object array, final int... indices) {
         final int length = getLength(array);
-        int diff = 0; // number of distinct indexes, i.e. number of entries that will be removed
+        int diff = 0;
         final int clonedIndices[] = indices.clone();
         Arrays.sort(clonedIndices);
-        // identify length of result array
         if (isNotEmpty(clonedIndices)) {
             int i = clonedIndices.length;
             int prevIndex = length;
@@ -2394,18 +1943,15 @@ public interface ArrayHelper {
                 prevIndex = index;
             }
         }
-        // create result array
         final Object result = Array.newInstance(array.getClass().getComponentType(), length - diff);
         if (diff < length) {
-            int end = length; // index just after last copy
-            int dest = length - diff; // number of entries so far not copied
+            int end = length;
+            int dest = length - diff;
             for (int i = clonedIndices.length - 1; i >= 0; i--) {
-                final int index = clonedIndices[i];
-                if (end - index > 1) { // same as (cp > 0)
-                    final int cp = end - index - 1;
+                final int index = clonedIndices[i], cp = end - index - 1;
+                if (cp > 0) {
                     dest -= cp;
                     System.arraycopy(array, index + 1, result, dest, cp);
-                    // After this copy, we still have room for dest items.
                 }
                 end = index;
             }
@@ -2417,7 +1963,7 @@ public interface ArrayHelper {
     
     static Object removeAll(final Object array, final BitSet indices) {
         final int srcLength = getLength(array);
-        final int removals = indices.cardinality(); // true bits are items to remove
+        final int removals = indices.cardinality();
         final Object result = Array.newInstance(array.getClass().getComponentType(), srcLength - removals);
         int srcIndex = 0;
         int destIndex = 0;
@@ -2440,10 +1986,6 @@ public interface ArrayHelper {
     static <T extends Comparable<? super T>> boolean isSorted(final T array[]) = isSorted(array, Comparator.naturalOrder());
     
     static <T> boolean isSorted(final T array[], final Comparator<T> comparator) {
-        if (comparator == null)
-            throw new IllegalArgumentException("Comparator should not be null.");
-        if (array == null || array.length < 2)
-            return true;
         T previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2456,8 +1998,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final int array[]) {
-        if (array == null || array.length < 2)
-            return true;
         int previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2470,8 +2010,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final long array[]) {
-        if (array == null || array.length < 2)
-            return true;
         long previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2484,8 +2022,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final short array[]) {
-        if (array == null || array.length < 2)
-            return true;
         short previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2498,8 +2034,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final double array[]) {
-        if (array == null || array.length < 2)
-            return true;
         double previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2512,8 +2046,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final float array[]) {
-        if (array == null || array.length < 2)
-            return true;
         float previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2526,8 +2058,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final byte array[]) {
-        if (array == null || array.length < 2)
-            return true;
         byte previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2540,8 +2070,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final char array[]) {
-        if (array == null || array.length < 2)
-            return true;
         char previous = array[0];
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2554,8 +2082,6 @@ public interface ArrayHelper {
     }
     
     static boolean isSorted(final boolean array[]) {
-        if (array == null || array.length < 2)
-            return true;
         boolean previous = false;
         final int n = array.length;
         for (int i = 1; i < n; i++) {
@@ -2675,9 +2201,7 @@ public interface ArrayHelper {
         return removeAll(array, Arrays.copyOf(indices, count));
     }
     
-    static @Nullable boolean[] insert(final int index, final @Nullable boolean array[], final boolean... values) {
-        if (array == null)
-            return null;
+    static boolean[] insert(final boolean array[], final int index = 0, final boolean... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2691,9 +2215,7 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable byte[] insert(final int index, final @Nullable byte array[], final byte... values) {
-        if (array == null)
-            return null;
+    static byte[] insert(final byte array[], final int index = 0, final byte... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2707,9 +2229,7 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable char[] insert(final int index, final @Nullable char array[], final char... values) {
-        if (array == null)
-            return null;
+    static char[] insert(final char array[], final int index = 0, final char... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2723,9 +2243,7 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable double[] insert(final int index, final @Nullable double array[], final double... values) {
-        if (array == null)
-            return null;
+    static double[] insert(final double array[], final int index = 0, final double... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2739,9 +2257,7 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable float[] insert(final int index, final @Nullable float array[], final float... values) {
-        if (array == null)
-            return null;
+    static float[] insert(final float array[], final int index = 0, final float... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2755,9 +2271,7 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable int[] insert(final int index, final @Nullable int array[], final int... values) {
-        if (array == null)
-            return null;
+    static int[] insert(final int array[], final int index = 0, final int... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2771,9 +2285,7 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable long[] insert(final int index, final @Nullable long array[], final long... values) {
-        if (array == null)
-            return null;
+    static long[] insert(final long array[], final int index = 0, final long... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2787,9 +2299,7 @@ public interface ArrayHelper {
         return result;
     }
     
-    static @Nullable short[] insert(final int index, final @Nullable short array[], final short... values) {
-        if (array == null)
-            return null;
+    static short[] insert(final short array[], final int index = 0, final short... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)
@@ -2804,9 +2314,7 @@ public interface ArrayHelper {
     }
     
     @SafeVarargs
-    static @Nullable <T> T[] insert(final int index, final @Nullable T array[], final T... values) {
-        if (array == null)
-            return null;
+    static <T> T[] insert(final T array[], final int index = 0, final T... values) {
         if (isEmpty(values))
             return array.clone();
         if (index < 0 || index > array.length)

@@ -60,6 +60,7 @@ public class GetterHandler extends BaseHandler<Getter> {
             if (tree.sym != null && (Privilege) tree.sym.data instanceof Callable<?>)
                 (Privilege) (tree.sym.data = null);
             tree.mods.flags &= ~FINAL;
+            // noinspection DataFlowIssue
             tree.sym.flags_field &= ~FINAL;
             final String type = switch (attr.attribType(unpackedType, env)) {
                 case Type.JCPrimitiveType primitiveType -> switch (primitiveType.getTag()) {

@@ -99,7 +99,7 @@ public class ResourcePath implements Closeable {
         
         @Override
         public String toString() {
-            final FileSystem domain = domain();
+            final @Nullable FileSystem domain = domain();
             return STR."\{domain == null ? "default" : domain.toString()} | \{root()}";
         }
         
@@ -138,7 +138,7 @@ public class ResourcePath implements Closeable {
         @Override
         public String toString() {
             final FileSystem domain = path().getFileSystem();
-            return STR."\{domain == null ? "default" : domain.toString()} | \{root() / path()}";
+            return STR."\{domain.toString()} | \{root() / path()}";
         }
         
     }

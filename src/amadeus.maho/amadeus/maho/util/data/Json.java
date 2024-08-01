@@ -17,7 +17,9 @@ import java.util.stream.IntStream;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
+import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.VisitorChain;
 import amadeus.maho.lang.inspection.Nullable;
@@ -111,7 +113,7 @@ public interface Json {
                     default                                  -> builder.append(dynamic);
                 }
             }
-            default       -> {
+            default                    -> {
                 final Class<?> type = value.getClass();
                 if (TypeHelper.isSimple(type) || Number.class.isAssignableFrom(type))
                     builder.append(value);
@@ -190,14 +192,19 @@ public interface Json {
         
     }
     
+    @RequiredArgsConstructor
     @FieldDefaults(level = AccessLevel.PROTECTED)
     class Dynamic extends Visitor {
+        
+        @Default
+        final boolean caseSensitive = true;
         
         final ArrayDeque<DynamicObject> deque = { };
         
         final ArrayDeque<String> keys = { };
         
-        @Nullable DynamicObject root;
+        @Nullable
+        DynamicObject root;
         
         public DynamicObject root() {
             assert root != null;
@@ -207,7 +214,7 @@ public interface Json {
         }
         
         @Override
-        public void beginObject() = deque += new DynamicObject.MapUnit();
+        public void beginObject() = deque += new DynamicObject.MapUnit(caseSensitive);
         
         @Override
         public void endObject() = end(deque.removeLast());
@@ -273,13 +280,15 @@ public interface Json {
     });
     
     EscapeFunction escape = (context, codePoint) -> switch (codePoint) {
-        case '\\', '/', '"' -> codePoint;
-        case 'b'            -> '\b';
-        case 'f'            -> '\f';
-        case 'n'            -> '\n';
-        case 'r'            -> '\r';
-        case 't'            -> '\t';
-        case 'u'            -> {
+        case '\\',
+             '/',
+             '"' -> codePoint;
+        case 'b' -> '\b';
+        case 'f' -> '\f';
+        case 'n' -> '\n';
+        case 'r' -> '\r';
+        case 't' -> '\t';
+        case 'u' -> {
             final char high = scan4Hex(context);
             if (Character.isHighSurrogate(high) && context.match("\\u")) {
                 context.offset(2);
@@ -290,7 +299,7 @@ public interface Json {
             }
             yield high;
         }
-        default             -> throw context.invalid(STR."invalid escape codePoint: \{codePoint}");
+        default  -> throw context.invalid(STR."invalid escape codePoint: \{codePoint}");
     };
     
     private static char scan4Hex(final Context context) {
@@ -302,19 +311,22 @@ public interface Json {
             final int v = hexTable[c];
             if (v == -1)
                 throw context.invalid();
+            // noinspection lossy-conversions
             result |= result << (i << 3);
         }
         return result;
     }
     
-    static void read(final String source, final Visitor visitor, final @Nullable String debugInfo = source) throws IOException = scanJsonBody(visitor, tokenization(source, debugInfo).root());
+    static void read(final String source, final Visitor visitor, final @Nullable String debugInfo = source) throws IOException
+        = scanJsonBody(visitor, tokenization(source, debugInfo).root());
     
     static void read(final Path path, final Charset charset = StandardCharsets.UTF_8, final Visitor visitor, final @Nullable String debugInfo = path.toString()) throws IOException {
-        try (final var input = Files.newInputStream(path)) { read(input, visitor, debugInfo); }
+        try (final var input = Files.newInputStream(path)) { read(input, charset, visitor, debugInfo); }
     }
     
     @SneakyThrows
-    static void read(final InputStream input, final Charset charset = StandardCharsets.UTF_8, final Visitor visitor, final @Nullable String debugInfo) = scanJsonBody(visitor, tokenization(input.readString(charset), debugInfo).root());
+    static void read(final InputStream input, final Charset charset = StandardCharsets.UTF_8, final Visitor visitor, final @Nullable String debugInfo)
+        = scanJsonBody(visitor, tokenization(input.readString(charset), debugInfo).root());
     
     static void scanJsonBody(final Visitor visitor, final Context context) {
         scanValue(visitor, context);
@@ -325,9 +337,20 @@ public interface Json {
     private static void scanValue(final Visitor visitor, final Context context) {
         context.skip(ws);
         switch (context.checkEOF().nextChar()) {
-            case '"'                                                        -> visitor.visitValue(scanString(context, true));
-            case '-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> visitor.visitValue(scanNumber(context.rollback()));
-            case '{'                                                        -> {
+            case '"' -> visitor.visitValue(scanString(context, true));
+            case '-',
+                 '+',
+                 '0',
+                 '1',
+                 '2',
+                 '3',
+                 '4',
+                 '5',
+                 '6',
+                 '7',
+                 '8',
+                 '9' -> visitor.visitValue(scanNumber(context.rollback()));
+            case '{' -> {
                 visitor.beginObject();
                 context.skip(ws);
                 while (!context.checkEOF().match("}")) {
@@ -340,7 +363,7 @@ public interface Json {
                 context.nextChar();
                 visitor.endObject();
             }
-            case '['                                                        -> {
+            case '[' -> {
                 visitor.beginArray();
                 context.skip(ws);
                 while (!context.checkEOF().match("]")) {
@@ -350,19 +373,19 @@ public interface Json {
                 context.nextChar();
                 visitor.endArray();
             }
-            case 't'                                                        -> {
+            case 't' -> {
                 context.skip("true".substring(1));
                 visitor.visitValue(true);
             }
-            case 'f'                                                        -> {
+            case 'f' -> {
                 context.skip("false".substring(1));
                 visitor.visitValue(false);
             }
-            case 'n'                                                        -> {
+            case 'n' -> {
                 context.skip("null".substring(1));
                 visitor.visitValue(null);
             }
-            default                                                         -> throw context.invalid(STR."invalid json value start with: \{context.nowChar()}");
+            default  -> throw context.invalid(STR."invalid json value start with: \{context.nowChar()}");
         }
         context.skip(ws);
     }

@@ -73,7 +73,9 @@ public record ClassLoaderDelegate(
                     if (connected)
                         return;
                     connected = true;
-                    final ShellClassLoader.ClassFile file = classFiles[name];
+                    final @Nullable ShellClassLoader.ClassFile file = classFiles[name];
+                    if (file == null)
+                        throw new IllegalStateException(STR."Resource not found: \{name}");
                     in = new ByteArrayInputStream(file.data());
                     fields = new LinkedHashMap<>();
                     fields.put("content-length", List.of(Integer.toString(file.data().length)));
@@ -90,7 +92,7 @@ public record ClassLoaderDelegate(
                 }
                 
                 @Override
-                public String getHeaderField(final String name) {
+                public @Nullable String getHeaderField(final String name) {
                     connect();
                     return fields.getOrDefault(name, List.of())
                             .stream()
@@ -109,7 +111,7 @@ public record ClassLoaderDelegate(
                 
                 @Override
                 public @Nullable String getHeaderField(final int n) {
-                    final String name = getHeaderFieldKey(n);
+                    final @Nullable String name = getHeaderFieldKey(n);
                     return name != null ? getHeaderField(name) : null;
                 }
                 

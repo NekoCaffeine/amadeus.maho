@@ -75,7 +75,7 @@ public class BitAccess {
         }
         
         @SneakyThrows
-        public LongStream stream(final int length, final @Nullable boolean hasNext[] = { true }) = LongStream.generate(() -> readNBits(length, hasNext)).takeWhile(_ -> hasNext[0]);
+        public LongStream stream(final int length, final boolean hasNext[] = { true }) = LongStream.generate(() -> readNBits(length, hasNext)).takeWhile(_ -> hasNext[0]);
         
     }
     

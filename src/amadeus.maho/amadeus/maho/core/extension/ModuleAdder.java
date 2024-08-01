@@ -33,7 +33,7 @@ public interface ModuleAdder {
     @IndirectCaller
     static void injectMissingSystemModules(final Class<?> caller = CallerContext.caller()) = ResourcePath.of(caller).traverse(Path.of("module-info.class")).forEach(ModuleAdder::injectMissingSystemModules);
     
-    static void injectMissingSystemModules(final Path moduleInfo) = ASMHelper.newClassNode(ASMHelper.newClassReader(moduleInfo))?.module?.requires?.stream()
+    static void injectMissingSystemModules(final Path moduleInfo) = ASMHelper.newClassNode(ASMHelper.newClassReader(moduleInfo)).module?.requires?.stream()
             .map(require -> require.module)
             .filter(name -> bootModules.contains(name) || platformModules.contains(name))
             .forEach(ModuleAdder::addSystemModule);

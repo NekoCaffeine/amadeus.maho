@@ -107,7 +107,7 @@ public class RearrangeHandler extends BaseHandler<Rearrange> {
     }
     
     private void let(final int indexes[], final Env<AttrContext> env, final JCTree.JCFieldAccess access, final Symbol.ClassSymbol symbol, final Symbol.ClassSymbol targetSymbol) {
-        final @Nullable List<? extends Symbol.RecordComponent> components = symbol.getRecordComponents();
+        final List<? extends Symbol.RecordComponent> components = symbol.getRecordComponents();
         final TreeMaker maker = this.maker.forToplevel(env.toplevel).at(access.pos);
         final JCTree.JCExpression expression;
         if (access.selected instanceof JCTree.JCIdent ident) {

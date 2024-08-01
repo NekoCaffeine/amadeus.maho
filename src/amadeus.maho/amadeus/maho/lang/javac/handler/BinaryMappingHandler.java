@@ -16,7 +16,6 @@ import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.jvm.Code;
 import com.sun.tools.javac.jvm.Gen;
 import com.sun.tools.javac.jvm.Items;
-import com.sun.tools.javac.jvm.PoolWriter;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeCopier;
 import com.sun.tools.javac.util.List;
@@ -136,12 +135,12 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
             final Name eofMark = name(BinaryMappingHandler.eofMark), offsetMark = name(BinaryMappingHandler.offsetMark);
             if (annotation.eofMark()) {
                 if (shouldInjectVariable(env, eofMark))
-                    injectMember(env, maker.VarDef(maker.Modifiers(PUBLIC | TRANSIENT, List.of(maker.Annotation(IdentQualifiedName(Getter.class), List.nil()))), eofMark, maker.TypeIdent(TypeTag.BOOLEAN), null), advance);
+                    injectMember(env, maker.VarDef(maker.Modifiers(PUBLIC | TRANSIENT, List.of(maker.Annotation(IdentQualifiedName(Getter.class), List.nil()))), eofMark, maker.TypeIdent(TypeTag.BOOLEAN), null), true);
                 injectInterface(env, tree, BinaryMapper.EOFMark.class);
             }
             if (annotation.offsetMark()) {
                 if (shouldInjectVariable(env, offsetMark))
-                    injectMember(env, maker.VarDef(maker.Modifiers(PUBLIC | TRANSIENT, List.of(maker.Annotation(IdentQualifiedName(Getter.class), List.nil()))), offsetMark, maker.TypeIdent(TypeTag.LONG), null), advance);
+                    injectMember(env, maker.VarDef(maker.Modifiers(PUBLIC | TRANSIENT, List.of(maker.Annotation(IdentQualifiedName(Getter.class), List.nil()))), offsetMark, maker.TypeIdent(TypeTag.LONG), null), true);
                 injectInterface(env, tree, BinaryMapper.OffsetMark.class);
             }
             injectInterface(env, tree, annotation.metadata() ? BinaryMapper.Metadata.class : BinaryMapper.class);
@@ -156,10 +155,10 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
                             List.of(maker.VarDef(maker.Modifiers(FINAL | PARAMETER), output, IdentQualifiedName(Serializable.Output.class), null)), List.of(IdentQualifiedName(IOException.class)), maker.Block(0L, fields(tree)
                                     .filter(field -> !skipWrite(field, env))
                                     .map(field -> {
-                                        List<JCTree.JCStatement> statements = write(maker.at(field.pos).Ident(output), maker.Ident(field.name), field.sym.type, bigEndian(endian, field, env), unsigned || unsigned(field, env), 0).collect(List.collector());
+                                        List<JCTree.JCStatement> statements = write(maker.at(field.pos).Ident(output), maker.Ident(field.name), field.sym.type, bigEndian(endian, field, env), unsigned || unsigned(field, env), 0)
+                                                .collect(List.collector());
                                         if (field.init != null && !constant(field, env) && forWrite(field, env)) {
                                             statements = statements.prepend(maker.at(field.init.pos).Exec(maker.Assign(maker.Ident(field.name), field.init)));
-                                            // noinspection DataFlowIssue
                                             field.init = null;
                                         }
                                         return maker.at(field.pos).Block(0L, statements);
@@ -182,7 +181,6 @@ public class BinaryMappingHandler extends BaseHandler<BinaryMapping> {
                                             assign = List.nil();
                                         else {
                                             assign = List.of(maker.at(field.init.pos).Exec(maker.Assign(maker.Ident(field.name), field.init)));
-                                            // noinspection DataFlowIssue
                                             field.init = null;
                                         }
                                         final EOFContext context = { annotation.eofMark() && ++p_index[0] == 0 ? EOFContext.Type.MARK_RETURN : optional(field, env) ? EOFContext.Type.RETURN : EOFContext.Type.THROW };

@@ -184,6 +184,7 @@ public class Frame {
         if (owner == TypeOwner.NULL)
             return Opcodes.NULL;
         if (owner.flag() != null)
+            // noinspection DataFlowIssue
             return owner.flag();
         return info(owner.type());
     }

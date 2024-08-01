@@ -6,6 +6,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 import amadeus.maho.lang.Extension;
+import amadeus.maho.lang.inspection.Nullable;
 
 @Extension
 public interface OptionalHelper {
@@ -18,7 +19,7 @@ public interface OptionalHelper {
     
     static double NOT(final OptionalDouble optional) = optional.orElseThrow();
     
-    static <T> T TILDE(final Optional<T> optional) = optional.orElse(null);
+    static <T> @Nullable T TILDE(final Optional<T> optional) = optional.orElse(null);
     
     static int TILDE(final OptionalInt optional) = optional.orElse(0);
     

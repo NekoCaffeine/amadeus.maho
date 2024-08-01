@@ -52,6 +52,7 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
     
     {
         if (handler.isNotDefault(TransformTarget::targetClass))
+            // noinspection DataFlowIssue
             target = handler.<Type>lookupSourceValue(TransformTarget::targetClass).getClassName();
         else
             target = annotation.target();
@@ -68,10 +69,11 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
     }
     
     @Override
-    public ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) = transformHandler[0].apply(context, node);
+    public ClassNode doTransform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain)
+        = transformHandler[0].apply(context, node);
     
     @SneakyThrows
-    private BiFunction<TransformContext, ClassNode, ClassNode> makeHandler(final ClassLoader loader) {
+    private BiFunction<TransformContext, ClassNode, ClassNode> makeHandler(final @Nullable ClassLoader loader) {
         final Class<?> targetType = lookupTargetType(sourceMethod);
         final Class<?> providerClass = ASMHelper.loadType(Type.getObjectType(sourceClass.name), false, loader);
         final MethodType methodType = ASMHelper.loadMethodType(sourceMethod.desc, loader);
@@ -112,7 +114,7 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
                 for (final ListIterator<MethodNode> iterator = node.methods.listIterator(); iterator.hasNext(); ) {
                     final MethodNode methodNode = iterator.next();
                     if ((uncheckName || selector.test(methodNode.name)) &&
-                            (uncheckDesc || desc.equals(methodNode.desc))) {
+                            (uncheckDesc || methodNode.desc.equals(desc))) {
                         TransformerManager.transform("transform", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}");
                         if (hasReturn) {
                             final @Nullable MethodNode result = (MethodNode) handle.invoke(context, node, methodNode);
@@ -131,7 +133,7 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
             return (context, node) -> {
                 for (final MethodNode methodNode : node.methods) {
                     if ((uncheckName || selector.test(methodNode.name)) &&
-                            (uncheckDesc || desc.equals(methodNode.desc))) {
+                            (uncheckDesc || methodNode.desc.equals(desc))) {
                         TransformerManager.transform("transform", STR."\{ASMHelper.sourceName(node.name)}#\{methodNode.name}\{methodNode.desc}\n->  \{ASMHelper.sourceName(sourceClass.name)}#\{sourceMethod.name}\{sourceMethod.desc}");
                         for (final ListIterator<AbstractInsnNode> insnIterator = methodNode.instructions.iterator(); insnIterator.hasNext(); ) {
                             final AbstractInsnNode insn = insnIterator.next();
@@ -200,6 +202,6 @@ public final class TargetTransformer extends MethodTransformer<TransformTarget> 
     public String lookupOwner(final String name) = ASMHelper.className(target);
     
     @Override
-    public String lookupDescriptor(final String name) = desc;
+    public String lookupDescriptor(final String name) = desc ?? "?";
     
 }

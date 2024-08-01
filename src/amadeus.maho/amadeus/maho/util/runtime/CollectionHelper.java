@@ -36,8 +36,9 @@ public interface CollectionHelper {
         return offset >= 0 && $this.subList(offset, offset + size).equals(suffix);
     }
     
-    static <T> @Nullable T GET(final List<T> list, final int index) {
+    static <T> T GET(final List<T> list, final int index) {
         final int size = list.size(), i = index < 0 ? size + index : index;
+        // noinspection DataFlowIssue
         return i > -1 && i < size ? list.get(i) : null;
     }
     

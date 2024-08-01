@@ -81,9 +81,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
     
     @Hook
     private static Hook.Result check(final Attr $this, final JCTree tree, final Type found, @Hook.Reference Kinds.KindSelector kind, final Attr.ResultInfo resultInfo) {
-        if (tree instanceof JCTree.JCMethodInvocation invocation && invocation.args.isEmpty() && invocation.typeargs.isEmpty()) {
-            final Name name = name(invocation.meth);
-            assert name != null;
+        if (tree instanceof JCTree.JCMethodInvocation invocation && invocation.args.isEmpty() && invocation.typeargs.isEmpty() && name(invocation.meth) instanceof Name name) {
             final Names names = name.table.names;
             if (name != names._this && name != names._super) {
                 kind = Kinds.KindSelector.VAR;
@@ -217,7 +215,7 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
     
     public @Nullable JCTree.JCExpression lowerSetter(final Env<AttrContext> env, final JCTree.JCMethodInvocation invocation,
             final UnaryOperator<JCTree.JCExpression> pre, final UnaryOperator<JCTree.JCExpression> post = UnaryOperator.identity()) {
-        final Name name = name(invocation.meth);
+        final @Nullable Name name = name(invocation.meth);
         if (name != names._this && name != names._super) {
             maker.at(invocation.pos);
             final LetHandler let = instance(LetHandler.class);
@@ -253,7 +251,6 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         return copier.copy(instance(LetHandler.class).let(env, letExpr, access.indexed, access.index));
     }
     
-    @SuppressWarnings("DataFlowIssue")
     public @Nullable JCTree.JCExpression lower(final JCTree tree, final Env<AttrContext> env, final @Nullable JCTree.JCExpression lowerExpr) {
         if (lowerExpr != null)
             throw new ReAttrException(() -> tree.type = lowerExpr.type, lowerExpr.type == null, next -> {
@@ -287,7 +284,6 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
         final ListBuffer<Type> argTypes = { };
         final Kinds.KindSelector kind = (Privilege) attr.attribArgs(Kinds.KindSelector.VAL, ((JCTree.JCMethodInvocation) localEnv.tree).args, localEnv, argTypes);
         final Type methodPrototype = (Privilege) attr.newMethodTemplate((Privilege) ((Privilege) attr.resultInfo).pt, argTypes.toList(), List.nil());
-        // noinspection DataFlowIssue
         (Privilege) (localEnv.info.pendingResolutionPhase = null);
         final Attr.ResultInfo resultInfo = (Privilege) attr.new ResultInfo(kind, methodPrototype, (Privilege) ((Privilege) attr.resultInfo).checkContext);
         final @Nullable Type methodType = discardDiagnostic(() -> {
@@ -316,7 +312,6 @@ public class OperatorOverloadingHandler extends BaseSyntaxHandler {
                     final Type returnType = methodType.getReturnType(), capturedReturnType = (Privilege) ((Privilege) resultInfo.checkContext).inferenceContext().cachedCapture(source, returnType, true);
                     (Privilege) (attr.result = (Privilege) attr.check(overloading, capturedReturnType, Kinds.KindSelector.VAL, resultInfo));
                     final Symbol symbol = symbol(overloading.meth);
-                    assert symbol != null;
                     final List<JCTree.JCExpression> realArgs = List.from(expressions).map(Supplier::get);
                     final OperatorInvocation invocation;
                     if (anyMatch(symbol.flags_field, STATIC))

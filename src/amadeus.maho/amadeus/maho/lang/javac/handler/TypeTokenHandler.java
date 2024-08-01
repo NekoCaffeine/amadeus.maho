@@ -22,8 +22,6 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.type.TypeToken;
 
-import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
-
 @TransformProvider
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -38,8 +36,7 @@ public class TypeTokenHandler extends JavacContext {
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void visitApply(final Attr $this, final JCTree.JCMethodInvocation tree) {
-        if (tree.args.isEmpty()) {
-            final Symbol symbol = requireNonNull(symbol(tree.meth));
+        if (tree.args.isEmpty() && symbol(tree.meth) instanceof Symbol symbol) {
             final TypeTokenHandler instance = instance(TypeTokenHandler.class);
             if (symbol instanceof Symbol.MethodSymbol methodSymbol && methodSymbol.owner.getQualifiedName() == instance.typeTokenName) {
                 final SignatureGenerator signatureGenerator = instance.signatureGenerator;
@@ -53,13 +50,11 @@ public class TypeTokenHandler extends JavacContext {
                         instance.log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, tree, new JCDiagnostic.Error(MahoJavac.KEY, "type-token.missing.type-arg"));
                 } else if (methodSymbol.name == instance.locateName) {
                     if (tree.typeargs.size() == 2) {
-                        // noinspection DataFlowIssue
                         if (tree.typeargs[1].type instanceof com.sun.tools.javac.code.Type.ClassType classType && classType.typarams_field != null && !classType.typarams_field.isEmpty()) {
                             final Symbol.TypeSymbol typeVarSymbol = tree.typeargs.head.type.tsym;
                             int index = -1;
                             final List<com.sun.tools.javac.code.Type> typeVars = classType.typarams_field;
                             for (int i = 0; i < typeVars.size(); i++) {
-                                // noinspection DataFlowIssue
                                 if (typeVars[i].tsym == typeVarSymbol)
                                     if (index == -1)
                                         index = i;

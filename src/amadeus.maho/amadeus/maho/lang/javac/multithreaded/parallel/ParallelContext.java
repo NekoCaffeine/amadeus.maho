@@ -16,10 +16,10 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
+import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCheck;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentTransTypes;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchCompiler;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchContext;
-import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCheck;
 import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.runtime.ObjectHelper;
 

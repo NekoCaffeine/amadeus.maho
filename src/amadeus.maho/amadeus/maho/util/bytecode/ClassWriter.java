@@ -4,10 +4,11 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+
+import jdk.internal.org.objectweb.asm.ClassReader;
 
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -43,9 +44,9 @@ public class ClassWriter extends org.objectweb.asm.ClassWriter {
     private static final FunctionChain<Tuple2<ClassLoader, String>, String> inheritanceChainMapper = new FunctionChain<Tuple2<ClassLoader, String>, String>()
             .add(target -> target.map(tuple -> {
                 final @Nullable InputStream resource = tuple.v1.getResourceAsStream(STR."\{tuple.v2}.class");
-                return resource == null ? null : ASMHelper.newClassReader(resource).getSuperName();
+                return resource == null ? null : new ClassReader(resource).getSuperName();
             }))
-            .add(target -> defaultSuperName());
+            .add(_ -> defaultSuperName());
     
     protected void lookupSuper(final ClassLoader loader, final String name, final LinkedList<String> result) {
         result << name;
@@ -106,7 +107,7 @@ public class ClassWriter extends org.objectweb.asm.ClassWriter {
     
     protected ClassLoader wrapper(final @Nullable ClassLoader loader) = loader == null ? ClassLoader.getPlatformClassLoader() : loader;
     
-    public static byte[] toBytecode(final Consumer<ClassWriter> accepter) = new ClassWriter(null).let(accepter).toByteArray();
+    public static byte[] toBytecode(final Consumer<ClassWriter> acceptor) = new ClassWriter(null).let(acceptor).toByteArray();
     
     public byte[] toBytecode(final ClassNode node, final Collection<MethodNode> methods) = toBytecode(node, methods::contains);
     

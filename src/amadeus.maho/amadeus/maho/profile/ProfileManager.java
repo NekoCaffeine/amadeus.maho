@@ -89,12 +89,14 @@ public enum ProfileManager implements ClassTransformer {
     public static void exit() = instance().profilers().forEach(Profiler::exit);
     
     @Override
-    public ClassNode transform(final TransformContext context, final ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
-        final String name = sourceName(node.name);
-        if (isTarget(loader, name))
-            for (final MethodNode methodNode : node.methods)
-                if (!methodNode.name.equals(_CLINIT_) && methodNode.instructions.size() != 0)
-                    hookMethod(context, node, methodNode);
+    public @Nullable ClassNode transform(final TransformContext context, final @Nullable ClassNode node, final @Nullable ClassLoader loader, final @Nullable Class<?> clazz, final @Nullable ProtectionDomain domain) {
+        if (node != null) {
+            final String name = sourceName(node.name);
+            if (isTarget(loader, name))
+                for (final MethodNode methodNode : node.methods)
+                    if (!methodNode.name.equals(_CLINIT_) && methodNode.instructions.size() != 0)
+                        hookMethod(context, node, methodNode);
+        }
         return node;
     }
     

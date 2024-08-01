@@ -1,7 +1,6 @@
 package amadeus.maho.util.bytecode;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -187,7 +186,7 @@ public interface ASMHelper {
     static boolean shouldCast(final Type castType) = (castType.getSort() == Type.OBJECT || castType.getSort() == Type.ARRAY) && !castType.equals(TYPE_OBJECT);
     
     static Handle handle(final java.lang.reflect.Method method)
-            = { Modifier.isStatic(method.getModifiers()) ? H_INVOKESTATIC : H_INVOKEVIRTUAL, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), method.getDeclaringClass().isInterface() };
+        = { Modifier.isStatic(method.getModifiers()) ? H_INVOKESTATIC : H_INVOKEVIRTUAL, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), method.getDeclaringClass().isInterface() };
     
     static int returnOpcode(final Type type) = switch (type.getSort()) {
         case Type.BYTE,
@@ -248,7 +247,7 @@ public interface ASMHelper {
     
     static String classDesc(final String name) = STR."L\{className(name)};";
     
-    static @Nullable String sourceName(final @Nullable String name) = name == null ? null : className(name).replace('/', '.');
+    static String sourceName(final String name) = className(name).replace('/', '.');
     
     static Type arrayType(final Type type, final int dim = 1) = dim < 1 ? type : Type.getType("[".repeat(dim) + type.getDescriptor());
     
@@ -270,34 +269,34 @@ public interface ASMHelper {
     };
     
     static MethodNode computeMethodNode(final ClassNode node, final String name, final String desc, final BiFunction<String, String, MethodNode> mapping)
-            = lookupMethodNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.methods::add));
+        = lookupMethodNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.methods::add));
     
     static FieldNode computeField(final ClassNode node, final String name, final String desc, final BiFunction<String, String, FieldNode> mapping)
-            = lookupFieldNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.fields::add));
+        = lookupFieldNode(node, name, desc).orElseGet(() -> mapping.apply(name, desc).let(node.fields::add));
     
     static Optional<MethodNode> lookupMethodNode(final ClassNode node, final String name, final String desc)
-            = node.methods.stream().filter(methodNode -> methodNode.name.equals(name) && methodNode.desc.equals(desc)).findAny();
+        = node.methods.stream().filter(methodNode -> methodNode.name.equals(name) && methodNode.desc.equals(desc)).findAny();
     
     static Optional<FieldNode> lookupFieldNode(final ClassNode node, final String name, final String desc)
-            = node.fields.stream().filter(fieldNode -> fieldNode.name.equals(name) && fieldNode.desc.equals(desc)).findAny();
+        = node.fields.stream().filter(fieldNode -> fieldNode.name.equals(name) && fieldNode.desc.equals(desc)).findAny();
     
     static void injectInsnList(final MethodNode methodNode, final Consumer<MethodGenerator> consumer)
-            = methodNode.instructions.insert(new InsnList().let(it -> consumer.accept(MethodGenerator.fromShadowMethodNode(methodNode, it))));
+        = methodNode.instructions.insert(new InsnList().let(it -> consumer.accept(MethodGenerator.fromShadowMethodNode(methodNode, it))));
     
     static void injectInsnList(final MethodNode methodNode, final Predicate<AbstractInsnNode> predicate, final boolean before, final Consumer<MethodGenerator> consumer)
-            = StreamHelper.fromIterable(methodNode.instructions)
-            .filter(predicate)
-            .forEach(insn -> {
-                final InsnList injectList = { };
-                consumer.accept(MethodGenerator.fromShadowMethodNode(methodNode, injectList));
-                if (before)
-                    methodNode.instructions.insertBefore(insn, injectList);
-                else
-                    methodNode.instructions.insert(insn, injectList);
-            });
+        = StreamHelper.fromIterable(methodNode.instructions)
+                .filter(predicate)
+                .forEach(insn -> {
+                    final InsnList injectList = { };
+                    consumer.accept(MethodGenerator.fromShadowMethodNode(methodNode, injectList));
+                    if (before)
+                        methodNode.instructions.insertBefore(insn, injectList);
+                    else
+                        methodNode.instructions.insert(insn, injectList);
+                });
     
     static void injectInsnListByBytecodes(final MethodNode methodNode, final IntPredicate predicate, final boolean before, final Consumer<MethodGenerator> consumer)
-            = injectInsnList(methodNode, insn -> predicate.test(insn.getOpcode()), before, consumer);
+        = injectInsnList(methodNode, insn -> predicate.test(insn.getOpcode()), before, consumer);
     
     static void delAllAnnotation(final ClassNode node, final Set<Class<? extends Annotation>> annotationTypes) {
         delAnnotation(node, annotationTypes);
@@ -334,7 +333,7 @@ public interface ASMHelper {
                 delAnnotation(annotationNodes, annotationTypes);
     }
     
-    static void delAnnotation(final List<? extends AnnotationNode> annotationNodes, final Set<Class<? extends Annotation>> annotationTypes) {
+    static void delAnnotation(final @Nullable List<? extends AnnotationNode> annotationNodes, final Set<Class<? extends Annotation>> annotationTypes) {
         if (annotationNodes == null)
             return;
         for (final Class<? extends Annotation> annotationType : annotationTypes) {
@@ -353,43 +352,43 @@ public interface ASMHelper {
     }
     
     static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final ClassNode node, final Class<? extends Annotation> annotationType)
-            = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
+        = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
     
     static boolean hasAnnotation(final ClassNode node, final Class<? extends Annotation> annotationType)
-            = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
+        = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
     
     static <T extends Annotation> @Nullable T findAnnotation(final ClassNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
-            = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+        = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
     static <T extends Annotation> @Nullable T[] findAnnotations(final ClassNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
-            = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+        = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
     static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final FieldNode node, final Class<? extends Annotation> annotationType)
-            = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
+        = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
     
     static boolean hasAnnotation(final FieldNode node, final Class<? extends Annotation> annotationType)
-            = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
+        = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
     
     static <T extends Annotation> @Nullable T findAnnotation(final FieldNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
-            = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+        = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
     static <T extends Annotation> @Nullable T[] findAnnotations(final FieldNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
-            = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+        = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
     static @Nullable List<? extends AnnotationNode> lookupAnnotationNodes(final MethodNode node, final Class<? extends Annotation> annotationType)
-            = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
+        = isRuntimeAnnotation(annotationType) ? node.visibleAnnotations : node.invisibleAnnotations;
     
     static boolean hasAnnotation(final MethodNode node, final Class<? extends Annotation> annotationType)
-            = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
+        = hasAnnotation(lookupAnnotationNodes(node, annotationType), annotationType);
     
     static <T extends Annotation> @Nullable T findAnnotation(final MethodNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
-            = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+        = findAnnotation(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
     static <T extends Annotation> @Nullable T[] findAnnotations(final MethodNode node, final Class<T> annotationType, final @Nullable ClassLoader loader)
-            = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
+        = findAnnotations(lookupAnnotationNodes(node, annotationType), annotationType, loader);
     
     static boolean hasAnnotation(final @Nullable List<? extends AnnotationNode> annotationNodes, final Class<? extends Annotation> annotationType)
-            = findAnnotationNode(annotationNodes, annotationType) != null;
+        = findAnnotationNode(annotationNodes, annotationType) != null;
     
     static @Nullable AnnotationNode findAnnotationNode(final @Nullable List<? extends AnnotationNode> targetAnnotationNodes, final Class<? extends Annotation> annotationType) {
         if (targetAnnotationNodes == null)
@@ -398,7 +397,7 @@ public interface ASMHelper {
         for (final AnnotationNode annotationNode : targetAnnotationNodes)
             if (annotationNode.desc.equals(desc))
                 return annotationNode;
-        final AnnotationNode annotationNodes[] = findAnnotationNodes(targetAnnotationNodes, annotationType);
+        final @Nullable AnnotationNode annotationNodes[] = findAnnotationNodes(targetAnnotationNodes, annotationType);
         return annotationNodes != null && annotationNodes.length > 0 ? annotationNodes[0] : null;
     }
     
@@ -438,7 +437,7 @@ public interface ASMHelper {
     }
     
     static <T extends Annotation> @Nullable T[] findAnnotations(final @Nullable List<? extends AnnotationNode> annotationNodes, final Class<T> annotationType, final @Nullable ClassLoader loader) {
-        final AnnotationNode nodes[] = findAnnotationNodes(annotationNodes, annotationType);
+        final @Nullable AnnotationNode nodes[] = findAnnotationNodes(annotationNodes, annotationType);
         return nodes == null ? null : Stream.of(nodes)
                 .map(node -> AnnotationHandler.make(annotationType, loader, node.values))
                 .toArray(size -> (T[]) Array.newInstance(annotationType, size));
@@ -466,7 +465,7 @@ public interface ASMHelper {
                 }, Map::putAll);
     }
     
-    static boolean corresponding(final AnnotationNode annotationNode, final Class<?> annotationType) = annotationNode != null && annotationNode.desc.equals(classDesc(annotationType));
+    static boolean corresponding(final AnnotationNode annotationNode, final Class<?> annotationType) = annotationNode.desc.equals(classDesc(annotationType));
     
     static boolean isRuntimeAnnotation(final Class<? extends Annotation> annotationType) {
         final Retention retention = annotationType.getAnnotation(Retention.class);
@@ -607,7 +606,7 @@ public interface ASMHelper {
     }
     
     static int[] findCandidateParameters(final Type parameters[], final Type parameter) {
-        @Nullable int result[] = null;
+        int result[] = ArrayHelper.EMPTY_INT_ARRAY;
         for (int i = 0; i < parameters.length; i++)
             if (parameters[i].equals(parameter))
                 result = ArrayHelper.add(result, i);
@@ -622,8 +621,8 @@ public interface ASMHelper {
         return -1;
     }
     
-    static @Nullable int[] findAnnotatedParameters(final MethodNode methodNode, final Class<? extends Annotation> annotationType) {
-        @Nullable int result[] = null;
+    static int[] findAnnotatedParameters(final MethodNode methodNode, final Class<? extends Annotation> annotationType) {
+        int result[] = ArrayHelper.EMPTY_INT_ARRAY;
         if (methodNode.visibleParameterAnnotations != null)
             for (int i = 0, length = methodNode.visibleParameterAnnotations.length; i < length; i++)
                 if (hasAnnotation(methodNode.visibleParameterAnnotations[i], annotationType))
@@ -828,68 +827,24 @@ public interface ASMHelper {
     static long comparableVersionNumber(final int version) = (long) (version >>> 16) | version << 16;
     
     @SneakyThrows
-    static @Nullable ClassReader newClassReader(final @Nullable Path path) {
-        if (path == null)
-            return null;
-        return { Files.newInputStream(path) };
-    }
+    static ClassReader newClassReader(final Path path) = { Files.newInputStream(path) };
     
-    @SneakyThrows
-    static @Nullable ClassReader newClassReader(final @Nullable InputStream input) {
-        if (input == null)
-            return null;
-        return { input };
-    }
-    
-    static @Nullable ClassReader newClassReader(final @Nullable byte data[]) {
-        if (data == null)
-            return null;
-        return { data };
-    }
-    
-    static @Nullable ClassNode newClassNode(final @Nullable ClassNode node) {
-        if (node == null)
-            return null;
-        return newClassNode(ClassWriter.toBytecode(node::accept));
-    }
+    static ClassNode newClassNode(final ClassNode node) = newClassNode(ClassWriter.toBytecode(node::accept));
     
     Attribute attributePrototypes[] = { new ModuleHashesAttribute(), new ModuleResolutionAttribute(), new ModuleTargetAttribute() };
     
-    static @Nullable ClassNode newClassNode(final @Nullable byte data[], final int flags = 0) {
-        if (data == null)
-            return null;
-        final ClassReader reader = newClassReader(data);
+    static ClassNode newClassNode(final byte data[], final int flags = 0) {
+        final ClassReader reader = { data };
         final ClassNode result = { };
         reader.accept(result, attributePrototypes, flags);
         return result;
     }
     
-    static @Nullable ClassNode newClassNode(final @Nullable ClassReader reader, final int flags = 0) {
-        if (reader == null)
-            return null;
+    static ClassNode newClassNode(final ClassReader reader, final int flags = 0) {
         final ClassNode result = { };
         reader.accept(result, flags);
         return result;
     }
-    
-    static @Nullable ClassReader newClassReader(final String name) {
-        try {
-            return { name };
-        } catch (final IOException e) {
-            return null;
-        }
-    }
-    
-    static @Nullable ClassNode newClassNode(final String name, final int flags) {
-        final ClassReader reader = newClassReader(name);
-        if (reader == null)
-            return null;
-        final ClassNode result = { };
-        reader.accept(result, flags);
-        return result;
-    }
-    
-    static ClassNode newClassNode(final String name) = newClassNode(name, 0);
     
     static void addBytecodeInfo(final Throwable target, final byte bytecode[]) = target.addSuppressed(new ExtraInformationThrowable(STR."bytecode: \n\{dumpBytecode(new ClassReader(bytecode))}"));
     
@@ -910,11 +865,11 @@ public interface ASMHelper {
     static Class<?>[] loadTypes(final Stream<Type> types, final boolean initialize = false, final @Nullable ClassLoader loader) = types.map(type -> loadType(type, false, loader)).toArray(Class<?>[]::new);
     
     static MethodType loadMethodType(final String desc, final @Nullable ClassLoader loader)
-            = MethodType.methodType(loadType(Type.getReturnType(desc), false, loader), loadTypes(Stream.of(Type.getArgumentTypes(desc)), loader));
+        = MethodType.methodType(loadType(Type.getReturnType(desc), false, loader), loadTypes(Stream.of(Type.getArgumentTypes(desc)), loader));
     
     @SneakyThrows
     static java.lang.reflect.Method loadMethod(final Type owner, final String name, final String desc, final @Nullable ClassLoader loader)
-            = loadType(owner, loader).getDeclaredMethod(name, loadTypes(Stream.of(Type.getArgumentTypes(desc)), loader));
+        = loadType(owner, loader).getDeclaredMethod(name, loadTypes(Stream.of(Type.getArgumentTypes(desc)), loader));
     
     static String forName(final Type type) = type.getSort() == Type.ARRAY ? type.getDescriptor().replace('/', '.') : type.getClassName();
     

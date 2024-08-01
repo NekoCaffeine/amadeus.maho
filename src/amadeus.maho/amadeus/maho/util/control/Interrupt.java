@@ -15,7 +15,7 @@ public interface Interrupt {
     
     interface InterruptibleGetter<T> {
         
-        @Nullable T get() throws InterruptedException;
+        T get() throws InterruptedException;
         
     }
     
@@ -24,7 +24,7 @@ public interface Interrupt {
             runnable.run();
         } catch (final InterruptedException e) {
             Thread.interrupted();
-            interruptCallback.run();
+            interruptCallback?.run();
         }
     }
     

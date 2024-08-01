@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import jdk.internal.misc.Unsafe;
+import jdk.jshell.CompletenessAnalyzer;
 
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
@@ -111,13 +112,14 @@ import static org.objectweb.asm.Opcodes.*;
 @FieldDefaults(level = AccessLevel.PUBLIC)
 public class JavacContext {
     
+    @NoArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class SignatureGenerator extends Types.SignatureGenerator {
         
         public static final Context.Key<SignatureGenerator> signatureGeneratorKey = { };
         
         public static SignatureGenerator instance(final Context context) = context.get(signatureGeneratorKey) ?? new SignatureGenerator(context);
-
+        
         public SignatureGenerator(final Context context) {
             super(Types.instance(context));
             context.put(signatureGeneratorKey, this);
@@ -290,7 +292,8 @@ public class JavacContext {
         
         String annotationTypes[];
         
-        @Nullable Function<Class<? extends Annotation>, AnnotationVisitor> mapper;
+        @Nullable
+        Function<Class<? extends Annotation>, AnnotationVisitor> mapper;
         
         Map<String, Class<? extends Annotation>> cache = new HashMap<>();
         
@@ -326,7 +329,7 @@ public class JavacContext {
         
         @SafeVarargs
         public static void process(final ClassReader reader, final Function<Class<? extends Annotation>, AnnotationVisitor> mapper, final Class<? extends Annotation>... annotationTypes)
-                = reader.accept(new ClassAnnotationFinder(mapper, annotationTypes), ClassReader.SKIP_CODE);
+            = reader.accept(new ClassAnnotationFinder(mapper, annotationTypes), ClassReader.SKIP_CODE);
         
         @SafeVarargs
         public static void processVoid(final ClassReader reader, final Consumer<Class<? extends Annotation>> consumer, final Class<? extends Annotation>... annotationTypes) = process(reader, annotationType -> {
@@ -416,8 +419,9 @@ public class JavacContext {
         public static final int nextTokenKindId[] = { Tokens.TokenKind.values().length };
         
         public static final Tokens.TokenKind
-                KIND_NULL_OR     = newTokenKind("NULL_OR", nextTokenKindId[0]++, "??"),
-                KIND_SAFE_ACCESS = newTokenKind("SAFE_ACCESS", nextTokenKindId[0]++, "?.");
+                KIND_NULL_OR       = newTokenKind("NULL_OR", nextTokenKindId[0]++, "??"),
+                KIND_SAFE_ACCESS   = newTokenKind("SAFE_ACCESS", nextTokenKindId[0]++, "?."),
+                KIND_ASSERT_ACCESS = newTokenKind("ASSERT_ACCESS", nextTokenKindId[0]++, "!.");
         
         public static final ArrayList<Tokens.TokenKind> KINDS = { };
         
@@ -437,12 +441,9 @@ public class JavacContext {
         
         // # hack jshell
         
-        public static final String CompletenessAnalyzer = "jdk.jshell.CompletenessAnalyzer", TK = CompletenessAnalyzer + "$TK", TK_ARRAY = "[L" + TK + ";";
+        public static final String TK = "jdk.jshell.CompletenessAnalyzer$TK", TK_ARRAY = "[L" + TK + ";";
         
-        @Proxy(value = GETSTATIC, target = CompletenessAnalyzer)
-        private static native int XEXPR();
-        
-        public static int XEXPR = XEXPR();
+        public static int XEXPR = (Privilege) CompletenessAnalyzer.XEXPR, XTERM = (Privilege) CompletenessAnalyzer.XTERM;
         
         @Proxy(value = INVOKESTATIC, target = TK)
         private static native Enum @InvisibleType(TK_ARRAY) [] values();
@@ -453,8 +454,10 @@ public class JavacContext {
         public static final int nextTKId[] = { values().length };
         
         public static final @InvisibleType(TK) Enum
-                TK_NULL_OR     = newTK("NULL_OR", nextTKId[0]++, KIND_NULL_OR, XEXPR),
-                TK_SAFE_ACCESS = newTK("SAFE_ACCESS", nextTKId[0]++, KIND_SAFE_ACCESS, XEXPR);
+                TK_NULL_OR            = newTK("NULL_OR", nextTKId[0]++, KIND_NULL_OR, XEXPR),
+                TK_SAFE_ACCESS        = newTK("SAFE_ACCESS", nextTKId[0]++, KIND_SAFE_ACCESS, XEXPR),
+                TK_ASSERT_ACCESS      = newTK("ASSERT_ACCESS", nextTKId[0]++, KIND_ASSERT_ACCESS, XEXPR),
+                TK_POST_ASSERT_ACCESS = newTK("POST_ASSERT_ACCESS", nextTKId[0]++, Tokens.TokenKind.BANG, XEXPR | XTERM);
         
         public static final Map<Tokens.TokenKind, @InvisibleType(TK) Enum> TK_MAP = new HashMap<>();
         
@@ -467,7 +470,6 @@ public class JavacContext {
         private static @InvisibleType(TK) Object tokenKindToTK(final EnumMap<Tokens.TokenKind, Object> map, final Tokens.TokenKind kind) {
             // noinspection ConstantValue
             if (TK_MAP == null) // jdk.jshell.CompletenessAnalyzer$TK#<clinit>
-                // noinspection UnreachableCode
                 return map.get(kind);
             final @Nullable @InvisibleType(TK) Enum result = TK_MAP[kind];
             return result == null ? requireNonNull(map[kind]) : result;
@@ -481,21 +483,20 @@ public class JavacContext {
         public static final int nextTagId[] = { JCTree.Tag.values().length };
         
         public static final JCTree.Tag
-                TAG_NULL_OR     = newTag("NULL_OR", nextTagId[0]++),
-                TAG_SAFE_ACCESS = newTag("SAFE_CALL", nextTagId[0]++);
+                TAG_NULL_OR            = newTag("NULL_OR", nextTagId[0]++),
+                TAG_SAFE_ACCESS        = newTag("SAFE_ACCESS", nextTagId[0]++),
+                TAG_ASSERT_ACCESS      = newTag("ASSERT_ACCESS", nextTagId[0]++),
+                TAG_POST_ASSERT_ACCESS = newTag("POST_ASSERT_ACCESS", nextTagId[0]++);
         
         public static final Map<Tokens.TokenKind, JCTree.Tag> KIND_TO_TAG_MAP = new HashMap<>();
         public static final Map<JCTree.Tag, Tokens.TokenKind> TAG_TO_KIND_MAP = new HashMap<>();
         public static final Map<JCTree.Tag, Integer>          TAG_PREC_MAP    = new HashMap<>();
         
-        public static void addOperatorTags(final Map<JCTree.Tag, Tuple2<Tokens.TokenKind, Integer>> tagMapping) {
-            EnumHelper.addEnum(tagMapping.keySet().toArray(Enum[]::new));
-            tagMapping.forEach((tag, tuple) -> {
-                KIND_TO_TAG_MAP.put(tuple.v1, tag);
-                TAG_TO_KIND_MAP.put(tag, tuple.v1);
-                TAG_PREC_MAP.put(tag, tuple.v2);
-            });
-        }
+        public static void addOperatorTags(final Map<JCTree.Tag, Tuple2<Tokens.TokenKind, Integer>> tagMapping) = tagMapping.forEach((tag, tuple) -> {
+            KIND_TO_TAG_MAP.put(tuple.v1, tag);
+            TAG_TO_KIND_MAP.put(tag, tuple.v1);
+            TAG_PREC_MAP.put(tag, tuple.v2);
+        });
         
         @Hook(value = TreeInfo.class, isStatic = true)
         private static Hook.Result opPrec(final JCTree.Tag op) = Hook.Result.nullToVoid(TAG_PREC_MAP[op]);
@@ -512,9 +513,10 @@ public class JavacContext {
         // # add new operator
         
         static {
-            addTokenKinds(KIND_NULL_OR, KIND_SAFE_ACCESS);
-            addTKs(Map.of(KIND_NULL_OR, TK_NULL_OR, KIND_SAFE_ACCESS, TK_SAFE_ACCESS));
-            addOperatorTags(Map.of(TAG_NULL_OR, Tuple.tuple(KIND_NULL_OR, TreeInfo.prefixPrec)));
+            addTokenKinds(KIND_NULL_OR, KIND_SAFE_ACCESS, KIND_ASSERT_ACCESS);
+            addTKs(Map.of(KIND_NULL_OR, TK_NULL_OR, KIND_SAFE_ACCESS, TK_SAFE_ACCESS, KIND_ASSERT_ACCESS, TK_ASSERT_ACCESS, Tokens.TokenKind.BANG, TK_POST_ASSERT_ACCESS));
+            addOperatorTags(Map.of(TAG_NULL_OR, Tuple.tuple(KIND_NULL_OR, TreeInfo.prefixPrec), TAG_POST_ASSERT_ACCESS, Tuple.tuple(Tokens.TokenKind.BANG, TreeInfo.postfixPrec)));
+            EnumHelper.addEnum(TAG_NULL_OR, TAG_SAFE_ACCESS, TAG_ASSERT_ACCESS, TAG_POST_ASSERT_ACCESS);
         }
         
     }
@@ -527,44 +529,44 @@ public class JavacContext {
         
         static {
             // @formatter:off
-            add("PLUS",     POS,       "+"    );
-            add("MINUS",    NEG,       "-"    );
-            add("NOT",      NOT,       "!"    );
-            add("TILDE",    COMPL,      "~"   );
-            add("PREINC",   PREINC,     "++_" );
-            add("PREDEC",   PREDEC,     "--_" );
-            add("POSTINC",  POSTINC,    "_++" );
-            add("POSTDEC",  POSTDEC,    "_--" );
-            add("OROR",     OR,         "||"  );
-            add("ANDAND",   AND,        "&&"  );
-            add("OR",       BITOR,      "|"   );
-            add("XOR",      BITXOR,     "^"   );
-            add("AND",      BITAND,     "&"   );
-            add("EQ",       EQ,         "=="  );
-            add("NE",       NE,         "!="  );
-            add("LT",       LT,         "<"   );
-            add("GT",       GT,         ">"   );
-            add("LE",       LE,         "<="  );
-            add("GE",       GE,         ">="  );
-            add("LTLT",     SL,         "<<"  );
-            add("GTGT",     SR,         ">>"  );
-            add("GTGTGT",   USR,        ">>>" );
-            add("PLUS",     PLUS,       "+"   );
-            add("MINUS",    MINUS,      "-"   );
-            add("MUL",      MUL,        "*"   );
-            add("DIV",      DIV,        "/"   );
-            add("MOD",      MOD,        "%"   );
-            add("OREQ",     BITOR_ASG,  "|="  );
-            add("XOREQ",    BITXOR_ASG, "^="  );
-            add("ANDEQ",    BITAND_ASG, "&="  );
-            add("LTLTEQ",   SL_ASG,     "<<=" );
-            add("GTGTEQ",   SR_ASG,     ">>=" );
-            add("GTGTGTEQ", USR_ASG,    ">>>=");
-            add("PLUSEQ",   PLUS_ASG,   "+="  );
-            add("MINUSEQ",  MINUS_ASG,  "-="  );
-            add("MULEQ",    MUL_ASG,    "*="  );
-            add("DIVEQ",    DIV_ASG,    "/="  );
-            add("MODEQ",    MOD_ASG,    "%="  );
+            add("PLUS"    , POS       , "+"   );
+            add("MINUS"   , NEG       , "-"   );
+            add("NOT"     , NOT       , "!"   );
+            add("TILDE"   , COMPL     , "~"   );
+            add("PREINC"  , PREINC    , "++_" );
+            add("PREDEC"  , PREDEC    , "--_" );
+            add("POSTINC" , POSTINC   , "_++" );
+            add("POSTDEC" , POSTDEC   , "_--" );
+            add("OROR"    , OR        , "||"  );
+            add("ANDAND"  , AND       , "&&"  );
+            add("OR"      , BITOR     , "|"   );
+            add("XOR"     , BITXOR    , "^"   );
+            add("AND"     , BITAND    , "&"   );
+            add("EQ"      , EQ        , "=="  );
+            add("NE"      , NE        , "!="  );
+            add("LT"      , LT        , "<"   );
+            add("GT"      , GT        , ">"   );
+            add("LE"      , LE        , "<="  );
+            add("GE"      , GE        , ">="  );
+            add("LTLT"    , SL        , "<<"  );
+            add("GTGT"    , SR        , ">>"  );
+            add("GTGTGT"  , USR       , ">>>" );
+            add("PLUS"    , PLUS      , "+"   );
+            add("MINUS"   , MINUS     , "-"   );
+            add("MUL"     , MUL       , "*"   );
+            add("DIV"     , DIV       , "/"   );
+            add("MOD"     , MOD       , "%"   );
+            add("OREQ"    , BITOR_ASG , "|="  );
+            add("XOREQ"   , BITXOR_ASG, "^="  );
+            add("ANDEQ"   , BITAND_ASG, "&="  );
+            add("LTLTEQ"  , SL_ASG    , "<<=" );
+            add("GTGTEQ"  , SR_ASG    , ">>=" );
+            add("GTGTGTEQ", USR_ASG   , ">>>=");
+            add("PLUSEQ"  , PLUS_ASG  , "+="  );
+            add("MINUSEQ" , MINUS_ASG , "-="  );
+            add("MULEQ"   , MUL_ASG   , "*="  );
+            add("DIVEQ"   , DIV_ASG   , "/="  );
+            add("MODEQ"   , MOD_ASG   , "%="  );
             // @formatter:on
         }
         
@@ -753,10 +755,6 @@ public class JavacContext {
     public Name name(final String name) = names.fromString(name);
     
     public Name name(final Class<?> clazz) = name(clazz.getCanonicalName());
-    
-    public Name name(final Symbol symbol) = symbol.type.tsym.getQualifiedName();
-    
-    public Name name(final Type type) = type.tsym.getQualifiedName();
     
     public Name[] names(final Class<?>... classes) = Stream.of(classes).map(this::name).toArray(Name[]::new);
     

@@ -138,7 +138,7 @@ public class AnnotationHandler<T> {
     public static <T extends Annotation> T make(final Class<T> type, final @Nullable ClassLoader contextLoader = type.getClassLoader(), final @Nullable List<Object> objects) = make(type, contextLoader, valueToMap(objects));
     
     public static <T extends Annotation> T make(final Class<T> clazz, final @Nullable ClassLoader contextLoader, final Map<String, Object> sourceMemberValues)
-            = wrapper(clazz).let(it -> BaseAnnotation.handler(it, new AnnotationHandler<>(clazz, contextLoader, sourceMemberValues)));
+        = wrapper(clazz).let(it -> BaseAnnotation.handler(it, new AnnotationHandler<>(clazz, contextLoader, sourceMemberValues)));
     
     public static <T extends Annotation> AnnotationHandler<T> asOneOfUs(final T object) = switch (object) {
         case BaseAnnotation annotation -> BaseAnnotation.handler(annotation);
@@ -151,7 +151,7 @@ public class AnnotationHandler<T> {
         if (list.size() % 2 != 0)
             throw new RuntimeException("objects.size() % 2 != 0");
         final LinkedHashMap<K, V> result = { };
-        K key = null;
+        @Nullable K key = null;
         for (final Object obj : list)
             if (key == null)
                 key = (K) obj;
@@ -246,8 +246,7 @@ public class AnnotationHandler<T> {
                                 .map(element -> getter(element, method).get())
                                 .toArray(lookupArrayMapper(method))));
                 case String[] args when args.length == 2 && Enum.class.isAssignableFrom(method.getReturnType()) -> lazy(() -> Enum.valueOf((Class<? extends Enum>) Class.forName(ASMHelper.sourceName(args[0]), true, contextLoader), args[1]));
-                case null,
-                     default                                                                                    -> () -> value;
+                default                                                                                         -> () -> value;
             };
     
     protected IntFunction<Object[]> lookupArrayMapper(final Method method) {
@@ -261,15 +260,14 @@ public class AnnotationHandler<T> {
             throw new IllegalArgumentException(clazz.getName());
         if (isAnnotationClass(clazz))
             return (Class<? extends Annotation>) clazz;
-        Class<?> result = null;
+        @Nullable Class<?> result = null;
         final Class<?>[] interfaces = clazz.getInterfaces();
         for (final Class<?> i : interfaces) {
             final Class<?> temp = findAnnotationClass(i);
-            if (temp != null)
-                if (result == null)
-                    result = temp;
-                else
-                    throw new IllegalArgumentException(clazz.getName());
+            if (result == null)
+                result = temp;
+            else
+                throw new IllegalArgumentException(clazz.getName());
         }
         if (result != null)
             return (Class<? extends Annotation>) result;
@@ -285,7 +283,7 @@ public class AnnotationHandler<T> {
         if (!annotationType().isInstance(obj))
             return false;
         final @Nullable AnnotationHandler<?> handler = asOneOfUs((Annotation) obj);
-        return annotationData().members().values().stream().allMatch(method -> ArrayHelper.deepEquals(lookupValue(method.getName()), handler != null ? handler.lookupValue(method.getName()) : method.invoke(obj)));
+        return annotationData().members().values().stream().allMatch(method -> ArrayHelper.deepEquals(lookupValue(method.getName()), handler.lookupValue(method.getName())));
     }
     
     protected String toStringImpl() = STR."@\{type().getName()}(\{sourceMemberValues().entrySet().stream()
@@ -295,7 +293,7 @@ public class AnnotationHandler<T> {
             })}")
             .collect(Collectors.joining(", "))})";
     
-    private String toStringValue(final Object object) = switch (object) {
+    private String toStringValue(final @Nullable Object object) = switch (object) {
         case Type type      -> type.getClassName();
         case Object[] array -> Stream.of(array).map(this::toStringValue).collect(Collectors.joining(", ", "[", "]"));
         case null,

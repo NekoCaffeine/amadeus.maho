@@ -11,11 +11,9 @@ import java.util.TreeSet;
 
 import jdk.internal.misc.Unsafe;
 
-import amadeus.maho.core.Maho;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
-import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.runtime.UnsafeHelper;
@@ -123,7 +121,8 @@ public enum HotSpot {
         final HotSpotField _addr = flagType.field("_addr"), _name = flagType.field("_name"), _flags = flagType.field("_flags"), _type = flagType.field("_type");
         long address = unsafe.getAddress(flagType.field("flags").offset);
         for (int i = 0; i < numFlagsValue - 1; i++) {
-            final String flagName = getString(unsafe.getAddress(address + _name.offset));
+            final @Nullable String flagName = getString(unsafe.getAddress(address + _name.offset));
+            assert flagName != null;
             flags[flagName] = { address + _addr.offset, flagName, unsafe.getInt(address + _flags.offset), unsafe.getInt(address + _type.offset) };
             address += flagSize;
         }
@@ -167,7 +166,7 @@ public enum HotSpot {
     
     @SneakyThrows
     public HotSpotType type(final String name) {
-        final HotSpotType type = types[name];
+        final @Nullable HotSpotType type = types[name];
         if (type == null)
             throw new JVMReflectiveOperationException(STR."No such type: \{name}");
         return type;
@@ -175,7 +174,7 @@ public enum HotSpot {
     
     @SneakyThrows
     public Number constant(final String name) {
-        final Number constant = constants[name];
+        final @Nullable Number constant = constants[name];
         if (constant == null)
             throw new JVMReflectiveOperationException(STR."No such constant: \{name}");
         return constant;
@@ -187,7 +186,7 @@ public enum HotSpot {
     
     @SneakyThrows
     public HotSpotFlag flag(final String name) {
-        final HotSpotFlag flag = flags[name];
+        final @Nullable HotSpotFlag flag = flags[name];
         if (flag == null)
             throw new JVMReflectiveOperationException(STR."No such flag: \{name}");
         return flag;

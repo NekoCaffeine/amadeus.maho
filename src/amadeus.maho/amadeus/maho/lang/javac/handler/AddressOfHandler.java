@@ -34,7 +34,6 @@ import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.runtime.DebugHelper;
-import amadeus.maho.util.tuple.Tuple2;
 
 import static com.sun.tools.javac.code.Flags.FINAL;
 import static com.sun.tools.javac.comp.Operators.OperatorType.*;
@@ -46,6 +45,8 @@ import static com.sun.tools.javac.tree.JCTree.Tag.*;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PUBLIC)
 public class AddressOfHandler extends JavacContext {
+    
+    private record ExpressionWithTags(JCTree.JCExpression arg, Set<JCTree.Tag> tags) { }
     
     @Hook
     private static Hook.Result term3(final JavacParser $this) {
@@ -97,7 +98,7 @@ public class AddressOfHandler extends JavacContext {
         return Hook.Result.VOID;
     }
     
-    private static Tuple2<JCTree.JCExpression, Set<JCTree.Tag>> arg(final JCTree.JCUnary expr) {
+    private static ExpressionWithTags arg(final JCTree.JCUnary expr) {
         JCTree.JCExpression arg = TreeInfo.skipParens(expr.arg);
         if (!(expr.arg instanceof JCTree.JCUnary))
             return { arg, Set.of() };
@@ -123,9 +124,10 @@ public class AddressOfHandler extends JavacContext {
         final HashMap<String, Symbol.MethodSymbol> unsafeGetterCache = { };
         final IdentityHashMap<JCTree.JCUnary, JCTree.JCExpression> mapping = { };
         for (final JCTree.JCUnary unary : addressOfArgs) {
-            final Tuple2<JCTree.JCExpression, Set<JCTree.Tag>> tuple = arg(unary);
-            final JCTree.JCExpression arg = tuple.v1;
-            final Type type = (Privilege) attr.attribTree(arg, env.dup(arg), tuple.v2.contains(POS) ? (Privilege) attr.unknownExprInfo : (Privilege) attr.varAssignmentInfo);
+            final ExpressionWithTags expressionWithTags = arg(unary);
+            final JCTree.JCExpression arg = expressionWithTags.arg();
+            final Set<JCTree.Tag> tags = expressionWithTags.tags();
+            final Type type = (Privilege) attr.attribTree(arg, env.dup(arg), tags.contains(POS) ? (Privilege) attr.unknownExprInfo : (Privilege) attr.varAssignmentInfo);
             if (type instanceof Type.JCPrimitiveType primitiveType) {
                 final @Nullable String name = switch ((Privilege) primitiveType.tag) {
                     case BYTE   -> "Byte";
@@ -146,12 +148,12 @@ public class AddressOfHandler extends JavacContext {
                     binary.operator = (Privilege) operators.resolveBinary(offset, PLUS, symtab.longType, symtab.longType);
                 offset.type = symtab.longType;
                 mapping[unary] = offset;
-                if (!tuple.v2.contains(NEG)) {
+                if (!tags.contains(NEG)) {
                     final JCTree.JCMethodInvocation put = maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."put\{name}", key -> lookup(Unsafe, name(key), arg2))), List.of(offset, arg));
                     put.type = symtab.voidType;
                     before.append(maker.Exec(put));
                 }
-                if (!tuple.v2.contains(POS)) {
+                if (!tags.contains(POS)) {
                     final JCTree.JCAssign assign = maker.Assign(arg, maker.App(maker.Select(maker.Ident($unsafe), unsafeGetterCache.computeIfAbsent(STR."get\{name}", key -> lookup(Unsafe, name(key), arg1))), List.of(offset)));
                     assign.type = type;
                     after.append(maker.Exec(assign));

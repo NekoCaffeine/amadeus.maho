@@ -19,6 +19,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
@@ -93,7 +94,7 @@ public interface HotSwap {
         }
         
         public static byte[] fixModifiers(final Class<?> target, final byte bytecode[])
-                = ClassWriter.toBytecode(writer -> ASMHelper.newClassReader(bytecode).accept(new ClassModifiersFixer(MahoExport.asmAPIVersion(), writer, target), 0));
+                = ClassWriter.toBytecode(writer -> new ClassReader(bytecode).accept(new ClassModifiersFixer(MahoExport.asmAPIVersion(), writer, target), 0));
         
     }
     

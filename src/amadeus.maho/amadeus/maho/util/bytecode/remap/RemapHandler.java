@@ -138,7 +138,7 @@ public interface RemapHandler {
     
     default String mapFieldName(final String owner, final String name) = name;
     
-    default String mapMethodName(final String owner, final String name, final String descriptor) = name;
+    default String mapMethodName(final String owner, final String name, final @Nullable String descriptor) = name;
     
     default ClassNode mapClassNode(final ClassNode node) {
         final ClassNode result = { };

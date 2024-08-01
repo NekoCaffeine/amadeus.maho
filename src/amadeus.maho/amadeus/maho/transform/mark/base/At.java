@@ -79,7 +79,7 @@ public @interface At {
                     }
                     int offset = at.offset();
                     final ListIterator<AbstractInsnNode> tmpIterator = list.iterator(offset < 0 ? index - 1 : index);
-                    AbstractInsnNode target = null;
+                    @Nullable AbstractInsnNode target = null;
                     while (offset != 0)
                         if (offset < 0) {
                             if (!tmpIterator.hasPrevious())

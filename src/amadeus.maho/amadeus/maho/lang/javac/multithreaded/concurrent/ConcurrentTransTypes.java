@@ -49,7 +49,6 @@ public class ConcurrentTransTypes extends TransTypes {
             final TreeMaker savedMake = (Privilege) this.make;
             final Type savedPt = (Privilege) this.pt;
             (Privilege) (this.make = savedMake.forToplevel(myEnv.toplevel));
-            // noinspection DataFlowIssue
             (Privilege) (this.pt = null);
             try {
                 final JCTree.JCClassDecl tree = (JCTree.JCClassDecl) myEnv.tree;

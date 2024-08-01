@@ -62,8 +62,6 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
     protected Predicate<ClassNode> nodeFilter = node -> (node != null || handleNullNode()) && (!experimental() || MahoExport.experimental());
     
     {
-        if (handler == null)
-            throw new IllegalArgumentException("Unable to get the expected annotation context.");
         applyNodeFilter(checkSwitch());
         injectTransformerRemapData();
         if (ASMHelper.hasAnnotation(sourceClass, Experimental.class))
@@ -88,6 +86,8 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
     
     public @Nullable ClassNode transformWithoutContext(final @Nullable ClassNode node, final @Nullable ClassLoader loader) = transform(new ClassWriter(loader).mark(node).context(), node, null, null, null);
     
+    public boolean important() = metadata?.important() ?? false;
+    
     public boolean valid() = true;
     
     @Override
@@ -111,8 +111,8 @@ public abstract class BaseTransformer<A extends Annotation> implements ClassTran
                         handler.changeValue(name, manager.remapper().mapType(handler.<Type>lookupSourceValue(name) ?? Type.getType(handler.<Class<?>>lookupValue(name))));
                     else if (member.getReturnType() == Class[].class)
                         handler.changeValue(name, (handler.<List<Type>>lookupSourceValue(name) ?? Stream.of(handler.<Class<?>[]>lookupValue(name)).map(Type::getType).toList()).stream()
-                                .map(manager.remapper()::mapType)
-                                .toArray(Type[]::new));
+                            .map(manager.remapper()::mapType)
+                            .toArray(Type[]::new));
                     else {
                         final @Nullable String string = handler.lookupSourceValue(name);
                         if (string != null)

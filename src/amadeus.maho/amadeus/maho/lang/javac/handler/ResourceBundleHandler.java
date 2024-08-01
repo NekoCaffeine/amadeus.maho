@@ -30,7 +30,6 @@ import amadeus.maho.lang.javac.MahoJavac;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.handler.base.Handler;
-import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.StreamHelper;

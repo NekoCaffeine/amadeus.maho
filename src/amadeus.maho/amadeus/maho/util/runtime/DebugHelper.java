@@ -66,7 +66,7 @@ public interface DebugHelper {
     
     static Map<Object, Object> localContext() = contextLocal().get();
     
-    static void breakpoint(final Throwable throwable = null) {
+    static void breakpoint(final @Nullable Throwable throwable = null) {
         if (showBreakpoint())
             (throwable ?? new Exception("Breakpoint stack trace")).printStackTrace();
     }
@@ -87,7 +87,6 @@ public interface DebugHelper {
     
     static <T> T breakpointThenError(final String message) = breakpointThenError(new AssertionError(message));
     
-    @SuppressWarnings("ThrowableNotThrown")
     @SneakyThrows
     static <T> T breakpointThenError(final Throwable throwable = new AssertionError()) {
         breakpoint();
@@ -104,7 +103,7 @@ public interface DebugHelper {
             breakpoint();
     }
     
-    static <T> @Nullable T breakpointWhenDebug(final @Nullable T value) {
+    static <T> T breakpointWhenDebug(final T value) {
         if (MahoExport.debug())
             breakpoint();
         return value;

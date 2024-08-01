@@ -11,7 +11,6 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Env;
@@ -32,7 +31,6 @@ import amadeus.maho.transform.mark.base.Slice;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.control.LinkedIterator;
@@ -145,7 +143,7 @@ public class AssignHandler {
             return Hook.Result.VOID;
         $this.nextToken();
         final Tokens.Token token = $this.token();
-        final JCTree.JCExpression result = token.kind == SEMI ? null : $this.variableInitializer();
+        final @Nullable JCTree.JCExpression result = token.kind == SEMI ? null : $this.variableInitializer();
         $this.accept(SEMI);
         return { toP($this, F($this).at(token.pos).Return(result)) };
     }

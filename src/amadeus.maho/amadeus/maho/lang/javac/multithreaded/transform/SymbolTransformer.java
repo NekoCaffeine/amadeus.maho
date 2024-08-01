@@ -11,7 +11,7 @@ import amadeus.maho.transform.mark.base.Transformer;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
 
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ACC_SYNCHRONIZED;
 
 @Transformer
 public class SymbolTransformer implements ClassTransformer {
@@ -21,7 +21,7 @@ public class SymbolTransformer implements ClassTransformer {
     @Override
     public @Nullable ClassNode transform(final TransformContext context, @Nullable final ClassNode node, @Nullable final ClassLoader loader, @Nullable final Class<?> clazz, @Nullable final ProtectionDomain domain) {
         context.markModified();
-        node.methods.stream()
+        node?.methods.stream()
                 .filter(method -> method.name.equals("complete") && method.desc.equals(ASMHelper.VOID_METHOD_DESC) || methods[method.name])
                 .forEach(method -> method.access |= ACC_SYNCHRONIZED);
         return node;

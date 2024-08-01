@@ -36,6 +36,7 @@ public class FixedString implements BinaryMapper {
         assert value != null;
         ensureIdentity();
         final int len = length - 1;
+        // noinspection DataFlowIssue
         output.write(cacheBuffer, 0, Math.min(cacheBuffer.length, len));
         if (cacheBuffer.length < len)
             for (int i = cacheBuffer.length; i < len; i++)
@@ -61,11 +62,13 @@ public class FixedString implements BinaryMapper {
     
     public void updateLength() throws IOException {
         ensureIdentity();
+        // noinspection DataFlowIssue
         length = cacheBuffer.length;
     }
     
     public int size() throws IOException {
         ensureIdentity();
+        // noinspection DataFlowIssue
         return cacheBuffer.length;
     }
     

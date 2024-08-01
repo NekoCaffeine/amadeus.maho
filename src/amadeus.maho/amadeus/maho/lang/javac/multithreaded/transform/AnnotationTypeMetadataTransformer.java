@@ -19,7 +19,7 @@ public class AnnotationTypeMetadataTransformer implements ClassTransformer.Limit
     @Override
     public @Nullable ClassNode transform(final TransformContext context, @Nullable final ClassNode node, @Nullable final ClassLoader loader, @Nullable final Class<?> clazz, @Nullable final ProtectionDomain domain) {
         context.markModified();
-        node.methods.stream()
+        node?.methods.stream()
                 .filter(method -> method.name.equals("init") && method.desc.equals(ASMHelper.VOID_METHOD_DESC))
                 .forEach(method -> method.access |= ACC_SYNCHRONIZED);
         return node;

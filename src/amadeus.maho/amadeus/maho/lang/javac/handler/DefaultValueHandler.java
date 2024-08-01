@@ -8,7 +8,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
@@ -40,7 +39,6 @@ import amadeus.maho.lang.javac.handler.base.Syntax;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
-import amadeus.maho.util.runtime.ObjectHelper;
 
 import static amadeus.maho.lang.javac.handler.DefaultValueHandler.PRIORITY;
 import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
@@ -98,15 +96,15 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
     
     @Hook
     private static Hook.Result setLazyConstValue(final Symbol.VarSymbol $this, final Env<AttrContext> env, final Attr attr, final JCTree.JCVariableDecl variable)
-            = Hook.Result.falseToVoid(anyMatch(variable.mods.flags, PARAMETER) || instance(DefaultValueHandler.class).hasAnnotation(variable.mods, env, Default.class), null);
+        = Hook.Result.falseToVoid(anyMatch(variable.mods.flags, PARAMETER) || instance(DefaultValueHandler.class).hasAnnotation(variable.mods, env, Default.class), null);
     
     @Hook(at = @At(method = @At.MethodInsn(name = "needsLazyConstValue")), before = false, capture = true, branchReversal = true)
     private static boolean visitVarDef(final boolean capture, final Attr $this, final JCTree.JCVariableDecl tree) = capture && !instance(DefaultValueHandler.class).hasAnnotation(tree.mods, env($this), Default.class);
     
     // There is no need to check assignment statements on method parameters.
     @Hook
-    private static Hook.Result checkInit(final Flow.AssignAnalyzer $this, final JCDiagnostic.DiagnosticPosition pos, final Symbol.VarSymbol sym, final JCDiagnostic.Error errkey)
-    = Hook.Result.falseToVoid((sym.flags_field & PARAMETER) != 0 && !sym.name.equals(sym.name.table.names._this));
+    private static Hook.Result checkInit(final Flow.AssignAnalyzer $this, final JCDiagnostic.DiagnosticPosition pos, final Symbol.VarSymbol sym, final JCDiagnostic.Error errorKey)
+        = Hook.Result.falseToVoid((sym.flags_field & PARAMETER) != 0 && !sym.name.equals(sym.name.table.names._this));
     
     @Hook
     private static void visitVarDef(final Attr $this, final JCTree.JCVariableDecl variable) {
@@ -124,7 +122,6 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
     }
     
     public static void eraseInitialization(final JCTree.JCVariableDecl decl) {
-        // noinspection DataFlowIssue
         decl.init = null;
         final @Nullable Symbol.VarSymbol sym = decl.sym;
         if (sym != null) {
@@ -153,7 +150,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
                 .collect(Collectors.toMap(decl -> decl.name, Function.identity()));
         capture.defs.stream()
                 .cast(JCTree.JCMethodDecl.class)
-                .filter(decl -> anyMatch(decl.mods.flags, Flags.COMPACT_RECORD_CONSTRUCTOR))
+                .filter(decl -> anyMatch(decl.mods.flags, COMPACT_RECORD_CONSTRUCTOR))
                 .forEach(decl -> decl.params.forEach(parameter -> {
                     final @Nullable JCTree.JCVariableDecl component = mapping[parameter.name];
                     if (component != null && component.init != null && parameter.init == null) {
@@ -213,9 +210,9 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
         }
     }
     
-    protected DerivedMethod derivedMethod(final TreeMaker maker, final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression restype, final List<JCTree.JCTypeParameter> typarams,
+    protected DerivedMethod derivedMethod(final TreeMaker maker, final JCTree.JCModifiers mods, final Name name, final JCTree.JCExpression returnTypeExpr, final List<JCTree.JCTypeParameter> typarams,
             final List<JCTree.JCVariableDecl> params, final List<JCTree.JCExpression> thrown, final JCTree.JCBlock body, final @Nullable JCTree.JCExpression defaultValue, final JCTree.JCMethodDecl source)
-            = new DerivedMethod(mods, name, restype, typarams, null, params, thrown, body, defaultValue, null, source).let(result -> result.pos = maker.pos);
+        = new DerivedMethod(mods, name, returnTypeExpr, typarams, null, params, thrown, body, defaultValue, null, source).let(result -> result.pos = maker.pos);
     
     protected JCTree.JCBlock body(final TreeMaker maker, final JCTree.JCMethodDecl methodDecl, final List<JCTree.JCVariableDecl> params, final Map<JCTree.JCVariableDecl, JCTree.JCExpression> initMapping,
             final Collection<JCTree.JCVariableDecl> defaultParameters, final Env<AttrContext> env) {

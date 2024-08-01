@@ -475,7 +475,7 @@ public enum WhiteBox {
     // use the below method that does not require the compilation context as argument.
     public boolean isIntrinsicAvailable(final Executable method, final int compLevel) = isIntrinsicAvailable(method, null, compLevel);
     
-    private native boolean isIntrinsicAvailable0(Executable method, Executable compilationContext, int compLevel);
+    private native boolean isIntrinsicAvailable0(Executable method, @Nullable Executable compilationContext, int compLevel);
     
     public int deoptimizeMethod(final Executable method) = deoptimizeMethod(method, false /*not osr*/);
     
@@ -782,7 +782,7 @@ public enum WhiteBox {
             this::getIntxVMFlag, this::getUintxVMFlag, this::getUint64VMFlag,
             this::getSizeTVMFlag, this::getStringVMFlag, this::getDoubleVMFlag);
     
-    public Object getVMFlag(final String name) = ~flagsGetters.stream()
+    public @Nullable Object getVMFlag(final String name) = ~flagsGetters.stream()
             .map(f -> f.apply(name))
             .nonnull();
     
@@ -827,7 +827,7 @@ public enum WhiteBox {
     
     public final List<BiFunction<Executable, String, Object>> methodOptionGetters = List.of(this::getMethodBooleanOption, this::getMethodIntxOption, this::getMethodUintxOption, this::getMethodDoubleOption, this::getMethodStringOption);
     
-    public Object getMethodOption(final Executable method, final String name) = ~methodOptionGetters.stream()
+    public @Nullable Object getMethodOption(final Executable method, final String name) = ~methodOptionGetters.stream()
             .map(f -> f.apply(method, name))
             .nonnull();
     

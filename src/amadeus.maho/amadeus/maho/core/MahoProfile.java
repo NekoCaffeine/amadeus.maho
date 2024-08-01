@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import amadeus.maho.lang.Getter;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.profile.Sampler;
 import amadeus.maho.util.tuple.Tuple2;
@@ -27,7 +28,8 @@ public interface MahoProfile {
             if (count == 0L)
                 list += STR."\{subHead2}\{name}: <empty>";
             else {
-                final Tuple2<?, Sampler.Frame> min = ~sampler.min(), max = ~sampler.max();
+                final @Nullable Tuple2<?, Sampler.Frame> min = ~sampler.min(), max = ~sampler.max();
+                assert min != null && max != null;
                 list += subHead2 + name + " [ total: %d ms, count: %d, avg: %.3f ns ]".formatted(total / (int) 1e6, count, (double) total / count);
                 list += subHead3 + STR."min: \{STR."\{min.v1} => \{min.v2}"}";
                 list += subHead3 + STR."max: \{STR."\{max.v1} => \{max.v2}"}";

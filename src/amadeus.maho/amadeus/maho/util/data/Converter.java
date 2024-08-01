@@ -95,7 +95,7 @@ public interface Converter {
             return (defaultSupplier[erasedType]?.get() ?? (Collection) erasedType.tryInstantiation()).let(it -> it.addAll(list));
         }
         
-        public static Object agent(final @Nullable Object instance = null, final Type type) {
+        public static @Nullable Object agent(final @Nullable Object instance = null, final Type type) {
             final Class<?> erasedType = TypeHelper.erase(type);
             return erasedType.isArray() || Collection.class.isAssignableFrom(erasedType) ? new ArrayAgent(type) : instance;
         }

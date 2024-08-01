@@ -42,7 +42,6 @@ import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.annotation.mark.HiddenDanger;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 
@@ -218,14 +217,14 @@ public class LiveStack {
     @Proxy(value = INSTANCEOF, target = "jdk.internal.reflect.DelegatingClassLoader")
     private static native boolean instanceofDelegatingClassLoader(Object $this);
     
-    private static String loaderName(final ClassLoader loader) = loader == null ? "boot" : instanceofDelegatingClassLoader(loader) ? "delegating" : loader.getName() == null ? loader.getClass().getName() : loader.getName();
+    private static String loaderName(final @Nullable ClassLoader loader) = loader == null ? "boot" : instanceofDelegatingClassLoader(loader) ? "delegating" : loader.getName() == null ? loader.getClass().getName() : loader.getName();
     
     private static StackTraceElement of(final StackWalker.StackFrame frame) {
         final Class<?> declaringClass = frame.getDeclaringClass();
         final ClassLoader loader = declaringClass.getClassLoader();
         final Module module = declaringClass.getModule();
         final ModuleDescriptor descriptor = !module.isNamed() ? instance().descriptorMapper().apply(declaringClass) : module.getDescriptor();
-        final String name = descriptor == null ? "<unnamed>" : descriptor.name(), version = descriptor == null ? null : descriptor.version().map(ModuleDescriptor.Version::toString).orElse("?");
+        final @Nullable String name = descriptor == null ? "<unnamed>" : descriptor.name(), version = descriptor == null ? null : descriptor.version().map(ModuleDescriptor.Version::toString).orElse("?");
         return { loaderName(loader), name, version, declaringClass.getName(), frame.getMethodName(), frame.getFileName(), frame.getLineNumber() };
     }
     
@@ -304,7 +303,7 @@ public class LiveStack {
     public static StackTraceElement[] getOurStackTrace(final StackTraceElement result[], final Throwable $this) = result.length == 0 ? result : Stream.of(result)
             .filter(element -> {
                 final LiveStackFrame frame = stackTraceLiveMap.get(element);
-                return frame == null || frame.method() == null || frame.method().getAnnotation(Hidden.class) == null;
+                return frame == null || frame.method() == null || frame.method()?.getAnnotation(Hidden.class) ?? null == null;
             }).toArray(StackTraceElement[]::new);
     
     private static boolean is64Bit(final int size) = size == 8;
@@ -322,6 +321,7 @@ public class LiveStack {
                 return result;
             final Map<Parameter, Object> localList = new LinkedHashMap<>();
             final Object locals[] = frame.locals;
+            // noinspection DataFlowIssue
             final Executable method = frame.method();
             final Parameter parameters[] = method == null ? new Parameter[0] : method.getParameters();
             for (int i = 0, offset = method == null ? 0 : Modifier.isStatic(method.getModifiers()) ? 0 : -1; offset < parameters.length; i++, offset++) {

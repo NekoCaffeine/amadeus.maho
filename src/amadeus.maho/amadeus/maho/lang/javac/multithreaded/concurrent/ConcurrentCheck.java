@@ -17,7 +17,6 @@ import com.sun.tools.javac.util.Pair;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Privilege;
-import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.multithreaded.SharedComponent;
 
 import static com.sun.tools.javac.code.Flags.*;

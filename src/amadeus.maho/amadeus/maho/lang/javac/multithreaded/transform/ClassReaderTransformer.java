@@ -18,7 +18,7 @@ public class ClassReaderTransformer implements ClassTransformer.Limited {
     @Override
     public ClassNode transform(final TransformContext context, @Nullable final ClassNode node, @Nullable final ClassLoader loader, @Nullable final Class<?> clazz, @Nullable final ProtectionDomain domain) {
         context.markModified();
-        node.methods.stream()
+        node?.methods.stream()
                 .filter(method -> method.name.equals("getEnclosingType"))
                 .forEach(method -> method.access |= Opcodes.ACC_SYNCHRONIZED);
         return node;

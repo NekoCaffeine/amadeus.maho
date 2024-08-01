@@ -135,7 +135,7 @@ public interface MethodTraverser {
             boolean result = handlers != null;
             loop:
             do
-                switch (next.getType()) {
+                switch (next?.getType() ?? NOP) {
                     case LABEL             -> {
                         final LabelNode labelNode = (LabelNode) next;
                         if (handlers != null) {
@@ -276,7 +276,7 @@ public interface MethodTraverser {
                     final Frame frame = queue.removeLast();
                     int stackSize = frame.stackSize();
                     @Nullable AbstractInsnNode next = frame.insn();
-                    int opcode = next.getOpcode();
+                    int opcode = next?.getOpcode() ?? NOP;
                     @Nullable List<TryCatchBlockNode> contextHandlers = null;
                     do {
                         safeCompute(frame.markInsn(next), opcode);

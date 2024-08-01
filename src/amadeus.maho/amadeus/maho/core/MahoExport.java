@@ -41,7 +41,7 @@ public final class MahoExport {
         @Getter
         private static @Nullable Executor executor;
         
-        public static void setupFilter(final Predicate<ResourcePath.ClassInfo> value) = setupFilter = setupFilter() == null ? value : setupFilter().and(value);
+        public static void setupFilter(final Predicate<ResourcePath.ClassInfo> value) = setupFilter = setupFilter()?.and(value) ?? value;
         
         public static void skip(final String packageName) {
             final String name = STR."\{packageName}.";

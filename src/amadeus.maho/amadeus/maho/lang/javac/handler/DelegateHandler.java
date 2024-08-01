@@ -80,7 +80,7 @@ public class DelegateHandler extends BaseHandler<Delegate> {
     
     @Override
     public void processVariable(final Env<AttrContext> env, final JCTree.JCVariableDecl tree, final JCTree owner, final Delegate annotation, final JCTree.JCAnnotation annotationTree, final boolean advance)
-            = delayProcessIfNeeded(env, tree, owner, annotation, annotationTree);
+        = delayProcessIfNeeded(env, tree, owner, annotation, annotationTree);
     
     @Override
     public void processMethod(final Env<AttrContext> env, final JCTree.JCMethodDecl tree, final JCTree owner, final Delegate annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
@@ -97,16 +97,16 @@ public class DelegateHandler extends BaseHandler<Delegate> {
             case Symbol.VarSymbol varSymbol       -> varSymbol.type;
             case Symbol.MethodSymbol methodSymbol -> methodSymbol.getReturnType();
             case null,
-                 default                    -> null;
+                 default                          -> null;
         };
         if (type != null) {
             if (type.isPrimitive()) {
-                final JCDiagnostic.Error error = new JCDiagnostic.Error(MahoJavac.KEY, "delegate.primitive.type.not.allowed", symbol);
+                final JCDiagnostic.Error error = { MahoJavac.KEY, "delegate.primitive.type.not.allowed", symbol };
                 log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, error);
                 return;
             }
             if (type instanceof Type.ArrayType) {
-                final JCDiagnostic.Error error = new JCDiagnostic.Error(MahoJavac.KEY, "delegate.array.type.not.allowed", symbol);
+                final JCDiagnostic.Error error = { MahoJavac.KEY, "delegate.array.type.not.allowed", symbol };
                 log.error(JCDiagnostic.DiagnosticFlag.RESOLVE_ERROR, annotationTree, error);
                 return;
             }
@@ -133,7 +133,6 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                         final JCTree.JCExpression qualifier = tree instanceof JCTree.JCMethodDecl ? maker.Apply(List.nil(), maker.Ident(name(tree)), List.nil()) : maker.Ident(name(tree));
                         final JCTree.JCMethodInvocation apply = maker.Apply(List.nil(), maker.Select(qualifier, methodSymbol.name), methodSymbol.params.stream().map(maker::Ident).collect(List.collector()));
                         final JCTree.JCMethodDecl methodDecl = maker.MethodDef(methodSymbol, maker.Block(0L, List.of(methodSymbol.getReturnType() instanceof Type.JCVoidType ? maker.Exec(apply) : maker.Return(apply))));
-                        // noinspection DataFlowIssue
                         methodDecl.sym = null;
                         methodDecl.mods.flags &= DefaultValueHandler.removeFlags;
                         if (owner instanceof JCTree.JCClassDecl decl && anyMatch(decl.mods.flags, INTERFACE))
@@ -152,16 +151,18 @@ public class DelegateHandler extends BaseHandler<Delegate> {
                 final @Nullable Attribute only = ~compound.values.stream()
                         .filter(pair -> pair.fst.name.toString().equals("only"))
                         .map(pair -> pair.snd);
+                final Type memberType = symbol instanceof Symbol.MethodSymbol methodSymbol ? methodSymbol.getReturnType() : symbol.type;
                 return switch (only) {
-                    case Attribute.Class clazz -> Stream.of(clazz.classType);
+                    case Attribute.Class clazz -> Stream.of(clazz.classType)
+                            .filter(type -> types.isAssignable(memberType, type));
                     case Attribute.Array array -> Stream.of(array.values)
                             .filter(Attribute.Class.class::isInstance)
                             .map(Attribute.Class.class::cast)
                             .map(clazz -> clazz.classType)
-                            .filter(type -> types.isAssignable(type, symbol.type))
+                            .filter(type -> types.isAssignable(memberType, type))
                             .distinct();
                     case null,
-                         default               -> Stream.of(symbol instanceof Symbol.MethodSymbol methodSymbol ? methodSymbol.getReturnType() : symbol.type);
+                         default               -> Stream.of(memberType);
                 };
             });
     
@@ -200,7 +201,7 @@ public class DelegateHandler extends BaseHandler<Delegate> {
     }
     
     private static JCTree.JCMethodInvocation apply(final TreeMaker maker, final JCTree.JCExpression expression, final Symbol.MethodSymbol symbol)
-            = maker.Apply(List.nil(), expression, List.nil()).let(it -> it.type = symbol.getReturnType());
+        = maker.Apply(List.nil(), expression, List.nil()).let(it -> it.type = symbol.getReturnType());
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
     public static Symbol findMethod(
@@ -280,7 +281,7 @@ public class DelegateHandler extends BaseHandler<Delegate> {
             final boolean allowBoxing,
             final boolean useVarargs,
             final UnaryOperator<Scope> mapper) {
-        final List<Type> iTypes[] = (List<Type>[]) new List[]{ List.nil(), List.nil() };
+        final List<Type> iTypes[] = new List<Type>[]{ List.nil(), List.nil() };
         {
             @Nullable Resolve.InterfaceLookupPhase phase = Resolve.InterfaceLookupPhase.ABSTRACT_OK;
             for (final Symbol.TypeSymbol superSymbol : (Privilege) resolve.superclasses(inType)) {
@@ -380,7 +381,7 @@ public class DelegateHandler extends BaseHandler<Delegate> {
     
     @Hook(at = @At(insn = @At.Insn(opcode = IRETURN), offset = 1, ordinal = 0), before = false)
     private static Hook.Result checkTypeContainsImportableElement(final Check $this, final Symbol.TypeSymbol symbol, final Symbol.TypeSymbol origin, final Symbol.PackageSymbol pkg, final Name name, final Set<Symbol> processed)
-            = Hook.Result.falseToVoid(symbol != null && symbol == origin && checkContainsImportableDelegateElements($this, symbol, pkg, name));
+        = Hook.Result.falseToVoid(symbol != null && symbol == origin && checkContainsImportableDelegateElements($this, symbol, pkg, name));
     
     private static boolean checkContainsImportableDelegateElements(final Check $this, final Symbol.TypeSymbol symbol, final Symbol.PackageSymbol pkg, final Name name) = allSupers(symbol)
             .flatMap(target -> target.getEnclosedElements().stream())

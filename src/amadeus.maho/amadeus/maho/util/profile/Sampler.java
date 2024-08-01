@@ -86,7 +86,9 @@ public class Sampler<T> {
         final long total = ~total(), count = ~count();
         if (count == 0L)
             return "<empty>";
+        // noinspection DataFlowIssue
         final Tuple2<T, Frame> min = ~min(), max = ~max();
+        // noinspection DataFlowIssue
         return "min: %s ns, max: %s ns, total: %d ms, count: %d, avg: %.3f ms".formatted(STR."\{min.v1} => \{min.v2}", STR."\{max.v1} => \{max.v2}", total / (int) 1e6, count, total / 1e6 / count);
     }
     

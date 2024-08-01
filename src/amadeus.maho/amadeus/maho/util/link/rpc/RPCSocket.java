@@ -73,7 +73,7 @@ public class RPCSocket {
                         p_code[0] = ERROR_MISSING_INSTANCE;
                         final Object instance = requireNonNull(localInstances()[itf]);
                         p_code[0] = ERROR_INVALID_METHOD;
-                        final Method method = requireNonNull(RPCContext.allMethods(itf)[request.methodIndex]);
+                        final Method method = RPCContext.allMethods(itf)[request.methodIndex];
                         localExecutor().execute(() -> {
                             try {
                                 p_code[0] = ERROR_INVALID_DATA;

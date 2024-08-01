@@ -100,7 +100,7 @@ public interface JNI extends Library {
         
     }
     
-    @Structure.FieldOrder("functions")
+    @SuppressWarnings("DataFlowIssue") @Structure.FieldOrder("functions")
     class JavaVM extends Structure {
         
         public static class ByReference extends JavaVM implements Structure.ByReference { }

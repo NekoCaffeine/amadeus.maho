@@ -13,6 +13,7 @@ import amadeus.maho.core.MahoExport;
 import amadeus.maho.core.MahoProfile;
 import amadeus.maho.lang.Include;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.build.Scaffold;
 import amadeus.maho.util.build.ScriptHelper;
 import amadeus.maho.util.bytecode.ASMHelper;
@@ -26,11 +27,11 @@ public interface ShellHelper extends ScriptHelper {
     
     Unsafe unsafe = UnsafeHelper.unsafe();
     
-    static void print(final Class<?> target) = ASMHelper.printBytecode(Maho.getClassNodeFromClass(target));
+    static void print(final Class<?> target) = ASMHelper.printBytecode(Maho.getClassNodeFromClassNonNull(target));
     
-    static void print(final Object object) {
+    static void print(final @Nullable Object object) {
         if (object != null && LambdaHelper.isLambdaClass(object.getClass()))
-            ASMHelper.printBytecode(Maho.getMethodNodeFromMethod((Method) object.getClass().constantPool().lastExecutableWithoutBoxed()));
+            ASMHelper.printBytecode(Maho.getMethodNodeFromMethodNonNull((Method) object.getClass().constantPool().lastExecutableWithoutBoxed()));
     }
     
     static void profile() = Dumper.print(Stream.of(MahoProfile::dump));

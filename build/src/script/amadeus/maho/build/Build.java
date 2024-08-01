@@ -153,6 +153,8 @@ public interface Build {
     
     List<String> defaultArgs = List.of("-XX:+EnableDynamicAgentLoading", STR."-XX:CICompilerCount=\{Runtime.getRuntime().availableProcessors()}", "-XX:CompileThresholdScaling=0.05");
     
+    static Process run(final List<String> args = defaultArgs) = workspace.run(module, -1, args);
+    
     static Process debug(final List<String> args = defaultArgs) = workspace.run(module, debugPort, args);
     
     static void bootstrap(final boolean aot = true) {

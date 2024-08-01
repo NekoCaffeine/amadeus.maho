@@ -140,11 +140,11 @@ public abstract class ReferenceHandler<A extends Annotation> extends BaseHandler
             final Tuple2<Getter, JCTree.JCAnnotation> getter = annotations[0];
             boolean error = getter.v1.lazy();
             if (!error)
-                error |= !tree.params.isEmpty();
+                error = !tree.params.isEmpty();
             if (!error)
-                error |= owner instanceof JCTree.JCClassDecl decl && noneMatch(decl.mods.flags, INTERFACE);
+                error = owner instanceof JCTree.JCClassDecl decl && noneMatch(decl.mods.flags, INTERFACE);
             if (!error)
-                error |= anyMatch(tree.mods.flags, STATIC);
+                error = anyMatch(tree.mods.flags, STATIC);
             if (!error) {
                 final Name referenceGetterName = tree.sym.name.append(name(GetterHandler.REFERENCE_GETTER));
                 if (shouldInjectMethod(env, referenceGetterName))

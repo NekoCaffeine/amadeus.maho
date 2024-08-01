@@ -41,7 +41,6 @@ import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.util.annotation.AnnotationHandler;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.Bytecodes;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.remap.RemapHandler;
 import amadeus.maho.util.bytecode.tree.DynamicVarInsnNode;
@@ -70,7 +69,7 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
         if (!annotation.onlyFirstTime() || clazz == null) {
             TransformerManager.transform("patch", STR."\{ASMHelper.sourceName(node.name)}\n->  \{ASMHelper.sourceName(sourceClass.name)}");
             final ClassNode copy = ASMHelper.newClassNode(sourceClass);
-            final ClassNode patch = handler.isNotDefault(Patch::remap) ? new RemapTransformer(manager, annotation.remap(), copy).transformWithoutContext(copy, loader) : copy;
+            final ClassNode patch = handler.isNotDefault(Patch::remap) ? new RemapTransformer(manager, annotation.remap(), copy).transformWithoutContext(copy, loader) ?? copy : copy;
             patch(context, manager.remapper(), patch, node, annotation.metadata().remap());
             context.markModified();
         }
@@ -163,7 +162,7 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
                         if (method.name.equals(ASMHelper._INIT_)) {
                             if (!method.desc.equals(patchMethod.desc))
                                 continue;
-                            MethodInsnNode superCall = ASMHelper.findSuperCall(patchMethod, superName);
+                            @Nullable MethodInsnNode superCall = ASMHelper.findSuperCall(patchMethod, superName);
                             if (superCall != null)
                                 for (Iterator<AbstractInsnNode> insnIterator = patchMethod.instructions.iterator(); insnIterator.hasNext(); ) {
                                     final AbstractInsnNode insn = insnIterator.next();
@@ -192,7 +191,7 @@ public final class PatchTransformer extends BaseTransformer<Patch> implements Cl
             }
         for (final MethodNode method : patch.methods)
             if (method.name.equals(ASMHelper._INIT_) && ASMHelper.hasAnnotation(method, Patch.Super.class)) {
-                final MethodInsnNode superCall = ASMHelper.findSuperCall(method, clazzName);
+                final @Nullable MethodInsnNode superCall = ASMHelper.findSuperCall(method, clazzName);
                 if (superCall != null)
                     superCall.owner = replace(superCall.owner, clazzName, superName);
             }

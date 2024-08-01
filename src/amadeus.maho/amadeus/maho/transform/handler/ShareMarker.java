@@ -29,8 +29,6 @@ import amadeus.maho.transform.mark.Erase;
 import amadeus.maho.transform.mark.Share;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.remap.ClassNameRemapHandler;
-import amadeus.maho.util.tuple.Tuple;
-import amadeus.maho.util.tuple.Tuple2;
 
 import static amadeus.maho.util.concurrent.AsyncHelper.async;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -39,7 +37,9 @@ import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public final class ShareMarker extends BaseMarker<Share> {
     
-    private static final ConcurrentLinkedQueue<Tuple2<Queue<String>, Runnable>> markerQueue = { };
+    private record Pending(Queue<String> queue, Runnable runnable) { }
+    
+    private static final ConcurrentLinkedQueue<Pending> markerQueue = { };
     
     private static final ConcurrentHashMap<String, Class<?>> loadedMapping = { };
     
@@ -51,7 +51,7 @@ public final class ShareMarker extends BaseMarker<Share> {
             if (queue.isEmpty())
                 runnable.run();
             else
-                markerQueue.add(Tuple.tuple(queue, runnable));
+                markerQueue.add(new Pending(queue, runnable));
         }
     }
     
@@ -60,7 +60,7 @@ public final class ShareMarker extends BaseMarker<Share> {
             if (loadedMapping.containsKey(require))
                 runnable.run();
             else
-                markerQueue.add(Tuple.tuple(new LinkedList<String>().let(queue -> queue << require), runnable));
+                markerQueue.add(new Pending(new LinkedList<String>().let(queue -> queue << require), runnable));
         }
     }
     
@@ -73,7 +73,7 @@ public final class ShareMarker extends BaseMarker<Share> {
                     if (init || ASMHelper.className(Share.class).equals(sourceClass.name))
                         break block;
                     else
-                        markerQueue.add(Tuple.tuple(new LinkedList<>(Set.of(Share.class.getName())), () -> onShare(context)));
+                        markerQueue.add(new Pending(new LinkedList<>(Set.of(Share.class.getName())), () -> onShare(context)));
                 } else {
                     final Queue<String> required = new LinkedList<>(List.of(annotation.required()));
                     required.add(Share.class.getName());
@@ -81,7 +81,7 @@ public final class ShareMarker extends BaseMarker<Share> {
                     if (required.isEmpty())
                         break block;
                     else
-                        markerQueue.add(Tuple.tuple(required, () -> onShare(context)));
+                        markerQueue.add(new Pending(required, () -> onShare(context)));
                 }
                 return;
             }
@@ -97,7 +97,7 @@ public final class ShareMarker extends BaseMarker<Share> {
         if (handler.isNotDefault(Share::erase)) {
             final Erase erase = annotation.erase();
             final List<AnnotationNode> reservedAnnotationNodes = reservedAnnotationNodes(node, Retention.class, Target.class);
-            node = new EraseTransformer(manager, erase, node).transformWithoutContext(node, null);
+            node = new EraseTransformer(manager, erase, node).transformWithoutContext(node, null) ?? node;
             if (node.visibleAnnotations == null && !reservedAnnotationNodes.isEmpty())
                 node.visibleAnnotations = reservedAnnotationNodes;
         }
@@ -108,7 +108,7 @@ public final class ShareMarker extends BaseMarker<Share> {
         if (annotation.makePublic())
             node.access = ASMHelper.changeAccess(node.access, ACC_PUBLIC);
         if (handler.isNotDefault(Share::remap))
-            node = new RemapTransformer(manager, annotation.remap(), node).transformWithoutContext(node, null);
+            node = new RemapTransformer(manager, annotation.remap(), node).transformWithoutContext(node, null) ?? node;
         final Class<?> shared = target != null ? Maho.shareClass(ClassNameRemapHandler.of(Map.of(sourceClass.name, ASMHelper.className(target))).mapClassNode(node)) : Maho.shareClass(node);
         TransformerManager.Patcher.preLoadedClasses() += shared;
         final String name = shared.getName();
@@ -117,10 +117,10 @@ public final class ShareMarker extends BaseMarker<Share> {
                 init = true;
             loadedMapping[name] = shared;
             markerQueue.stream()
-                    .filter(tuple -> tuple.v1.remove(name))
-                    .filter(tuple -> tuple.v1.isEmpty())
+                    .filter(pending -> pending.queue().remove(name))
+                    .filter(pending -> pending.queue().isEmpty())
                     .peek(markerQueue::remove)
-                    .map(tuple -> async(tuple.v2, MahoExport.Setup.executor()))
+                    .map(pending -> async(pending.runnable(), MahoExport.Setup.executor()))
                     .forEach(context.asyncTasks::offer);
         }
         if (handler.isNotDefault(Share::init))

@@ -25,7 +25,6 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.EqualsAndHashCode;

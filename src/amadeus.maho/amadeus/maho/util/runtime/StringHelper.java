@@ -28,11 +28,15 @@ public interface StringHelper {
     
     static boolean nonEmptyOrNull(final @Nullable String string) = !isEmptyOrNull(string);
     
-    static String isEmptyOr(final @Nullable String string, final String or) = isEmptyOrNull(string) ? or : string;
+    static String isEmptyOr(final @Nullable String string, final String or) {
+        // noinspection DataFlowIssue
+        return isEmptyOrNull(string) ? or : string;
+    }
     
     static String requireNonEmpty(final @Nullable String string) {
         if (isEmptyOrNull(string))
             throw new NullPointerException();
+        // noinspection DataFlowIssue
         return string;
     }
     

@@ -108,8 +108,12 @@ public interface TypeInferer {
         case InferredGenericType inferredGenericType -> inferredGenericType;
         default                                      -> {
             Type type = genericType;
-            while (context.containsKey(type))
-                type = context[type];
+            while (true) {
+                @Nullable final Type next = context[type];
+                if (next == null)
+                    break;
+                type = next;
+            }
             yield switch (type) {
                 case TypeVariable<?> typeVariable        -> {
                     final @Nullable Type result = typeVariableMap[typeVariable];

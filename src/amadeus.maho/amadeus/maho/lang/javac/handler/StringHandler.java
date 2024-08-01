@@ -11,7 +11,7 @@ import com.sun.tools.javac.tree.TreeInfo;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 
-import amadeus.maho.lang.javac.handler.base.HandlerSupport;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformProvider;
@@ -25,8 +25,8 @@ import static java.lang.StringTemplate.*;
 public interface StringHandler {
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
-    private static Type adjustMethodReturnType(final Type capture, final Attr $this, final Symbol method, final Type qualifierType, final Name methodName, final List<Type> argTypes, final Type returnType) {
-        if (method != null && method.owner != null && method.owner.type == HandlerSupport.instance().symtab.stringType && method.name.toString().equals("formatted") && qualifierType.constValue() instanceof String format) {
+    private static Type adjustMethodReturnType(final Type capture, final Attr $this, final @Nullable Symbol method, final Type qualifierType, final Name methodName, final List<Type> argTypes, final Type returnType) {
+        if (method != null && method.owner != null && method.owner.type == instance().symtab.stringType && method.name.toString().equals("formatted") && qualifierType.constValue() instanceof String format) {
             final Object args[] = argTypes.stream()
                     .map(Type::constValue)
                     .takeWhile(ObjectHelper::nonNull)
@@ -47,7 +47,7 @@ public interface StringHandler {
     private static Hook.Result visitStringTemplate(final Attr $this, final JCTree.JCStringTemplate tree, @Hook.LocalVar(index = 3) @Hook.Reference Type resultType) {
         final java.util.List<Object> constArgs = tree.expressions.stream().map(expression -> expression.type?.constValue() ?? null).toList();
         if (!constArgs[null] && symbol(tree.processor) instanceof Symbol.VarSymbol symbol && symbol.owner.type.tsym == instance().symtab.stringTemplateType.tsym && symbol.name == symbol.name.table.names.STR) {
-            resultType = resultType.constType(STR.process(StringTemplate.of(tree.fragments, constArgs)));
+            resultType = resultType.constType(STR.process(of(tree.fragments, constArgs)));
             return { };
         }
         return Hook.Result.VOID;

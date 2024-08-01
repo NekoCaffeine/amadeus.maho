@@ -114,19 +114,18 @@ public class ConcurrentSymtab extends Symtab {
     public Symbol.ClassSymbol enterClass(final Symbol.ModuleSymbol moduleSymbol, final Name name, final Symbol.TypeSymbol owner)
             = adjustClassOwner(modules2classes(Symbol.TypeSymbol.formFlatName(name, owner)).computeIfAbsent(moduleSymbol, m -> defineClass(name, owner)), name, owner);
     
-    public Symbol.ClassSymbol adjustClassOwner(final Symbol.ClassSymbol symbol, final Name name, final Symbol.TypeSymbol owner) {
+    public static Symbol.ClassSymbol adjustClassOwner(final Symbol.ClassSymbol symbol, final Name name, final Symbol.TypeSymbol owner) {
         if (owner.kind == TYP && symbol.owner.kind == PCK && (symbol.flags_field & FROM_SOURCE) == 0) {
-            final Symbol.PackageSymbol pkg = (Symbol.PackageSymbol) symbol.owner;
-            boolean shouldRemove = false;
+            @Nullable Symbol.PackageSymbol pkg = null;
             synchronized (symbol) {
-                if (symbol.owner != owner) {
-                    shouldRemove = true;
+                if (symbol.owner instanceof Symbol.PackageSymbol) {
+                    pkg = (Symbol.PackageSymbol) symbol.owner;
                     symbol.name = name;
                     symbol.owner = owner;
                     symbol.fullname = Symbol.ClassSymbol.formFullName(name, owner);
                 }
             }
-            if (shouldRemove)
+            if (pkg != null)
                 synchronized (pkg) { pkg.members().remove(symbol); }
         }
         return symbol;

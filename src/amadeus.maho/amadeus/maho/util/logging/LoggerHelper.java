@@ -146,10 +146,9 @@ public interface LoggerHelper {
     
     @SneakyThrows
     static WrapperPrintStream newWrapperPrintStream(final FileDescriptor fileDescriptor, final Consumer<String> logger, final Charset charset) {
-        if (charset != null)
-            try {
-                return { makeStdOut(fileDescriptor), logger, charset };
-            } catch (final UnsupportedCharsetException ignored) { }
+        try {
+            return { makeStdOut(fileDescriptor), logger, charset };
+        } catch (final UnsupportedCharsetException ignored) { }
         return { makeStdOut(fileDescriptor), logger };
     }
     

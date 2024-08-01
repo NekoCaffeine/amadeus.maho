@@ -28,10 +28,10 @@ import amadeus.maho.core.Maho;
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.Bytecodes;
 import amadeus.maho.util.bytecode.ClassWriter;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.bytecode.remap.ClassNameRemapHandler;
 import amadeus.maho.util.bytecode.remap.RemapHandler;
@@ -58,7 +58,7 @@ public interface Reference {
     @Extension
     interface Ext {
         
-        static <T> T TILDE(final java.lang.ref.Reference<T> reference) = reference.get();
+        static @Nullable <T> T TILDE(final java.lang.ref.Reference<T> reference) = reference.get();
         
     }
     

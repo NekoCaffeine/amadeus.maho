@@ -15,6 +15,7 @@ import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.Unsupported;
+import amadeus.maho.lang.inspection.Nullable;
 
 public sealed interface DynamicObject {
     
@@ -26,10 +27,14 @@ public sealed interface DynamicObject {
     final class MapUnit implements DynamicObject {
         
         @Default
+        boolean caseSensitive = true;
+        
+        @Default
         Map<String, DynamicObject> asMap = new LinkedHashMap<>();
         
         @Override
-        public DynamicObject GET(final String key) = asMap[key];
+        public @Nullable DynamicObject GET(final String key) = caseSensitive ? asMap[key] :
+                asMap[key] ?? asMap.entrySet().stream().filter(entry -> entry.getKey().equalsIgnoreCase(key)).findFirst().map(Map.Entry::getValue).orElse(null);
         
         @Override
         public String toString() = asMap.toString();

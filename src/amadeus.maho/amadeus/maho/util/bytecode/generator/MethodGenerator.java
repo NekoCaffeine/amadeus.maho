@@ -772,7 +772,7 @@ public class MethodGenerator extends MethodVisitor {
     public void markLineNumber(final int lineNumber, final Label label) = mv.visitLineNumber(lineNumber, label);
     
     @Override
-    public void visitFrame(final int type, final int numLocal, final Object[] local, final int numStack, final Object[] stack) = mv.visitFrame(type, numLocal, local, numStack, stack);
+    public void visitFrame(final int type, final int numLocal, final @Nullable Object[] local, final int numStack, final @Nullable Object[] stack) = mv.visitFrame(type, numLocal, local, numStack, stack);
     
     public void frame(final int type, final @Nullable Object locals[], final @Nullable Object stack[]) = visitFrame(type, locals == null ? 0 : locals.length, locals, stack == null ? 0 : stack.length, stack);
     

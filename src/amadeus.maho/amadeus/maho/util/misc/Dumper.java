@@ -17,6 +17,7 @@ import amadeus.maho.core.MahoProfile;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.vm.reflection.hotspot.HotSpot;
 
+@SneakyThrows
 public interface Dumper {
     
     String head = " ".repeat(4);
@@ -30,16 +31,16 @@ public interface Dumper {
             )
     };
     
-    @SneakyThrows
-    static void dump(final Path target, final Stream<Map.Entry<String, BiConsumer<List<String>, String>>> info) throws IOException
-            = info.forEach(entry -> Files.write(target / entry.getKey(), new ArrayList<String>().let(it -> entry.getValue().accept(it, head)), StandardCharsets.UTF_8));
+    static void dump(final Path target, final Stream<Map.Entry<String, BiConsumer<List<String>, String>>> info, final String subHead = head) throws IOException
+            = info.forEach(entry -> Files.write(target / entry.getKey(), new ArrayList<String>().let(it -> entry.getValue().accept(it, subHead)), StandardCharsets.UTF_8));
+
+    static void dump(final Path target, final BiConsumer<List<String>, String> info, final String subHead = head) throws IOException
+            = Files.write(target, new ArrayList<String>().let(it -> info.accept(it, subHead)), StandardCharsets.UTF_8);
     
-    @SneakyThrows
-    static String string(final Stream<BiConsumer<List<String>, String>> info) throws IOException
-            = String.join("\n", new ArrayList<String>().let(it -> info.forEach(consumer -> consumer.accept(it, head))));
+    static String string(final Stream<BiConsumer<List<String>, String>> info, final String subHead = head) throws IOException
+            = String.join("\n", new ArrayList<String>().let(it -> info.forEach(consumer -> consumer.accept(it, subHead))));
     
-    @SneakyThrows
-    static void print(final Consumer<String> printer = System.out::println, final Stream<BiConsumer<List<String>, String>> info) throws IOException
-            = printer.accept(string(info));
+    static void print(final Consumer<String> printer = System.out::println, final Stream<BiConsumer<List<String>, String>> info, final String subHead = head) throws IOException
+            = printer.accept(string(info, subHead));
     
 }
