@@ -17,7 +17,6 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import com.sun.tools.javac.code.Kinds;
@@ -28,6 +27,7 @@ import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Env;
+import com.sun.tools.javac.comp.LambdaToMethod;
 import com.sun.tools.javac.comp.Resolve;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeInfo;
@@ -35,13 +35,16 @@ import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
+import com.sun.tools.javac.util.Names;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.FieldDefaults;
+import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
+import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
@@ -136,6 +139,25 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         
     }
     
+    @Getter
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+    public static class ReferenceMethodSymbol extends Symbol.MethodSymbol {
+        
+        MethodSymbol delegate;
+        
+        public ReferenceMethodSymbol(final MethodSymbol delegate, final Symbol owner) {
+            super(delegate.flags_field & ~STATIC, delegate.name, dropFirstParameter(delegate.type.asMethodType()), owner);
+            this.delegate = delegate;
+        }
+        
+        @Override
+        public MethodHandleSymbol asHandle() = delegate.asHandle();
+        
+        private static Type.MethodType dropFirstParameter(final Type.MethodType methodType) = { methodType.argtypes.tail, methodType.restype, methodType.thrown, methodType.tsym };
+        
+    }
+    
     Set<Name> polymorphicSignatureMethodNames = PolymorphicSignatureHolder.methodNames.stream().map(names::fromString).collect(Collectors.toSet());
     
     Set<Symbol.TypeSymbol> handleSymbols = Set.of(symtab.methodHandleType.tsym, symtab.varHandleType.tsym);
@@ -161,7 +183,7 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
             final Resolve resolve,
             final Env<AttrContext> env,
             final List<Type> argTypes,
-            final List<Type> typeArgTypes,
+            final @Nullable List<Type> typeArgTypes,
             final Collection<Symbol.MethodSymbol> methodSymbols,
             final Symbol bestSoFar,
             final boolean allowBoxing,
@@ -172,6 +194,22 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         return result;
     }
     
+    private static boolean skipByName(final Name name, final Names names = name.table.names) = name == names.init || name == names.clinit;
+    
+    @Hook
+    private static Hook.Result visitReference(final LambdaToMethod $this, final JCTree.JCMemberReference tree) {
+        if (tree.sym instanceof ReferenceMethodSymbol referenceMethodSymbol) {
+            final LambdaToMethod.LambdaAnalyzerPreprocessor.ReferenceTranslationContext localContext = (LambdaToMethod.LambdaAnalyzerPreprocessor.ReferenceTranslationContext) (Privilege) $this.context;
+            (Privilege) ($this.result = (Privilege) $this.makeMetafactoryIndyCall(localContext, referenceMethodSymbol.asHandle(), switch (tree.kind) {
+                case BOUND   -> (Privilege) $this.translate(List.of(tree.getQualifierExpression()), (Privilege) localContext.prev);
+                case UNBOUND -> List.nil();
+                default      -> throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException(STR."Unexpected kind: \{tree.kind}"));
+            }));
+            return Hook.Result.NULL;
+        }
+        return Hook.Result.VOID;
+    }
+    
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true, metadata = @TransformMetadata(order = 1 << 5))
     private static Symbol findMethod(
             final Symbol capture,
@@ -180,12 +218,16 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
             final Type site,
             final Name name,
             final List<Type> argTypes,
-            final List<Type> typeArgTypes,
+            final @Nullable List<Type> typeArgTypes,
             final Type inType,
             final Symbol bestSoFar,
             final boolean allowBoxing,
             final boolean useVarargs) {
-        if (capture.kind == Kinds.Kind.MTH || capture.kind == Kinds.Kind.AMBIGUOUS || site.isErroneous() || argTypes.stream().anyMatch(Type::isErroneous) || !HandlerSupport.attrContext().contains(env.tree))
+        final boolean isReference = env.tree instanceof JCTree.JCMemberReference;
+        if (!isReference)
+            if (capture.kind == Kinds.Kind.MTH || capture.kind == Kinds.Kind.AMBIGUOUS || !HandlerSupport.attrContext().contains(env.tree))
+                return capture;
+        if (site.isErroneous() || skipByName(name) || argTypes.stream().anyMatch(Type::isErroneous))
             return capture;
         final ExtensionHandler instance = instance(ExtensionHandler.class);
         if (instance.handleSymbols[site.tsym] && instance.polymorphicSignatureMethodNames[name] || instance.table.extensionProviders.isEmpty())
@@ -193,12 +235,19 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         final Attr.ResultInfo resultInfo = (Privilege) instance.attr.resultInfo;
         if (resultInfo == null)
             return capture;
-        final @Nullable Collection<Symbol.MethodSymbol> extensionMethods = instance.table.lookupExtensionProvider((Privilege) $this.types, env, name);
-        if (extensionMethods != null) {
-            final List<Type> extArgTypes = argTypes.prepend(site);
+        @Nullable Collection<Symbol.MethodSymbol> extensionMethods = instance.table.lookupExtensionProvider((Privilege) $this.types, env, name);
+        if (extensionMethods != null && isReference) {
+            final Symbol owner = env.enclClass.sym;
+            extensionMethods = extensionMethods.stream()
+                    .filter(methodSymbol -> instance.types.isAssignable(site, methodSymbol.type.asMethodType().argtypes.head))
+                    .map(methodSymbol -> new ReferenceMethodSymbol(methodSymbol, owner))
+                    .collect(Collectors.toList());
+        }
+        if (extensionMethods != null && !extensionMethods.isEmpty()) {
+            final List<Type> extArgTypes = isReference ? argTypes : argTypes.prepend(site);
             final Type pt = (Privilege) resultInfo.pt;
             @Nullable Runnable rollback = null;
-            if (pt instanceof Type.ForAll forAll) {
+            if (!isReference && pt instanceof Type.ForAll forAll) {
                 final Type.MethodType methodType = (Type.MethodType) forAll.qtype;
                 final List<Type> rollbackArgTypes = methodType.argtypes, rollbackTvars = forAll.tvars;
                 rollback = () -> { // Keep a copy for rollbacks that may be required.
@@ -209,6 +258,8 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
             }
             Symbol result = capture;
             result = findMethodInScope($this, env, extArgTypes, typeArgTypes, extensionMethods, result, allowBoxing, useVarargs);
+            if (env.tree instanceof JCTree.JCMemberReference reference)
+                return result;
             if (result instanceof Resolve.InapplicableSymbolError || result instanceof Resolve.InapplicableSymbolsError) {
                 if (pt instanceof Type.ForAll forAll) { // If there is a generic parameter list, try to fix the missing parameters.
                     if (!forAll.tvars.isEmpty() && typeArgTypes != null && !typeArgTypes.isEmpty()) {
@@ -218,8 +269,6 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                     }
                 }
             }
-            if (result instanceof Resolve.AmbiguityError ambiguityError)
-                result = ((Privilege) ambiguityError.ambiguousSyms).getLast();
             if (result.kind == Kinds.Kind.MTH && result instanceof Symbol.MethodSymbol methodSymbol) {
                 final TreeMaker maker = instance.maker.at(env.tree.pos);
                 if (env.tree instanceof JCTree.JCMethodInvocation invocation) {
@@ -228,26 +277,11 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                     final List<JCTree.JCExpression> args = invocation.args.prepend(invocation.meth instanceof JCTree.JCFieldAccess access ? access.selected : maker.Ident(instance.names._this));
                     final JCTree.JCMethodInvocation resolved = maker.Apply(invocation.typeargs, maker.QualIdent(result), args);
                     throw new ReAttrException(() -> invocation.type = resolved.type, resolved, invocation);
-                } else if (env.tree instanceof JCTree.JCMemberReference reference) {
-                    List<JCTree.JCVariableDecl> decls = IntStream.range(0, argTypes.size()).mapToObj(i -> maker.VarDef(maker.Modifiers(0L), instance.name(STR."$arg\{i}"), null, null, true)).collect(List.collector());
-                    List<JCTree.JCExpression> args = decls.map(decl -> maker.Ident(decl.name));
-                    final @Nullable Type type = ((Privilege) instance.deferredAttr.attribSpeculative(reference.expr, env.dup(reference.expr), (Privilege) instance.attr.unknownExprInfo)).type;
-                    if (type != null) {
-                        maker.at(env.tree.pos + 1);
-                        if (!type.isErroneous())
-                            args = args.prepend(reference.expr);
-                        else {
-                            final Name $ref = instance.name("$ref");
-                            decls = decls.prepend(maker.VarDef(maker.Modifiers(0L), $ref, maker.Type(site), null));
-                            args = args.prepend(maker.Ident($ref));
-                        }
-                        final JCTree.JCLambda lambda = maker.Lambda(decls, maker.Apply(List.nil(), maker.QualIdent(result), args));
-                        throw new ReAttrException(() -> reference.type = lambda.type, lambda, reference);
-                    } else
-                        DebugHelper.breakpoint();
                 }
             } else if (rollback != null) // Failed to look up a suitable result from the extension method.
                 rollback.run(); // If the generic parameter list is modified, roll back to the previous state.
+            if (result instanceof Resolve.AmbiguityError ambiguityError)
+                return ambiguityError;
         }
         return capture;
     }
