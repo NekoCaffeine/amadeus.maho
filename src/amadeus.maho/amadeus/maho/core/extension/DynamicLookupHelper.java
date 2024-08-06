@@ -37,6 +37,8 @@ public interface DynamicLookupHelper {
     
     Indexed<ClassLoader> loaderIndexed = Indexed.ofConcurrent();
     
+    { loaderIndexed[DynamicLookupHelper.class.getClassLoader()]; }
+    
     static int submit(final @Nullable ClassLoader loader) = loaderIndexed.id(loader == null ? ClassLoader.getPlatformClassLoader() : loader);
     
     static ClassLoader fetch(final int id) = loaderIndexed.value(id);

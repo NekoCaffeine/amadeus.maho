@@ -20,7 +20,6 @@ import amadeus.maho.transform.handler.base.MethodTransformer;
 import amadeus.maho.transform.mark.Proxy;
 import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.bytecode.remap.RemapContext;
@@ -80,7 +79,7 @@ public final class ProxyTransformer extends MethodTransformer<Proxy> implements 
                                     selector, sourceMethod.desc,
                                     makeSiteByName,
                                     annotation.value(),
-                                    submit(contextClassLoader()),
+                                    context[contextClassLoader()],
                                     targetType.getClassName(),
                                     sourceMethod.desc.equals(desc) ? "" : desc
                             );

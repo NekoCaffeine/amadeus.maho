@@ -30,7 +30,7 @@ import amadeus.maho.util.bytecode.remap.RemapContext;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.vm.JDWP;
 
-import static amadeus.maho.core.extension.DynamicLookupHelper.*;
+import static amadeus.maho.core.extension.DynamicLookupHelper.makeSiteByName;
 import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static org.objectweb.asm.Opcodes.*;
 
@@ -92,7 +92,7 @@ public final class RedirectTransformer extends MethodTransformer<Redirect> imple
                                         sourceMethod.desc,
                                         makeSiteByName,
                                         INVOKESTATIC,
-                                        submit(contextClassLoader()),
+                                        context[contextClassLoader()],
                                         ASMHelper.sourceName(sourceClass.name),
                                         ""
                                 ) :

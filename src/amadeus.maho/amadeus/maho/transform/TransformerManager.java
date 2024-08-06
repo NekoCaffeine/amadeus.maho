@@ -33,6 +33,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -517,7 +518,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         } finally { lock.unlock(); }
     }
     
-    public synchronized Context setupRuntimeClass(final Class<?> clazz, final ClassNode node = Maho.getClassNodeFromClass(clazz)) {
+    public synchronized Context setupRuntimeClass(final Class<?> clazz, final ClassNode node = Maho.getClassNodeFromClassNonNull(clazz)) {
         final Context context = { this, clazz.getClassLoader() };
         final ClassLoadable.Loaded loaded = { clazz };
         context.scanProvider(loaded, node);
@@ -561,7 +562,8 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 return null;
             final ClassNode p_node[] = { reader == null ? null : ASMHelper.newClassNode(reader) };
             final ClassWriter writer = { loader };
-            final TransformContext.WithSource context = writer.mark(p_node[0]).context(bytecode);
+            writer.mark(p_node[0]);
+            final TransformContext context = bytecode == null ? writer.context() : writer.context(bytecode);
             transformers.forEach(transformer -> p_node[0] = transform(context, p_node[0], transformer, loader, clazz, domain));
             final @Nullable byte result[] = writeBytecodeAndMark(p_node[0], context, loader);
             if (result != null && runtime() == this && DebugDumper.state()) {
@@ -581,7 +583,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     }
     
     @SneakyThrows
-    public void aot(final Path source, final Path target, final ClassLoader loader, final Predicate<Path> checker = path -> path.toString().endsWith(".class")) {
+    public void aot(final Path source, final Path target, final ClassLoader loader, final ToIntFunction<ClassLoader> loaderIndexed, final Predicate<Path> checker = path -> path.toString().endsWith(".class")) {
         ~-target;
         if (checker.test(source)) {
             final byte bytecode[] = Files.readAllBytes(source);
@@ -591,7 +593,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             if (!transformers.isEmpty()) {
                 final ClassNode p_node[] = { ASMHelper.newClassNode(reader) };
                 final ClassWriter writer = { loader };
-                final TransformContext.WithSource context = writer.mark(p_node[0]).context(true, bytecode);
+                final TransformContext.WithSource context = writer.mark(p_node[0]).context(loaderIndexed, bytecode);
                 transformers.forEach(transformer -> p_node[0] = transform(context, p_node[0], transformer, loader));
                 final @Nullable byte result[] = writeBytecodeAndMark(p_node[0], context, loader);
                 if (result != null) {

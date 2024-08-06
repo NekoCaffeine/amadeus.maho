@@ -7,12 +7,14 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 import jdk.internal.org.objectweb.asm.ClassReader;
 
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import amadeus.maho.core.extension.DynamicLookupHelper;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
@@ -101,9 +103,9 @@ public class ClassWriter extends org.objectweb.asm.ClassWriter {
     @Override
     protected ClassLoader getClassLoader() = loader();
     
-    public TransformContext context(final boolean aot = false) = { this, aot };
+    public TransformContext context(final ToIntFunction<ClassLoader> loaderIndexed = DynamicLookupHelper.loaderIndexed) = { this, loaderIndexed };
     
-    public TransformContext.WithSource context(final boolean aot = false, final byte bytecode[]) = { this, aot, bytecode };
+    public TransformContext.WithSource context(final ToIntFunction<ClassLoader> loaderIndexed = DynamicLookupHelper.loaderIndexed, final byte bytecode[]) = { this, loaderIndexed, bytecode };
     
     protected ClassLoader wrapper(final @Nullable ClassLoader loader) = loader == null ? ClassLoader.getPlatformClassLoader() : loader;
     

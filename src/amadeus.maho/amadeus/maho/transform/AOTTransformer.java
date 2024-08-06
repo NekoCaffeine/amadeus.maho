@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -32,10 +33,8 @@ import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.context.TransformContext;
-import amadeus.maho.util.function.FunctionHelper;
+import amadeus.maho.util.container.Indexed;
 import amadeus.maho.util.resource.ResourcePath;
-import amadeus.maho.util.tuple.Tuple;
-import amadeus.maho.util.tuple.Tuple2;
 
 @Getter
 @RequiredArgsConstructor
@@ -67,15 +66,15 @@ public class AOTTransformer implements ClassTransformer.Limited {
     }
     
     @SneakyThrows
-    public static void transform(final Path sourceDir, final Path targetDir)
-            = transform(Files.walk(sourceDir).filter(path -> path.toString().endsWith(".jar")).collect(Collectors.toMap(Function.identity(), path -> targetDir / (sourceDir % path).toString())));
+    public static void transform(final Path sourceDir, final Path targetDir, final ToIntFunction<ClassLoader> loaderIndexed = Indexed.ofConcurrent()::id)
+            = transform(Files.walk(sourceDir).filter(path -> path.toString().endsWith(".jar")).collect(Collectors.toMap(Function.identity(), path -> targetDir / (sourceDir % path).toString())), loaderIndexed);
     
     @SneakyThrows
-    public static void transform(final Map<Path, Path> files) {
+    public static void transform(final Map<Path, Path> files, final ToIntFunction<ClassLoader> loaderIndexed) {
         final TransformerManager manager = { "aot-t" };
         try (final AOTClassLoader loader = { files.keySet().stream().map(Path::toUri).map(URI::toURL).toArray(URL[]::new) }) {
             manager.setup(loader, ResourcePath.of(loader), Level.OPEN_WORLD, files.keySet().stream().map(Path::toString).collect(Collectors.joining(",\n    ", "AOT [\n    ", "\n]")));
-            files.forEach((a, b) -> a | pa -> b | pb -> pa.projection(pb, (source, target) -> manager.aot(source, target, loader)));
+            files.forEach((a, b) -> a | pa -> b | pb -> pa.projection(pb, (source, target) -> manager.aot(source, target, loader, loaderIndexed)));
         }
     }
     

@@ -55,7 +55,7 @@ import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.StringHelper;
 import amadeus.maho.vm.JDWP;
 
-import static amadeus.maho.core.extension.DynamicLookupHelper.*;
+import static amadeus.maho.core.extension.DynamicLookupHelper.makeSiteByName;
 import static amadeus.maho.util.bytecode.ASMHelper.*;
 import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static org.objectweb.asm.Opcodes.*;
@@ -328,7 +328,7 @@ public final class HookTransformer extends MethodTransformer<Hook> implements Cl
                     sourceMethod.desc,
                     makeSiteByName,
                     INVOKESTATIC,
-                    submit(contextClassLoader()),
+                    context[contextClassLoader()],
                     sourceName(sourceClass.name),
                     ""
             );

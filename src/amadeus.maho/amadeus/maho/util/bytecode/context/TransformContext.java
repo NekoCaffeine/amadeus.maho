@@ -1,23 +1,21 @@
 package amadeus.maho.util.bytecode.context;
 
 import java.nio.ByteBuffer;
-import java.util.EnumSet;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import amadeus.maho.core.extension.DynamicLookupHelper;
 import amadeus.maho.lang.AccessLevel;
-import amadeus.maho.lang.Default;
+import amadeus.maho.lang.Extension;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.util.bytecode.ClassWriter;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.traverser.MethodTraverser;
 
 @Getter
@@ -40,12 +38,16 @@ public class TransformContext {
     
     final ClassWriter writer;
     
-    @Default
-    final boolean aot = false;
+    final ToIntFunction<ClassLoader> loaderIndexed;
     
     boolean modified;
     
     final Set<MethodNode> shouldComputeMethods = new HashSet<>();
+    
+    public boolean aot() = loaderIndexed() != DynamicLookupHelper.loaderIndexed;
+    
+    @Extension.Operator("GET")
+    public int id(final ClassLoader loader) = loaderIndexed().applyAsInt(loader);
     
     public self markModified() = modified = true;
     

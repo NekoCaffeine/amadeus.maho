@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.ToIntFunction;
 
 import amadeus.maho.lang.EqualsAndHashCode;
 import amadeus.maho.lang.Extension;
@@ -14,7 +15,7 @@ import amadeus.maho.lang.ToString;
 
 import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 
-public interface Indexed<T> {
+public interface Indexed<T> extends ToIntFunction<T> {
     
     @ToString
     @EqualsAndHashCode
@@ -65,6 +66,9 @@ public interface Indexed<T> {
     
     @Extension.Operator("GET")
     int id(T value);
+    
+    @Override
+    default int applyAsInt(final T value) = id(value);
     
     @Extension.Operator("GET")
     T value(int id);
