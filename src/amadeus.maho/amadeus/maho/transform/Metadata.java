@@ -28,7 +28,7 @@ public @interface Metadata {
             final Map<Object, Object> map = AnnotationHandler.valueToMap(metadata.values);
             final @Nullable List<Object> value = (List<Object>) map["value"];
             if (value != null) {
-                if (value[name])
+                if (value.contains(name))
                     return false;
                 value += name;
             } else

@@ -103,7 +103,7 @@ public interface Javac {
             if (listener != null)
                 context.put(DiagnosticListener.class, listener);
             context.put(Log.errKey, writer);
-            if (!options["nonBatchMode"])
+            if (!options.contains("nonBatchMode"))
                 CacheFSInfo.preRegister(context);
             final JavacFileManager fileManager = { context, true, charset };
             fileManager.autoClose = true;

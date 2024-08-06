@@ -46,7 +46,7 @@ public interface StringHandler {
     @Hook(at = @At(var = @At.VarInsn(opcode = ALOAD, var = 3), ordinal = 1))
     private static Hook.Result visitStringTemplate(final Attr $this, final JCTree.JCStringTemplate tree, @Hook.LocalVar(index = 3) @Hook.Reference Type resultType) {
         final java.util.List<Object> constArgs = tree.expressions.stream().map(expression -> expression.type?.constValue() ?? null).toList();
-        if (!constArgs[null] && symbol(tree.processor) instanceof Symbol.VarSymbol symbol && symbol.owner.type.tsym == instance().symtab.stringTemplateType.tsym && symbol.name == symbol.name.table.names.STR) {
+        if (!constArgs.contains(null) && symbol(tree.processor) instanceof Symbol.VarSymbol symbol && symbol.owner.type.tsym == instance().symtab.stringTemplateType.tsym && symbol.name == symbol.name.table.names.STR) {
             resultType = resultType.constType(STR.process(of(tree.fragments, constArgs)));
             return { };
         }
