@@ -584,7 +584,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
     
     @SneakyThrows
     public void aot(final Path source, final Path target, final ClassLoader loader, final ToIntFunction<ClassLoader> loaderIndexed, final Predicate<Path> checker = path -> path.toString().endsWith(".class")) {
-        ~-target;
+        ++target;
         if (checker.test(source)) {
             final byte bytecode[] = Files.readAllBytes(source);
             final ClassReader reader = { bytecode };

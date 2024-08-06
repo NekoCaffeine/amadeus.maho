@@ -113,8 +113,7 @@ public interface Config {
         
         @Override
         public void save(final Object data, final String name) = executor.execute(() -> {
-            final Path locate = locator.locate(data.getClass(), name);
-            ~-locate;
+            final Path locate = ++locator.locate(data.getClass(), name);
             try (final var output = Files.newOutputStream(locate)) { converter.write(output, data); }
         });
     

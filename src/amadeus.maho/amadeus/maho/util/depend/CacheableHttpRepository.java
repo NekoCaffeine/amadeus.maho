@@ -91,7 +91,7 @@ public abstract class CacheableHttpRepository implements Repository {
         final ArrayList<Throwable> throwables = { };
         do {
             try {
-                ~-cache;
+                ++cache;
                 return Interrupt.getUninterruptible(() -> client().sendMayThrow(request, info -> switch (info.statusCode()) {
                     case OK        -> HttpResponse.BodyHandlers.ofFile(cache--).apply(info);
                     case NOT_FOUND -> throw new RepositoryFileNotFoundException(request.uri().toString(), this);

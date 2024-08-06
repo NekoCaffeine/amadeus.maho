@@ -160,37 +160,37 @@ public interface FileHelper {
     static Path PLUS(final Path path) = path;
     
     static Path TILDE(final Path path) {
-        Files.createDirectories(path);
+        if (path != null)
+            Files.createDirectories(path);
         return path;
     }
     
     static Path GTGT(final byte data[], final Path path) {
-        createDirectoriesIfNotNull(path.getParent());
-        Files.write(path, data);
+        Files.write(++path, data);
         return path;
     }
     
     static Path GTGTGT(final byte data[], final Path path) {
-        createDirectoriesIfNotNull(path.getParent());
-        Files.write(path, data, APPEND);
+        Files.write(++path, data, APPEND);
         return path;
     }
     
     static Path GTGT(final CharSequence sequence, final Path path) {
-        createDirectoriesIfNotNull(path.getParent());
-        Files.writeString(path, sequence, StandardCharsets.UTF_8);
+        Files.writeString(++path, sequence, StandardCharsets.UTF_8);
         return path;
     }
     
     static Path GTGTGT(final CharSequence sequence, final Path path) {
-        createDirectoriesIfNotNull(path.getParent());
-        Files.writeString(path, sequence, StandardCharsets.UTF_8, APPEND);
+        Files.writeString(++path, sequence, StandardCharsets.UTF_8, APPEND);
         return path;
     }
     
-    static void createDirectoriesIfNotNull(final @Nullable Path path) {
-        if (path != null)
-            Files.createDirectories(path);
+    @Extension.Operator("++_")
+    static Path createParentDirectoriesIfNotNull(final Path path) {
+        final @Nullable Path parent = path.getParent();
+        if (parent != null)
+            Files.createDirectories(parent);
+        return path;
     }
     
     static String fileName(final Path path) {
