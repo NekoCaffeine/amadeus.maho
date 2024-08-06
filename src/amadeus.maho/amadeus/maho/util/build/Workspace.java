@@ -73,7 +73,7 @@ public record Workspace(Path root, Config config = Config.of(Config.Locator.ofFi
             final String command = String.join(" ", args);
             switch (getOSType()) {
                 case WINDOWS -> commands *= List.of("cmd", "/c", "start", "/wait", "cmd", "/c", STR."\{command} & pause > nul");
-                case LINUX   -> commands *= List.of("xterm", "-e", STR."\{command} ; read -n 1 -s");
+                case LINUX   -> commands *= List.of("xterm", "-e", "bash", "-c", STR."\{command} ; read -n 1 -s");
                 case MAC     -> commands *= List.of("osascript", "-e", STR."tell application 'Terminal' to do script '\{command} ; read -n 1 -s'");
                 default      -> throw unsupportedOSType();
             }

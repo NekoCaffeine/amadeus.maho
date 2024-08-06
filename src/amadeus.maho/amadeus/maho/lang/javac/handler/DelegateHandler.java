@@ -34,6 +34,7 @@ import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.handler.base.Handler;
 import amadeus.maho.lang.javac.handler.base.HandlerSupport;
+import amadeus.maho.lang.javac.handler.base.MethodIdentitiesCache;
 import amadeus.maho.lang.javac.multithreaded.SharedComponent;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
@@ -53,17 +54,14 @@ import static com.sun.tools.javac.code.Kinds.Kind.*;
 public class DelegateHandler extends BaseHandler<Delegate> {
     
     public record SharedData(
-            Set<String> objectMethodIdentities = Set.of("getClass()", "equals(java.lang.Object)", "hashCode()", "toString()", "clone()", "notify()", "notifyAll()", "wait()", "wait(long)", "wait(long,int)"),
-            ConcurrentWeakIdentityHashMap<Symbol.MethodSymbol, String> identitiesCache = { },
+            MethodIdentitiesCache methodIdentitiesCache = { },
             ConcurrentWeakIdentityHashMap<Symbol, Map<Symbol, java.util.List<Type>>> delegateTypesCache = { }) implements SharedComponent {
         
-        public static SharedData instance(final Context context) = context.get(SharedData.class) ?? new SharedData().let(it -> context.put(SharedData.class, it));
-        
-        public String identity(final Symbol.MethodSymbol symbol) = identitiesCache().computeIfAbsent(symbol, JavacContext::methodIdentity);
+        public static SharedData instance(final Context context) = context.get(SharedData.class) ?? new SharedData(MethodIdentitiesCache.instance(context)).let(it -> context.put(SharedData.class, it));
         
         public boolean skip(final Symbol.MethodSymbol symbol, final Set<String> context) {
-            final String identity = identity(symbol);
-            return objectMethodIdentities()[identity] || !context.add(identity);
+            final String identity = methodIdentitiesCache[symbol];
+            return MethodIdentitiesCache.objectMethodIdentities[identity] || !context.add(identity);
         }
         
     }

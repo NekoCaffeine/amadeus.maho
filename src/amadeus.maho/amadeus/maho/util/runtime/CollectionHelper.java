@@ -26,23 +26,26 @@ public interface CollectionHelper {
         return collection;
     }
     
-    static <T> boolean startsWith(final List<T> $this, final List<T> prefix) {
+    static <L extends List<T>, T> boolean startsWith(final L $this, final List<T> prefix) {
         final int size = prefix.size();
         return $this.size() >= size && $this.subList(0, size).equals(prefix);
     }
     
-    static <T> boolean endsWith(final List<T> $this, final List<T> suffix) {
+    static <L extends List<T>, T> boolean endsWith(final L $this, final List<T> suffix) {
         final int size = suffix.size(), offset = $this.size() - size;
         return offset >= 0 && $this.subList(offset, offset + size).equals(suffix);
     }
     
-    static <T> T GET(final List<T> list, final int index) {
+    static <L extends List<T>, T> T GET(final L list, final int index) {
         final int size = list.size(), i = index < 0 ? size + index : index;
         // noinspection DataFlowIssue
         return i > -1 && i < size ? list.get(i) : null;
     }
     
-    static <T> @Nullable T PUT(final List<T> list, final int index, final @Nullable T element) = list.set(index < 0 ? list.size() + index : index, element);
+    static <L extends List<T>, T> @Nullable T PUT(final L list, final int index, final @Nullable T element) {
+        list.set(index < 0 ? list.size() + index : index, element);
+        return element;
+    }
     
     static <C extends Collection<T>, T> C PLUSEQ(final C collection, final @Nullable T value) {
         collection.add(value);
@@ -84,7 +87,7 @@ public interface CollectionHelper {
     
     static <T> boolean nonEmpty(final Collection<T> $this) = !$this.isEmpty();
     
-    static <T> boolean GET(final Collection<T> collection, final @Nullable T value) = collection.contains(value);
+    static <T> boolean GET(final Collection<T> collection, final @Nullable Object value) = collection.contains(value);
     
     static <K, V> @Nullable V GET(final Map<K, V> map, final @Nullable K key) = map.get(key);
     

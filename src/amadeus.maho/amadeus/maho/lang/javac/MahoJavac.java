@@ -139,9 +139,10 @@ public class MahoJavac {
         annotate.annotateLater(tree.annotations, env, env.toplevel.packge, tree.pos());
     }
     
-    // Disable some unnecessary warnings
+    private static final Set<String> skipErrorKeys = Set.of("compiler.err.cant.resolve.location.args", "compiler.err.illegal.char");
+    
     public static boolean skipLog(final String key) {
-        if (reportFlag && !key.startsWith("compiler.note.") && !key.equals("compiler.err.cant.resolve.location.args") && CallerContext.Stack.walker().walk(stream -> stream.noneMatch(MahoJavac::skipFrame)))
+        if (reportFlag && !key.startsWith("compiler.note.") && !skipErrorKeys[key] && CallerContext.Stack.walker().walk(stream -> stream.noneMatch(MahoJavac::skipFrame)))
             System.out.println(STR."report: \{key}"); // breakpoint can be here
         return key.startsWith("compiler.note.");
     }

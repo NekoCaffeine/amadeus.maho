@@ -121,7 +121,7 @@ public enum ProfileManager implements ClassTransformer {
         else
             methodNode.instructions.insert(start);
         methodNode.instructions.add(end); // Throwable
-        final Object locals[] = empty(), stack[] = array("java/lang/Throwable"); // TODO test empty locals
+        final Object locals[] = empty(), stack[] = array("java/lang/Throwable");
         methodNode.instructions.add(new FrameNode(F_FULL, locals.length, locals, 1, stack));
         methodNode.instructions.add(hookTail(node, methodNode)); // Throwable
         methodNode.instructions.add(new InsnNode(ATHROW)); // <EMPTY>

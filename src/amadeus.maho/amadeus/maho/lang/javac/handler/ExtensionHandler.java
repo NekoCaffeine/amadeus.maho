@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,9 +34,10 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeInfo;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
+import com.sun.tools.javac.util.RichDiagnosticFormatter;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.EqualsAndHashCode;
@@ -51,11 +53,14 @@ import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.DynamicAnnotationHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
 import amadeus.maho.lang.javac.handler.base.HandlerSupport;
+import amadeus.maho.lang.javac.handler.base.MethodIdentitiesCache;
 import amadeus.maho.lang.javac.multithreaded.SharedComponent;
 import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
+import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
 import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.lang.javac.handler.ExtensionHandler.PRIORITY;
@@ -70,17 +75,53 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
     
     public static final int PRIORITY = -1 << 24;
     
+    @Getter
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+    public static class ReferenceMethodSymbol extends Symbol.MethodSymbol {
+        
+        MethodSymbol delegate;
+        
+        public ReferenceMethodSymbol(final MethodSymbol delegate, final Symbol owner) {
+            super(delegate.flags_field & ~STATIC, delegate.name, dropFirstParameter(delegate.type.asMethodType()), owner);
+            this.delegate = delegate;
+        }
+        
+        @Override
+        public MethodHandleSymbol asHandle() = delegate.asHandle();
+        
+        private static Type.MethodType dropFirstParameter(final Type.MethodType methodType) = { methodType.argtypes.tail, methodType.restype, methodType.thrown, methodType.tsym };
+        
+    }
+    
+    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+    public static class ExtensionResolveError extends Resolve.ResolveError {
+        
+        Resolve.ResolveError error;
+        
+        public ExtensionResolveError(final Resolve resolve, final Resolve.ResolveError error) {
+            resolve.super(Kinds.Kind.ABSENT_MTH, "extension method resolve error");
+            this.error = error;
+        }
+        
+        @Override
+        public JCDiagnostic getDiagnostic(final JCDiagnostic.DiagnosticType diagnosticType, final JCDiagnostic.DiagnosticPosition pos, final Symbol location, final Type site, final Name name,
+                final List<Type> argTypes, final @Nullable List<Type> typeArgTypes) = (Privilege) error.getDiagnostic(diagnosticType, pos, location, site, name, argTypes, typeArgTypes);
+        
+    }
+    
     @ToString
     @EqualsAndHashCode
     public record SymbolTable(ConcurrentHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ClassSymbol>> extensionProviders = { },
                               ConcurrentHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ModuleSymbol>> importInfos = { },
-                              ConcurrentHashMap<Symbol.ModuleSymbol, Map<Name, Collection<Symbol.MethodSymbol>>> extensionMethodsWithImport = { }) implements SharedComponent {
+                              ConcurrentHashMap<Symbol.ModuleSymbol, Map<Name, Collection<Symbol.MethodSymbol>>> extensionMethodsWithImport = { },
+                              ConcurrentHashMap<Symbol.MethodSymbol, ConcurrentWeakIdentityHashMap<Symbol, ReferenceMethodSymbol>> referenceMethodSymbolsCache = { }) implements SharedComponent {
         
         public static SymbolTable instance(final Context context) = context.get(SymbolTable.class) ?? new SymbolTable().let(it -> context.put(SymbolTable.class, it));
         
-        public Map<Name, Collection<Symbol.MethodSymbol>> lookupExtensionProvider(final Types types, final Env<AttrContext> env) = extensionMethodsWithImport().computeIfAbsent(env.toplevel.modle, module -> {
-            final @Nullable Collection<Symbol.ModuleSymbol> moduleSymbols = importInfos()[module];
-            final HashMap<Name, Collection<Symbol.MethodSymbol>> methods = { };
+        public Map<Name, Collection<Symbol.MethodSymbol>> lookupExtensionProvider(final Symbol.ModuleSymbol moduleSymbol) = extensionMethodsWithImport().computeIfAbsent(moduleSymbol, it -> {
+            final @Nullable Collection<Symbol.ModuleSymbol> moduleSymbols = importInfos()[it];
+            final HashMap<Name, Collection<Symbol.MethodSymbol>> methodsByName = { };
             (moduleSymbols == null ?
                     extensionProviders().values().stream().flatMap(Collection::stream) :
                     moduleSymbols.stream().map(symbol -> extensionProviders()[symbol]).nonnull().flatMap(Collection::stream))
@@ -89,17 +130,20 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                     .forEach(methodSymbol -> {
                         final List<Symbol.VarSymbol> params = methodSymbol.params();
                         if (params.tail != null && !(params.head.type instanceof Type.JCPrimitiveType))
-                            methods.computeIfAbsent(methodSymbol.name, _ -> new ArrayList<>()) += methodSymbol;
+                            methodsByName.computeIfAbsent(methodSymbol.name, _ -> new ArrayList<>()) += methodSymbol;
                     });
-            return methods;
+            return methodsByName;
         });
         
-        public @Nullable Collection<Symbol.MethodSymbol> lookupExtensionProvider(final Types types, final Env<AttrContext> env, final Name name) = lookupExtensionProvider(types, env)[name];
+        public @Nullable Collection<Symbol.MethodSymbol> lookupExtensionProvider(final Env<AttrContext> env, final Name name) = lookupExtensionProvider(env.toplevel.modle)[name];
         
         public static Predicate<Symbol> filter() = symbol -> {
             final long flags = symbol.flags();
             return symbol.kind == Kinds.Kind.MTH && (flags & (PUBLIC | STATIC)) == (PUBLIC | STATIC) && (flags & SYNTHETIC) == 0;
         };
+        
+        public ReferenceMethodSymbol asReferenceMethodSymbol(final Symbol.MethodSymbol methodSymbol, final Symbol owner)
+            = referenceMethodSymbolsCache().computeIfAbsent(methodSymbol, _ -> new ConcurrentWeakIdentityHashMap<>()).computeIfAbsent(owner, it -> new ReferenceMethodSymbol(methodSymbol, it));
         
     }
     
@@ -139,30 +183,15 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         
     }
     
-    @Getter
-    @RequiredArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-    public static class ReferenceMethodSymbol extends Symbol.MethodSymbol {
-        
-        MethodSymbol delegate;
-        
-        public ReferenceMethodSymbol(final MethodSymbol delegate, final Symbol owner) {
-            super(delegate.flags_field & ~STATIC, delegate.name, dropFirstParameter(delegate.type.asMethodType()), owner);
-            this.delegate = delegate;
-        }
-        
-        @Override
-        public MethodHandleSymbol asHandle() = delegate.asHandle();
-        
-        private static Type.MethodType dropFirstParameter(final Type.MethodType methodType) = { methodType.argtypes.tail, methodType.restype, methodType.thrown, methodType.tsym };
-        
-    }
+    MethodIdentitiesCache methodIdentitiesCache = MethodIdentitiesCache.instance(context);
     
     Set<Name> polymorphicSignatureMethodNames = PolymorphicSignatureHolder.methodNames.stream().map(names::fromString).collect(Collectors.toSet());
     
     Set<Symbol.TypeSymbol> handleSymbols = Set.of(symtab.methodHandleType.tsym, symtab.varHandleType.tsym);
     
     SymbolTable table = SymbolTable.instance(context);
+    
+    Set<Symbol> errorSymbols = new ConcurrentWeakIdentityHashSet<>();
     
     @Override
     public void initModules(final Set<Symbol.ModuleSymbol> modules) = table.extensionProviders().clear();
@@ -194,7 +223,21 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         return result;
     }
     
-    private static boolean skipByName(final Name name, final Names names = name.table.names) = name == names.init || name == names.clinit;
+    private boolean skipByName(final Name name) = name == names.init || name == names.clinit;
+    
+    private boolean skipOriginal(final Symbol original, final Symbol.MethodSymbol symbol) = switch (original) {
+        case Symbol.MethodSymbol originalMethod    -> originalMethod == original || methodIdentitiesCache.isSameMethod(originalMethod, symbol);
+        case Resolve.AmbiguityError ambiguityError -> ((Privilege) ambiguityError.ambiguousSyms).stream().cast(Symbol.MethodSymbol.class)
+                .anyMatch(methodSymbol -> methodSymbol == original || methodIdentitiesCache.isSameMethod(methodSymbol, symbol));
+        default                                    -> false;
+    };
+    
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    private static String visitMethodSymbol(final String capture, final RichDiagnosticFormatter.RichPrinter $this, final Symbol.MethodSymbol symbol, final Locale locale) {
+        if (symbol instanceof ReferenceMethodSymbol referenceMethodSymbol)
+            return capture + STR." => \{$this.visit(referenceMethodSymbol.delegate.owner, locale)}#\{$this.visitMethodSymbol(referenceMethodSymbol.delegate, locale)}";
+        return capture;
+    }
     
     @Hook
     private static Hook.Result visitReference(final LambdaToMethod $this, final JCTree.JCMemberReference tree) {
@@ -227,20 +270,21 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         if (!isReference)
             if (capture.kind == Kinds.Kind.MTH || capture.kind == Kinds.Kind.AMBIGUOUS || !HandlerSupport.attrContext().contains(env.tree))
                 return capture;
-        if (site.isErroneous() || skipByName(name) || argTypes.stream().anyMatch(Type::isErroneous))
+        if (site.isErroneous() || argTypes.stream().anyMatch(Type::isErroneous))
             return capture;
         final ExtensionHandler instance = instance(ExtensionHandler.class);
-        if (instance.handleSymbols[site.tsym] && instance.polymorphicSignatureMethodNames[name] || instance.table.extensionProviders.isEmpty())
+        if (instance.skipByName(name) || instance.handleSymbols[site.tsym] && instance.polymorphicSignatureMethodNames[name] || instance.table.extensionProviders.isEmpty())
             return capture;
         final Attr.ResultInfo resultInfo = (Privilege) instance.attr.resultInfo;
         if (resultInfo == null)
             return capture;
-        @Nullable Collection<Symbol.MethodSymbol> extensionMethods = instance.table.lookupExtensionProvider((Privilege) $this.types, env, name);
+        @Nullable Collection<Symbol.MethodSymbol> extensionMethods = instance.table.lookupExtensionProvider(env, name);
         if (extensionMethods != null && isReference) {
-            final Symbol owner = env.enclClass.sym;
+            final Symbol owner = site.tsym;
             extensionMethods = extensionMethods.stream()
                     .filter(methodSymbol -> instance.types.isAssignable(site, methodSymbol.type.asMethodType().argtypes.head))
-                    .map(methodSymbol -> new ReferenceMethodSymbol(methodSymbol, owner))
+                    .filter(methodSymbol -> !instance.skipOriginal(bestSoFar, methodSymbol))
+                    .map(methodSymbol -> instance.table.asReferenceMethodSymbol(methodSymbol, owner))
                     .collect(Collectors.toList());
         }
         if (extensionMethods != null && !extensionMethods.isEmpty()) {
@@ -280,8 +324,8 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
                 }
             } else if (rollback != null) // Failed to look up a suitable result from the extension method.
                 rollback.run(); // If the generic parameter list is modified, roll back to the previous state.
-            if (result instanceof Resolve.AmbiguityError ambiguityError)
-                return ambiguityError;
+            if (result instanceof Resolve.ResolveError error)
+                return new ExtensionResolveError($this, error);
         }
         return capture;
     }
