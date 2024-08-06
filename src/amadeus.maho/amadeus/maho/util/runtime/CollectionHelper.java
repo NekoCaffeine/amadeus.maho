@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.Spliterators;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -87,7 +88,7 @@ public interface CollectionHelper {
     
     static <T> boolean nonEmpty(final Collection<T> $this) = !$this.isEmpty();
     
-    static <T> boolean GET(final Collection<T> collection, final @Nullable Object value) = collection.contains(value);
+    static <T> boolean GET(final Set<T> set, final @Nullable Object value) = set.contains(value);
     
     static <K, V> @Nullable V GET(final Map<K, V> map, final @Nullable K key) = map.get(key);
     
