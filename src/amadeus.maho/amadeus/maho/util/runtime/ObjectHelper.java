@@ -38,6 +38,11 @@ public interface ObjectHelper {
         throw DebugHelper.breakpointBeforeThrow(new NullPointerException());
     }
     
+    static void assertNonNull(final @Nullable Object obj) {
+        if (obj == null)
+            throw DebugHelper.breakpointBeforeThrow(new NullPointerException());
+    }
+    
     static boolean isNull(final @Nullable Object object) = object == null;
     
     static boolean nonNull(final @Nullable Object object) = object != null;

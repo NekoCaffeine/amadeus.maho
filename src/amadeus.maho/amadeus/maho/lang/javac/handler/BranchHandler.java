@@ -174,9 +174,15 @@ public class BranchHandler extends BaseSyntaxHandler {
         
     }
     
-    public static final String requireNonNull = LookupHelper.method1(ObjectHelper::requireNonNull).getName();
+    public static final String
+            requireNonNull = LookupHelper.method1(ObjectHelper::requireNonNull).getName(),
+            assertNonNull  = LookupHelper.methodV1(ObjectHelper::assertNonNull).getName();
     
-    Name ObjectHelperName = name(ObjectHelper.class), nullOrName = name("??"), requireNonNullName = name(requireNonNull);
+    Name
+            ObjectHelperName   = name(ObjectHelper.class),
+            nullOrName         = name("??"),
+            requireNonNullName = name(requireNonNull),
+            assertNonNullName  = name(assertNonNull);
     
     @Hook(at = @At(field = @At.FieldInsn(name = "SUBSUB"), ordinal = 0, offset = 1), capture = true)
     private static boolean term3Rest(final boolean capture, final JavacParser $this, final JCTree.JCExpression t, final List<JCTree.JCExports> typeArgs) = capture || $this.token().kind == Tokens.TokenKind.BANG;
@@ -542,7 +548,8 @@ public class BranchHandler extends BaseSyntaxHandler {
     
     private void genNullCheck(final Code code, final JCTree tree) {
         code.statBegin(tree.pos);
-        (Privilege) gen.callMethod(tree.pos(), symtab.enterClass(mahoModule, ObjectHelperName).type, names.requireNonNull, List.of(symtab.objectType), true);
+        code.emitop0(dup);
+        (Privilege) gen.callMethod(tree.pos(), symtab.enterClass(mahoModule, ObjectHelperName).type, assertNonNullName, List.of(symtab.objectType), true);
     }
     
 }
