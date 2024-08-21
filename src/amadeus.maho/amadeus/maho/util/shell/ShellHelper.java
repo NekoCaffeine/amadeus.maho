@@ -18,12 +18,13 @@ import amadeus.maho.util.build.Scaffold;
 import amadeus.maho.util.build.ScriptHelper;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.dynamic.LambdaHelper;
+import amadeus.maho.util.llm.LLMHelper;
 import amadeus.maho.util.misc.Dumper;
 import amadeus.maho.util.runtime.UnsafeHelper;
 
 @Include(Scaffold.class)
 @SneakyThrows
-public interface ShellHelper extends ScriptHelper {
+public interface ShellHelper extends ScriptHelper, LLMHelper {
     
     Unsafe unsafe = UnsafeHelper.unsafe();
     

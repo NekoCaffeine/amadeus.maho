@@ -13,10 +13,12 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -34,6 +36,7 @@ import jdk.internal.net.http.ResponseSubscribers;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 
+import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
@@ -43,20 +46,18 @@ import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.bytecode.ASMHelper;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
+import amadeus.maho.util.data.JSON;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.dynamic.Wrapper;
+import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
 import amadeus.maho.util.type.TypeInferer;
 import amadeus.maho.util.type.TypeToken;
-
-import sun.net.www.MimeTable;
-
 
 @SneakyThrows
 public interface HttpApi {
@@ -93,7 +94,7 @@ public interface HttpApi {
             public HttpRequest.BodyPublisher publisher(final Callable callable, final Object body) = adapter().publisher(callable, body) ?? fallback().publisher(callable, body);
             
             @Override
-            public HttpResponse.BodyHandler handler(final Callable callable) = adapter().handler(callable) ?? fallback().handler(callable);
+            public HttpResponse.BodyHandler handler(final Callable callable) = responseInfo -> adapter().handler(callable)?.apply(responseInfo) ?? fallback().handler(callable)?.apply(responseInfo) ?? null;
             
         }
         
@@ -127,27 +128,25 @@ public interface HttpApi {
             private static final Json instance = { };
             
             @Override
-            public HttpRequest.BodyPublisher publisher(final Callable callable, final Object body) {
-                final amadeus.maho.util.data.Json.Writer writer = { };
-                writer.visitValue(body);
-                return HttpRequest.BodyPublishers.ofString(writer.toString());
-            }
+            public HttpRequest.BodyPublisher publisher(final Callable callable, final @Nullable Object body) = HttpRequest.BodyPublishers.ofString(JSON.Writer.write(body));
             
             @Override
-            public HttpResponse.BodyHandler handler(final Callable callable) = responseInfo -> new ResponseSubscribers.ByteArraySubscriber<>(
-                    bytes -> {
-                        final String json = { bytes, StandardCharsets.UTF_8 };
-                        final amadeus.maho.util.data.Json.Dynamic dynamic = { };
-                        amadeus.maho.util.data.Json.read(json, dynamic);
-                        return dynamic.root();
-                    }
-            );
+            public @Nullable HttpResponse.BodyHandler handler(final Callable callable) = responseInfo -> MediaType.charsetBySubType(responseInfo, "json") instanceof Charset charset ?
+                    new ResponseSubscribers.ByteArraySubscriber<>(bytes -> JSON.Dynamic.read(new String(bytes, charset))) : null;
             
         }
         
         @Nullable HttpRequest.BodyPublisher publisher(Callable callable, Object body);
         
         @Nullable HttpResponse.BodyHandler handler(Callable callable);
+        
+    }
+    
+    @Target(ElementType.PARAMETER)
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface Header {
+        
+        String value() default "";
         
     }
     
@@ -210,7 +209,10 @@ public interface HttpApi {
         
         Type returnType = method.getGenericReturnType();
         
-        @Nullable ParameterizedPath parameterizedPath = ParameterizedPath.parse(request.path(), method.getParameters());
+        ParameterizedHeader parameterizedHeaders[] = ParameterizedHeader.parse(method.getParameters());
+        
+        @Nullable
+        ParameterizedPath parameterizedPath = ParameterizedPath.parse(request.path(), method.getParameters());
         
         Object cache = makeCache();
         
@@ -228,7 +230,7 @@ public interface HttpApi {
                 builder.headers(request.headers());
             if (parameterizedPath == null) {
                 builder.uri(URI.create(realEndpoint + request.path()));
-                if (bodyType == Void.class)
+                if (bodyType == Void.class && parameterizedHeaders.length == 0)
                     return builder.build();
             }
             return builder;
@@ -238,18 +240,35 @@ public interface HttpApi {
             case HttpRequest request         -> setting.client().send(request, ObjectHelper.requireNonNull(adapter.handler(this))).body();
             case HttpRequest.Builder builder -> {
                 final HttpRequest.Builder copy = builder.copy();
+                if (parameterizedHeaders.length > 0)
+                    Stream.of(parameterizedHeaders).forEach(header -> {
+                        switch (args[header.index]) {
+                            case Map<?, ?> map -> map.forEach((key, value) -> copy.header(String.valueOf(key), String.valueOf(value)));
+                            case Object object -> copy.header(header.name(), String.valueOf(object));
+                            case null          -> { }
+                        }
+                    });
                 if (parameterizedPath != null)
                     copy.uri(URI.create(realEndpoint + parameterizedPath.merge(args)));
                 if (bodyType != Void.class) {
                     final Object body = args[pathParameterCount];
                     copy.method(request.method(), ObjectHelper.requireNonNull(adapter.publisher(this, body)));
                     if (bodyType == Path.class && body instanceof Path path)
-                        copy.header(HttpHelper.Header.Content_Type, MimeTable.loadTable().getContentTypeFor(path.getFileName().toString()));
+                        copy.header(HttpHelper.Header.Content_Type, URLConnection.getFileNameMap().getContentTypeFor(path.getFileName().toString()));
                 }
                 yield setting.client().send(copy.build(), ObjectHelper.requireNonNull(adapter.handler(this))).body();
             }
             default                          -> throw new IllegalStateException(STR."Unexpected value: \{cache}");
         };
+        
+    }
+    
+    record ParameterizedHeader(String name, int index) {
+        
+        public static ParameterizedHeader[] parse(final Parameter parameters[]) = IntStream.range(0, parameters.length)
+                .filter(index -> parameters[index].isAnnotationPresent(Header.class))
+                .mapToObj(index -> new ParameterizedHeader(parameters[index].getName().isEmptyOr(parameters[index].getName()), index))
+                .toArray(ParameterizedHeader[]::new);
         
     }
     
@@ -293,6 +312,9 @@ public interface HttpApi {
         }
         
     }
+
+    @NoArgsConstructor
+    class MissingTokenException extends RuntimeException { }
     
     String root();
     
@@ -333,5 +355,19 @@ public interface HttpApi {
         callableMap.forEach((fieldNode, callable) -> lookup.findSetter(wrapperClass, fieldNode.name, Callable.class).invoke(instance, callable));
         return instance;
     }
+    
+    @IndirectCaller
+    static String token(final String variable = MahoExport.subKey("token")) {
+        final @Nullable String token = Environment.local().lookup(variable);
+        if (token == null)
+            throw new MissingTokenException(variable);
+        return token;
+    }
+    
+    @IndirectCaller
+    static Map<String, String> authorizationArgs(final String type = "Bearer", final String token = token()) = Map.of(HttpHelper.Header.Authorization, STR."\{type} \{token}");
+    
+    @IndirectCaller
+    static HttpSetting authorization(final String type = "Bearer", final String token = token()) = { HttpSetting.withBaseHeaders(authorizationArgs(type, token)) };
     
 }

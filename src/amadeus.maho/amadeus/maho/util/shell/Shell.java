@@ -117,7 +117,7 @@ public interface Shell {
     }
     
     @Hook
-    private static Hook.Result translateExceptionStack(final Eval $this, final Exception ex) = { ex.getStackTrace() };
+    private static Hook.Result translateExceptionStack(final Eval $this, final Exception ex) = { Stream.of(ex.getStackTrace()).takeWhile(element -> !element.getMethodName().equals("do_it$")).toArray(StackTraceElement[]::new) };
     
     @Hook(at = @At(method = @At.MethodInsn(name = "getName")), before = false, capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     private static String toString(final String name, final Throwable $this) = $this instanceof EvalException evalEx ? evalEx.getExceptionClassName() : name;

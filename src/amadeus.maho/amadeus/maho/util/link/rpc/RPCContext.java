@@ -38,7 +38,7 @@ public class RPCContext {
     
     private static final ConcurrentWeakIdentityHashMap<Class<?>, List<Method>> allMethods = { };
     
-    public static List<Method> allMethods(final Class<?> itf) = allMethods.computeIfAbsent(itf, it -> ReflectionHelper.allMethods(it).stream().filterNot(ObjectHelper.OBJECT_METHODS::contains).toList());
+    public static List<Method> allMethods(final Class<?> itf) = allMethods.computeIfAbsent(itf, it -> ReflectionHelper.allMethods(it).stream().filterNot(ObjectHelper.objectBaseMethods::contains).toList());
     
     public static RPCPacket.Sync sync(final Class<?> interfaces[]) {
         final RPCPacket.Sync sync = { };

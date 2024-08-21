@@ -25,7 +25,11 @@ public @interface Extension {
     @Documented
     @Target(ElementType.MODULE)
     @Retention(RetentionPolicy.RUNTIME)
-    @interface Provider { }
+    @interface Provider {
+        
+        String[] value() default { };
+        
+    }
     
     @Documented
     @Target(ElementType.MODULE)

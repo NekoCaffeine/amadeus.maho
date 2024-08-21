@@ -8,7 +8,6 @@ import com.sun.tools.javac.util.Context;
 
 import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchCompiler;
-import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.util.concurrent.AsyncHelper.await;
 
@@ -21,20 +20,16 @@ public class ConcurrentDelayedContext extends DelayedContext {
     
     @Override
     public synchronized void beforeEnterDone(final JavaCompiler compiler) {
-        if (compiler instanceof DispatchCompiler dispatchCompiler) {
-            dispatch(dispatchCompiler, todos());
-            checkImportsResolvableDelayed = false;
-            dispatch(dispatchCompiler, delayedImportCheck());
-        } else
-            DebugHelper.breakpoint();
+        final DispatchCompiler dispatchCompiler = (DispatchCompiler) compiler;
+        dispatch(dispatchCompiler, todos());
+        checkImportsResolvableDelayed = false;
+        dispatch(dispatchCompiler, delayedImportCheck());
     }
     
     @Override
     public synchronized void beforeAttributeDone(final JavaCompiler compiler) {
-        if (compiler instanceof DispatchCompiler dispatchCompiler)
-            dispatch(dispatchCompiler, todos());
-        else
-            DebugHelper.breakpoint();
+        final DispatchCompiler dispatchCompiler = (DispatchCompiler) compiler;
+        dispatch(dispatchCompiler, todos());
     }
     
 }

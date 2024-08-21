@@ -17,13 +17,13 @@ import java.util.stream.IntStream;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
-import amadeus.maho.lang.Default;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.VisitorChain;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.dynamic.DynamicObject;
+import amadeus.maho.util.dynamic.FieldsMap;
 import amadeus.maho.util.language.parsing.ParseException;
 import amadeus.maho.util.runtime.TypeHelper;
 
@@ -34,7 +34,7 @@ import static amadeus.maho.util.language.parsing.Tokenizer.*;
  * See also: https://www.json.org/json-en.html
  * See also: https://www.ietf.org/rfc/rfc4627.txt
  */
-public interface Json {
+public interface JSON {
     
     @VisitorChain
     @AllArgsConstructor
@@ -77,7 +77,7 @@ public interface Json {
         
         @Override
         @SneakyThrows
-        public void visitValue(final Object value) = switch (value) {
+        public void visitValue(final @Nullable Object value) = switch (value) {
             case null                  -> builder.append("null");
             case DynamicObject dynamic -> {
                 switch (dynamic) {
@@ -110,6 +110,7 @@ public interface Json {
                         });
                         endObject();
                     }
+                    case DynamicObject.ObjectUnit objectUnit -> visitValue(objectUnit.as());
                     default                                  -> builder.append(dynamic);
                 }
             }
@@ -159,13 +160,13 @@ public interface Json {
                 } else {
                     beginObject();
                     final boolean p_flag[] = { false };
-                    Converter.handle()[type].forEach((name, info) -> {
+                    FieldsMap.fieldsMapLocal()[type].forEach((name, info) -> {
                         if (p_flag[0])
                             builder.append(',');
                         else
                             p_flag[0] = true;
                         visitKey(name);
-                        visitValue(info.v3.invoke(value));
+                        visitValue(info.getter().invoke(value));
                     });
                     endObject();
                 }
@@ -190,14 +191,23 @@ public interface Json {
         @Override
         public String toString() = builder.toString();
         
+        public static String write(final @Nullable Object value) {
+            if (value == null)
+                return "null";
+            if ((value instanceof Character character ? character.toString() : value) instanceof String string)
+                return STR."\"\{string}\"";
+            if (TypeHelper.isSimple(value.getClass()))
+                return value.toString();
+            final Writer writer = { };
+            writer.visitValue(value);
+            return writer.toString();
+        }
+        
     }
     
     @RequiredArgsConstructor
     @FieldDefaults(level = AccessLevel.PROTECTED)
     class Dynamic extends Visitor {
-        
-        @Default
-        final boolean caseSensitive = true;
         
         final ArrayDeque<DynamicObject> deque = { };
         
@@ -214,7 +224,7 @@ public interface Json {
         }
         
         @Override
-        public void beginObject() = deque += new DynamicObject.MapUnit(caseSensitive);
+        public void beginObject() = deque += new DynamicObject.MapUnit();
         
         @Override
         public void endObject() = end(deque.removeLast());
@@ -233,11 +243,13 @@ public interface Json {
         
         @Override
         public void visitValue(final @Nullable Object value) = end(switch (value) {
-            case String string      -> new DynamicObject.StringUnit(string);
-            case BigDecimal decimal -> new DynamicObject.DecimalUnit(decimal);
-            case Boolean bool       -> new DynamicObject.BooleanUnit(bool);
-            case null               -> DynamicObject.NullUnit.instance();
-            default                 -> throw new IllegalStateException(STR."Unexpected value: \{value}");
+            case null                  -> DynamicObject.NullUnit.instance();
+            case DynamicObject dynamic -> dynamic;
+            case Character character   -> new DynamicObject.StringUnit(character.toString());
+            case String string         -> new DynamicObject.StringUnit(string);
+            case Number decimal        -> new DynamicObject.DecimalUnit(decimal);
+            case Boolean bool          -> new DynamicObject.BooleanUnit(bool);
+            default                    -> throw new IllegalStateException(STR."Unexpected value: \{value}");
         });
         
         protected void end(final DynamicObject object) {
@@ -249,6 +261,14 @@ public interface Json {
                 case null                              -> root = object;
                 default                                -> { assert false; }
             }
+        }
+        
+        public static DynamicObject read(final String source, final String debugInfo = source) {
+            if (source.equals("null"))
+                return DynamicObject.NullUnit.instance();
+            final Dynamic dynamic = { };
+            JSON.read(source, dynamic);
+            return dynamic.root();
         }
         
     }
@@ -317,8 +337,7 @@ public interface Json {
         return result;
     }
     
-    static void read(final String source, final Visitor visitor, final @Nullable String debugInfo = source) throws IOException
-        = scanJsonBody(visitor, tokenization(source, debugInfo).root());
+    static void read(final String source, final Visitor visitor, final @Nullable String debugInfo = source) = scanJsonBody(visitor, tokenization(source, debugInfo).root());
     
     static void read(final Path path, final Charset charset = StandardCharsets.UTF_8, final Visitor visitor, final @Nullable String debugInfo = path.toString()) throws IOException {
         try (final var input = Files.newInputStream(path)) { read(input, charset, visitor, debugInfo); }
@@ -406,5 +425,9 @@ public interface Json {
     }
     
     private static BigDecimal scanNumber(final Context context) = { context.scanString(token.negate()) };
+    
+    static String stringify(final @Nullable Object value) = Writer.write(value);
+    
+    static DynamicObject parse(final String source) = Dynamic.read(source);
     
 }

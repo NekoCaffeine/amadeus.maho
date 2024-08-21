@@ -16,9 +16,9 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.dynamic.FieldsMap;
 import amadeus.maho.util.language.parsing.Tokenizer;
 import amadeus.maho.util.runtime.TypeHelper;
-import amadeus.maho.util.tuple.Tuple3;
 import amadeus.maho.util.type.TypeInferer;
 
 @Getter
@@ -102,11 +102,11 @@ public enum Cfg implements Converter {
                             case null             -> null;
                             case ArrayAgent agent -> agent.innerGenericType();
                             default               -> {
-                                final @Nullable Tuple3<Field, MethodHandle, MethodHandle> tuple = Converter.handle()[layer.getClass()][key];
-                                if (tuple == null)
+                                final @Nullable FieldsMap.Info info = FieldsMap.uniqueFieldsMapLocal()[layer.getClass()][key];
+                                if (info == null)
                                     yield null;
-                                setters << tuple.v2;
-                                yield TypeInferer.infer(tuple.v1.getGenericType(), typesContext.peekLast());
+                                setters << info.setter();
+                                yield TypeInferer.infer(info.field().getGenericType(), typesContext.peekLast()!);
                             }
                         };
                         typesContext << nextType;
@@ -133,16 +133,16 @@ public enum Cfg implements Converter {
         if (data == null)
             writer.append("null");
         else {
-            Converter.handle()[data.getClass()].forEach((name, tuple) -> {
-                write(writer, tuple.v1, layer);
-                final @Nullable Object value = tuple.v3.invoke(data);
-                if (TypeHelper.isBasics(tuple.v1.getType())) {
+            FieldsMap.uniqueFieldsMapLocal()[data.getClass()].forEach((name, info) -> {
+                write(writer, info.field(), layer);
+                final @Nullable Object value = info.getter().invoke(data);
+                if (TypeHelper.isBasics(info.field().getType())) {
                     final String text = value.toString();
                     writer
                             .append("\t".repeat(layer))
                             .append(name)
                             .append(" = ")
-                            .append(text.codePoints().anyMatch(Character::isWhitespace) || tuple.v1.getType() == String.class ? '"' + text + '\"' : text)
+                            .append(text.codePoints().anyMatch(Character::isWhitespace) || info.field().getType() == String.class ? '"' + text + '\"' : text)
                             .append("\n\n");
                 } else {
                     writer

@@ -1,6 +1,7 @@
 package amadeus.maho.core;
 
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -16,6 +17,7 @@ import amadeus.maho.lang.Setter;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.APIStatus;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.logging.AsyncLogger;
 import amadeus.maho.util.logging.LogLevel;
@@ -63,11 +65,14 @@ public final class MahoExport {
     
     public static final String VERSION = Maho.class.getModule().getDescriptor()?.version().map(Object::toString).orElse("DEV") ?? "DEV";
     
+    public static final String MAHO_HOME_VARIABLE = "MAHO_HOME";
+    
     public static final String
             MAHO_WORK_DIRECTORY           = "amadeus.maho.work.directory", // string
             MAHO_AGENT_REDIRECT           = "amadeus.maho.agent.redirect", // string
             MAHO_EXPERIMENTAL             = "amadeus.maho.experimental", // boolean
             MAHO_SETUP_SKIP               = "amadeus.maho.setup.skip", // String array split(";")
+            MAHO_LLM_THROWABLE_ASSISTANT  = "amadeus.maho.llm.throwable.assistant", // boolean
             MAHO_LOGS_ENABLE              = "amadeus.maho.logs.enable", // boolean
             MAHO_LOGS_LEVEL               = "amadeus.maho.logs.level", // Enum name
             MAHO_LOGS_ENCODE              = "amadeus.maho.logs.encode", // String
@@ -86,6 +91,9 @@ public final class MahoExport {
             experimental = env.lookup(MAHO_EXPERIMENTAL, true),
             debug        = env.lookup(MAHO_DEBUG_MODE, JDWP.isJDWPEnable()),
             hotswap      = env.lookup(MAHO_DEBUG_HOTSWAP, debug());
+    
+    @IndirectCaller
+    public static String subKey(final Class<?> caller = CallerContext.caller(), final String key) = STR."amadeus.maho.\{caller.getSimpleName().toLowerCase(Locale.ENGLISH)}.\{key}";
     
     @SneakyThrows
     public static Path workDirectory() = Path.of(env.lookup(MAHO_WORK_DIRECTORY, Path.of("").toRealPath().toString()));

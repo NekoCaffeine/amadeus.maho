@@ -197,7 +197,7 @@ public class Wrapper<T> {
     
     public byte[] writeClass() {
         final ClassNode node = node();
-        final byte data[] = context().compute().writer().toBytecode(node);
+        final byte data[] = context().compute().writer().toBytecodeWithoutComputeFrame(node);
         TransformerManager.DebugDumper.dumpBytecode(ASMHelper.sourceName(node.name).replace('.', '/'), data, TransformerManager.DebugDumper.dump_transform_generate);
         return data;
     }
@@ -227,6 +227,6 @@ public class Wrapper<T> {
     public static <R, T extends R> Wrapper<R> ofAnonymousReplace(final Class<T> target, final String suffix)
             = new Wrapper<>(target.getClassLoader(), (Class<R>) target.getSuperclass(), suffix, target.getInterfaces()).let(result -> result.node(Maho.getClassNodeFromClassNonNull(target)));
     
-    private static String methodKey(final Method method) = method.getName() + Type.getMethodDescriptor(method);
+    public static String methodKey(final Method method) = method.getName() + Type.getMethodDescriptor(method);
     
 }

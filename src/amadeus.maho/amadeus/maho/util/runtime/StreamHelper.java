@@ -38,7 +38,7 @@ public interface StreamHelper {
     
     static <T> Stream<T> nonnull(final Stream<T> $this) = $this.filter(ObjectHelper::nonNull);
     
-    static <S, R, T extends Throwable> Stream<R> safeMap(final Stream<S> $this, final Function<S, R> mapper, final Class<T> type = (Class<T>) Throwable.class, final BiFunction<S, T, R> handler = (it, e) -> null)
+    static <S, R, T extends Throwable> Stream<R> safeMap(final Stream<S> $this, final Function<S, R> mapper, final Class<T> type = (Class<T>) Throwable.class, final BiFunction<S, T, R> handler = (_, _) -> null)
             = $this.map(it -> {
         try {
             return mapper.apply(it);

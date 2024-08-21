@@ -161,7 +161,7 @@ public class DefaultValueHandler extends BaseSyntaxHandler {
         return capture;
     }
     
-    public static final long removeFlags = ~(ABSTRACT | NATIVE | SYNCHRONIZED | RECORD | COMPACT_RECORD_CONSTRUCTOR);
+    public static final long removeFlags = ~(ABSTRACT | NATIVE | SYNCHRONIZED | DEFAULT | RECORD | COMPACT_RECORD_CONSTRUCTOR);
     
     @Override
     public void process(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final boolean advance) {

@@ -15,7 +15,6 @@ import amadeus.maho.transform.GhostContext;
 import amadeus.maho.util.annotation.mark.Ghost;
 
 import static amadeus.maho.lang.javac.handler.GhostHandler.PRIORITY;
-import static com.sun.tools.javac.code.Flags.*;
 
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -27,9 +26,7 @@ public class GhostHandler extends BaseHandler<Ghost> {
     Name touch = names.fromString("touch");
     
     @Override
-    public void processMethod(final Env<AttrContext> env, final JCTree.JCMethodDecl tree, final JCTree owner, final Ghost annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
-        if (tree.body == null && noneMatch(tree.mods.flags, NATIVE | ABSTRACT))
-            tree.body = maker.Block(0, List.of(maker.Throw(maker.Apply(List.nil(), maker.Select(IdentQualifiedName(GhostContext.class), touch), List.nil()))));
-    }
+    public void generateMethodBody(final Env<AttrContext> env, final JCTree.JCMethodDecl tree, final Ghost annotation, final JCTree.JCAnnotation annotationTree)
+        = tree.body = maker.Block(0, List.of(maker.Throw(maker.Apply(List.nil(), maker.Select(IdentQualifiedName(GhostContext.class), touch), List.nil()))));
     
 }

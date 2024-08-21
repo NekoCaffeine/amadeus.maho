@@ -1,7 +1,6 @@
 package amadeus.maho.util.build;
 
 import java.nio.file.Path;
-import java.util.Map;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Default;
@@ -12,8 +11,6 @@ import amadeus.maho.util.dynamic.DynamicObject;
 import amadeus.maho.util.link.http.HttpApi;
 import amadeus.maho.util.link.http.HttpHelper;
 import amadeus.maho.util.link.http.HttpSetting;
-import amadeus.maho.util.misc.Environment;
-import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.util.link.http.HttpHelper.RequestType.*;
 
@@ -106,9 +103,6 @@ public interface Github extends HttpApi {
     @Extension.Operator("GET")
     default Owner owner(final String owner) = { this, owner };
     
-    static HttpSetting authorization(final String token = Environment.local().lookup("amadeus.maho.github.token", DebugHelper.breakpointWhenDebug("<missing>")))
-            = { HttpSetting.withBaseHeaders(Map.of(HttpHelper.Header.Authorization, STR."Bearer \{token}")) };
-    
-    static Github make(final HttpSetting setting = authorization()) = HttpApi.make(setting, adapter);
+    static Github make(final HttpSetting setting = HttpApi.authorization()) = HttpApi.make(setting, adapter);
     
 }

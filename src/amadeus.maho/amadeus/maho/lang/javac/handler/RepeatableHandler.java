@@ -15,6 +15,8 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.javac.handler.base.BaseHandler;
 import amadeus.maho.lang.javac.handler.base.Handler;
@@ -24,14 +26,16 @@ import static com.sun.tools.javac.code.Flags.*;
 
 @NoArgsConstructor
 @Handler(value = Repeatable.class, priority = PRIORITY)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class RepeatableHandler extends BaseHandler<Repeatable> {
     
     public static final int PRIORITY = -1 << 24;
     
+    Name RepeatableList = name("RepeatableList");
+    
     @Override
     public void processClass(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final JCTree owner, final Repeatable annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
         if (annotationTree.args.isEmpty()) {
-            final Name RepeatableList = name("RepeatableList");
             if (shouldInjectInnerClass(env, RepeatableList))
                 injectMember(env,maker.ClassDef(maker.Modifiers(ANNOTATION | INTERFACE, tree.mods.annotations.stream().filter(it -> shouldFollowAnnotation(it.type.tsym.getQualifiedName().toString())).collect(List.collector())), RepeatableList,
                         List.nil(), null, List.nil(), List.of(maker.MethodDef(maker.Modifiers(0L), names.value, maker.TypeArray(maker.Ident(tree.name)), List.nil(), List.nil(), List.nil(), null, null))));

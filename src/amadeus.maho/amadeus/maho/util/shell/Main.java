@@ -59,6 +59,7 @@ public class Main {
         }.setDefaultUseCaches(false);
         final Environment local = Environment.local();
         local.lookup(MahoExport.MAHO_LOGS_LEVEL, LogLevel.WARNING.name());
+        local.lookup(MahoExport.MAHO_LLM_THROWABLE_ASSISTANT, true);
         if (local.lookup("amadeus.maho.shell.minimize", true))
             MahoExport.Setup.minimize();
         Maho.instrumentation();

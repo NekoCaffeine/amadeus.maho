@@ -55,6 +55,7 @@ import amadeus.maho.util.resource.ResourcePath;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.ModuleHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
+import amadeus.maho.util.runtime.PropertiesHelper;
 import amadeus.maho.util.runtime.UnsafeHelper;
 
 import static amadeus.maho.core.MahoExport.*;
@@ -255,6 +256,7 @@ public final class Maho {
     
     @SneakyThrows
     public static Instrumentation installation(final @Nullable String agentArgs = null, final Instrumentation instrumentation) {
+        PropertiesHelper.Overrider.overrideByMahoHome();
         instrumentation(ObjectHelper.requireNonNull(instrumentation));
         new ArrayList<String>().let(result -> dump(result, " ".repeat(4))).forEach(Maho::debug);
         loadJavaSupport(instrumentation);

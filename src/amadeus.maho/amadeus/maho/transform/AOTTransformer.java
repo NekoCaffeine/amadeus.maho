@@ -66,7 +66,7 @@ public class AOTTransformer implements ClassTransformer.Limited {
     }
     
     @SneakyThrows
-    public static void transform(final Path sourceDir, final Path targetDir, final ToIntFunction<ClassLoader> loaderIndexed = Indexed.ofConcurrent()::id)
+    public static void transform(final Path sourceDir, final Path targetDir, final ToIntFunction<ClassLoader> loaderIndexed = Indexed.ofConcurrent())
             = transform(Files.walk(sourceDir).filter(path -> path.toString().endsWith(".jar")).collect(Collectors.toMap(Function.identity(), path -> targetDir / (sourceDir % path).toString())), loaderIndexed);
     
     @SneakyThrows

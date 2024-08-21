@@ -1,8 +1,6 @@
-import jdk.jshell.spi.*;
-
-import amadeus.maho.lang.*;
-import amadeus.maho.transform.mark.base.*;
-import amadeus.maho.util.shell.*;
+import amadeus.maho.lang.Extension;
+import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.util.shell.MahoExecutionControlProvider;
 
 @TransformProvider
 @Extension.Provider
@@ -30,6 +28,6 @@ open module amadeus.maho {
     
     requires static jdk.unsupported;
     
-    provides ExecutionControlProvider with MahoExecutionControlProvider;
+    provides jdk.jshell.spi.ExecutionControlProvider with MahoExecutionControlProvider;
     
 }

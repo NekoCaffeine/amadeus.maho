@@ -79,6 +79,7 @@ import amadeus.maho.lang.ToString;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.lang.javac.JavacContext;
 import amadeus.maho.lang.javac.handler.base.DelayedContext;
+import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.lang.javac.incremental.IncrementalContext;
 import amadeus.maho.lang.javac.incremental.IncrementalScanner;
 import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
@@ -518,6 +519,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     
     @Override
     public void enterDone() {
+        await(dispatch(modules.allModules().stream(), (compiler, module) -> JavacContext.instance(compiler.context, HandlerSupport.class).loadDynamicAnnotationProvider(module)));
         enterDoing = true;
         try {
             barrier(ParallelCompiler::unblockAnnotationsNoFlush);

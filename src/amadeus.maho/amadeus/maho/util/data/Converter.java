@@ -5,10 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.charset.Charset;
@@ -17,11 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +26,6 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.Default;
@@ -40,13 +34,9 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.dynamic.ClassLocal;
+import amadeus.maho.util.dynamic.FieldsMap;
 import amadeus.maho.util.dynamic.LookupHelper;
-import amadeus.maho.util.runtime.MethodHandleHelper;
-import amadeus.maho.util.runtime.ReflectionHelper;
 import amadeus.maho.util.runtime.TypeHelper;
-import amadeus.maho.util.tuple.Tuple;
-import amadeus.maho.util.tuple.Tuple3;
 
 public interface Converter {
     
@@ -102,39 +92,11 @@ public interface Converter {
         
     }
     
-    @Getter
-    @SneakyThrows
-    ClassLocal<Map<String, Tuple3<Field, MethodHandle, MethodHandle>>> handle = {
-            it -> {
-                if (it.isPrimitive())
-                    throw new IllegalArgumentException(STR."Class: \{it}");
-                if (it == Object.class)
-                    return Map.of();
-                final MethodHandles.Lookup lookup = MethodHandleHelper.lookup();
-                final LinkedHashMap<String, Tuple3<Field, MethodHandle, MethodHandle>> fieldHandles = { };
-                final LinkedList<Class<?>> types = { };
-                Class<?> owner = it;
-                do {
-                    types.push(owner);
-                } while ((owner = owner.getSuperclass()) != Object.class);
-                types.stream()
-                        .map(Class::getDeclaredFields)
-                        .flatMap(Stream::of)
-                        .filter(ReflectionHelper.noneMatch(Modifier.STATIC | Modifier.TRANSIENT))
-                        .peek(field -> {
-                            if (fieldHandles.containsKey(field.getName()))
-                                throw new UnsupportedOperationException(STR."Duplicate key: \{field.getName()}");
-                        })
-                        .forEach(field -> fieldHandles.putIfAbsent(field.getName(), Tuple.tuple(field, lookup.unreflectSetter(field), lookup.unreflectGetter(field))));
-                return Collections.unmodifiableMap(fieldHandles);
-            }, true
-    };
-    
     @SneakyThrows
     static void visitKeyValue(final Object layer, final String key, final String value) {
-        final @Nullable Tuple3<Field, MethodHandle, MethodHandle> tuple = handle()[layer.getClass()][key];
-        if (tuple != null)
-            set(layer, tuple.v1.getType(), tuple.v2, value);
+        final @Nullable FieldsMap.Info info = FieldsMap.uniqueFieldsMapLocal()[layer.getClass()][key];
+        if (info != null)
+            set(layer, info.field().getType(), info.setter(), value);
     }
     
     @SneakyThrows

@@ -2,18 +2,19 @@ package amadeus.maho.lang.javac.handler.base;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.tree.AnnotationNode;
+import org.objectweb.asm.tree.ClassNode;
 
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -25,14 +26,17 @@ import com.sun.tools.javac.comp.DeferredAttr;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.Flow;
 import com.sun.tools.javac.comp.Lower;
-import com.sun.tools.javac.comp.Modules;
 import com.sun.tools.javac.comp.TypeEnter;
 import com.sun.tools.javac.jvm.Gen;
+import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeCopier;
 import com.sun.tools.javac.tree.TreeScanner;
 import com.sun.tools.javac.util.Log;
+import com.sun.tools.javac.util.Name;
 
+import amadeus.maho.lang.AccessLevel;
+import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.Privilege;
@@ -46,56 +50,81 @@ import amadeus.maho.transform.mark.Hook;
 import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.InvisibleType;
 import amadeus.maho.transform.mark.base.TransformProvider;
+import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.Bytecodes;
-import amadeus.maho.util.runtime.StreamHelper;
+import amadeus.maho.util.control.OverrideMap;
 import amadeus.maho.util.tuple.Tuple2;
 
-import static com.sun.tools.javac.code.Flags.PARAMETER;
+import static com.sun.tools.javac.code.Flags.*;
 
 @TransformProvider
 @NoArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class HandlerSupport extends JavacContext {
     
-    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
-    private static void initModules(final Modules $this, final com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> trees) {
-        final HandlerSupport marker = instance(HandlerSupport.class);
-        final List<DynamicAnnotationHandler> handlers = Stream.concat(marker.baseHandlers().stream(), marker.syntaxHandlers().stream()).cast(DynamicAnnotationHandler.class).toList();
-        final Set<Symbol.ModuleSymbol> allModules = $this.allModules();
-        handlers.forEach(handler -> handler.initModules(allModules));
-        final Class providerTypes[] = handlers.stream().map(DynamicAnnotationHandler::providerType).toArray(Class[]::new);
-        final Class annotationTypes[] = handlers.stream().map(DynamicAnnotationHandler::annotationType).toArray(Class[]::new);
-        final Map<Class<? extends Annotation>, DynamicAnnotationHandler> map = handlers.stream().collect(Collectors.toMap(DynamicAnnotationHandler::annotationType, Function.identity()));
-        allModules.stream()
-                .filter(module -> {
-                    if (module.module_info != null && module.module_info.classfile != null)
-                        try (final var input = module.module_info.classfile.openInputStream()) {
-                            return ClassAnnotationFinder.hasAnnotations(new ClassReader(input), providerTypes);
-                        } catch (final Exception ignored) { }
-                    return false;
-                })
-                .flatMap(module -> module.enclosedPackages.stream())
-                .map(pkg -> pkg.members().getSymbols(Symbol.ClassSymbol.class::isInstance))
-                .flatMap(StreamHelper::fromIterable)
-                .cast(Symbol.ClassSymbol.class)
-                .forEach(symbol -> {
-                    if (symbol.classfile != null)
-                        try (final var input = symbol.classfile.openInputStream()) {
-                            ClassAnnotationFinder.processVoid(new ClassReader(input), clazz -> map[clazz].addSymbol(symbol), annotationTypes);
-                        } catch (final Exception ignored) { }
+    private static final OverrideMap overrideMap = { };
+    
+    @Getter
+    List<BaseHandler<Annotation>> baseHandlers = Handler.Marker.handlerTypes().stream()
+            .map(Supplier::get)
+            .map(JavacContext::instance)
+            .collect(Collectors.toCollection(ArrayList::new));
+    
+    @Getter
+    List<BaseSyntaxHandler> syntaxHandlers = Syntax.SyntaxMarker.syntaxTypes().values().stream()
+            .map(Supplier::get)
+            .map(JavacContext::instance)
+            .collect(Collectors.toCollection(ArrayList::new));
+    
+    List<DynamicAnnotationHandler> handlers = Stream.concat(baseHandlers().stream(), syntaxHandlers().stream()).cast(DynamicAnnotationHandler.class).toList();
+    
+    @Hook
+    private static void enterDone(final JavaCompiler $this) = instance(HandlerSupport.class).beforeEnterDone();
+    
+    public void beforeEnterDone() = modules.allModules().forEach(this::loadDynamicAnnotationProvider);
+    
+    public void loadDynamicAnnotationProvider(final Symbol.ModuleSymbol moduleSymbol) {
+        if (moduleSymbol.module_info != null && moduleSymbol.module_info.classfile != null)
+            try (final var input = moduleSymbol.module_info.classfile.openInputStream()) {
+                final ClassNode node = ASMHelper.newClassNode(new ClassReader(input));
+                handlers.forEach(handler -> {
+                    final @Nullable AnnotationNode annotationNode = ASMHelper.findAnnotationNode(node.visibleAnnotations, handler.providerType());
+                    if (annotationNode != null) {
+                        final int index = annotationNode.values.indexOf("value");
+                        if (index != -1 && annotationNode.values[index + 1] instanceof List<?> array)
+                            array.stream()
+                                    .cast(String.class)
+                                    .map(name -> symtab.enterClass(moduleSymbol, names.fromString(name)))
+                                    .forEach(handler::addSymbol);
+                    }
                 });
+            } catch (final Exception ignored) { }
     }
     
-    @Getter
-    private final List<BaseHandler<Annotation>> baseHandlers = Handler.Marker.handlerTypes().stream()
-            .map(Supplier::get)
-            .map(JavacContext::instance)
-            .collect(Collectors.toCollection(ArrayList::new));
+    public void beforeAttrModuleInfo(final JCTree.JCModuleDecl moduleDecl) {
+        final Symbol.ModuleSymbol module = moduleDecl.sym;
+        handlers.forEach(handler -> {
+            final Collection<Symbol.ClassSymbol> symbols = handler.allSymbols(module);
+            if (!symbols.isEmpty()) {
+                final JCTree.JCAnnotation annotation = maker.at(moduleDecl.mods.pos).Annotation(IdentQualifiedName(handler.providerType()),
+                        com.sun.tools.javac.util.List.of(maker.NewArray(null, null, symbols.stream()
+                                .map(Symbol.ClassSymbol::flatName)
+                                .map(Name::toString)
+                                .map(maker::Literal)
+                                .collect(com.sun.tools.javac.util.List.collector()))));
+                moduleDecl.mods.annotations = Stream.concat(moduleDecl.mods.annotations.stream()
+                                .filter(it -> !it.type.tsym.flatName().toString().equals(handler.providerType().getName())), Stream.of(annotation))
+                        .collect(com.sun.tools.javac.util.List.collector());
+                (Privilege) (moduleDecl.sym.getMetadata().attributes = ((Privilege) moduleDecl.sym.getMetadata().attributes).stream()
+                        .filter(it -> !it.type.tsym.flatName().toString().equals(handler.providerType().getName()))
+                        .collect(com.sun.tools.javac.util.List.collector()));
+                moduleDecl.sym.appendAttributes(com.sun.tools.javac.util.List.of(annotate.attributeAnnotation(annotation, symtab.annotationType, (Privilege) attr.env)));
+            }
+        });
+    }
     
-    @Getter
-    private final List<BaseSyntaxHandler> syntaxHandlers = Syntax.SyntaxMarker.syntaxTypes().values().stream()
-            .map(Supplier::get)
-            .map(JavacContext::instance)
-            .collect(Collectors.toCollection(ArrayList::new));
+    @Hook
+    private static void visitModuleDef(final Attr $this, final JCTree.JCModuleDecl tree) = instance(HandlerSupport.class).beforeAttrModuleInfo(tree);
     
     LinkedList<JCTree> attrContext = { };
     
@@ -166,6 +195,34 @@ public class HandlerSupport extends JavacContext {
             final Env<AttrContext> env,
             final Attr.ResultInfo resultInfo) = attrContext().removeLast();
     
+    @Hook
+    private static void visitMethodDef(final Attr $this, final JCTree.JCMethodDecl tree) {
+        if (tree.body == null && noneMatch(tree.mods.flags, NATIVE | ABSTRACT))
+            instance(HandlerSupport.class).generateMethodBody((Privilege) $this.env, tree);
+    }
+    
+    private void generateMethodBody(final Env<AttrContext> env, final JCTree.JCMethodDecl tree) = overrideMap[baseHandlers()][BaseHandler.Methods.generateMethodBody].stream()
+            .map(baseHandler -> getAnnotationsByTypeWithOuter(tree.mods, env, tree, baseHandler))
+            .nonnull()
+            .collect(Collectors.toCollection(ArrayList::new))
+            .let(result -> result.sort((a, b) -> (int) (a.getKey().handler().priority() - b.getKey().handler().priority())))
+            .stream()
+            .takeWhile(_ -> tree.body == null)
+            .forEach(entry -> entry.getValue().forEach(tuple -> generateMethodBody(entry.getKey(), env, tree, tuple.v1, tuple.v2)));
+    
+    private void generateMethodBody(final BaseHandler<Annotation> baseHandler, final Env<AttrContext> env, final JCTree.JCMethodDecl tree, final Annotation annotation, final JCTree.JCAnnotation annotationTree) {
+        final JCTree.JCCompilationUnit topLevel = maker.toplevel;
+        final int pos = maker.pos;
+        try {
+            maker.toplevel = env.toplevel;
+            maker.pos = annotationTree.pos;
+            baseHandler.generateMethodBody(env, tree, annotation, annotationTree);
+        } finally {
+            maker.toplevel = topLevel;
+            maker.pos = pos;
+        }
+    }
+    
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)))
     private static void setSyntheticVariableType(final Attr $this, final JCTree.JCVariableDecl tree, final Type type) {
         if (!type.isErroneous() && noneMatch(tree.mods.flags, PARAMETER))
@@ -193,7 +250,6 @@ public class HandlerSupport extends JavacContext {
     
     public void preprocessing(final JCTree.JCClassDecl tree, final Env<AttrContext> env) {
         baseHandlers().forEach(handler -> handler.preprocessing(env));
-        syntaxHandlers().forEach(handler -> handler.preprocessing(env));
         processClassDecl(tree, env, true);
     }
     
@@ -228,19 +284,19 @@ public class HandlerSupport extends JavacContext {
             methodDecl.params.forEach(param -> process(env, param, tree, advance));
         final @Nullable JCTree.JCModifiers modifiers = modifiers(tree);
         if (modifiers != null)
-            baseHandlers().stream()
+            overrideMap[baseHandlers()][BaseHandler.Methods.specific(tree)].stream()
                     .filter(baseHandler -> baseHandler.shouldProcess(advance))
                     .map(baseHandler -> getAnnotationsByTypeWithOuter(modifiers, env, tree, baseHandler))
                     .nonnull()
                     .collect(Collectors.toCollection(ArrayList::new))
                     .let(result -> result.sort((a, b) -> (int) (a.getKey().handler().priority() - b.getKey().handler().priority())))
                     .forEach(entry -> entry.getValue().forEach(tuple -> process(env, tree, owner, entry.getKey(), tuple.v1, tuple.v2, advance)));
-        syntaxHandlers().forEach(handler -> process(env, tree, owner, handler, advance));
+        overrideMap[syntaxHandlers()][BaseSyntaxHandler.Methods.process].forEach(handler -> process(env, tree, owner, handler, advance));
         if (modifiers != null)
             AccessibleHandler.transformPackageLocalToProtected(tree, owner, modifiers);
     }
     
-    public @Nullable <A extends Annotation> Map.Entry<BaseHandler<A>, List<Tuple2<A, JCTree.JCAnnotation>>> getAnnotationsByTypeWithOuter(final @Nullable JCTree.JCModifiers modifiers, final Env<AttrContext> env, final JCTree tree,
+    public @Nullable <A extends Annotation> Map.Entry<BaseHandler<A>, List<Tuple2<A, JCTree.JCAnnotation>>> getAnnotationsByTypeWithOuter(final JCTree.JCModifiers modifiers, final Env<AttrContext> env, final JCTree tree,
             final BaseHandler<A> baseHandler) {
         final Handler handler = baseHandler.handler();
         final Class<A> annotationType = (Class<A>) handler.value();
@@ -252,15 +308,15 @@ public class HandlerSupport extends JavacContext {
     }
     
     public <A extends Annotation> List<Tuple2<A, JCTree.JCAnnotation>> getAnnotationsByTypeWithOuter(final JCTree.JCModifiers modifiers, final Env<AttrContext> env, final JCTree tree, final Class<A> annotationType)
-            = baseHandlers().stream()
-            .filter(baseHandler -> baseHandler.handler().value() == annotationType)
-            .findFirst()
-            .map(baseHandler -> getAnnotationsByTypeWithOuter(modifiers, env, tree, (BaseHandler<A>) baseHandler))
-            .map(Map.Entry::getValue)
-            .orElseGet(() -> getAnnotationsByType(modifiers, env, annotationType));
+        = baseHandlers().stream()
+                .filter(baseHandler -> baseHandler.handler().value() == annotationType)
+                .findFirst()
+                .map(baseHandler -> getAnnotationsByTypeWithOuter(modifiers, env, tree, (BaseHandler<A>) baseHandler))
+                .map(Map.Entry::getValue)
+                .orElseGet(() -> getAnnotationsByType(modifiers, env, annotationType));
     
     public <A extends Annotation> @Nullable A lookupAnnotation(final JCTree.JCModifiers modifiers, final Env<AttrContext> env, final JCTree tree, final Class<A> annotationType)
-            = getAnnotationsByTypeWithOuter(modifiers, env, tree, annotationType).stream().findFirst().map(Tuple2::v1).orElse(null);
+        = getAnnotationsByTypeWithOuter(modifiers, env, tree, annotationType).stream().findFirst().map(Tuple2::v1).orElse(null);
     
     private void process(final Env<AttrContext> env, final JCTree tree, final JCTree owner, final BaseSyntaxHandler baseHandler, final boolean advance) {
         final JCTree.JCCompilationUnit topLevel = maker.toplevel;
@@ -289,13 +345,12 @@ public class HandlerSupport extends JavacContext {
     }
     
     private static boolean checkRange(final Handler.Range range, final JCTree tree) {
-        if (tree instanceof JCTree.JCVariableDecl)
-            return range == Handler.Range.FIELD;
-        if (tree instanceof JCTree.JCMethodDecl)
-            return range == Handler.Range.METHOD;
-        if (tree instanceof JCTree.JCClassDecl)
-            return range == Handler.Range.CLASS;
-        return false;
+        return switch (tree) {
+            case JCTree.JCVariableDecl _ -> range == Handler.Range.FIELD;
+            case JCTree.JCMethodDecl _   -> range == Handler.Range.METHOD;
+            case JCTree.JCClassDecl _    -> range == Handler.Range.CLASS;
+            default                      -> false;
+        };
     }
     
     public void injectMember(final Env<AttrContext> env, final JCTree tree, final boolean advance = false) {

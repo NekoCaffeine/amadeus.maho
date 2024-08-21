@@ -5,8 +5,6 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -34,6 +32,7 @@ import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.UnsafeHelper;
 
+import static amadeus.maho.util.concurrent.AsyncHelper.async;
 import static java.lang.Boolean.TRUE;
 
 public enum JIT {
@@ -207,7 +206,8 @@ public enum JIT {
         } catch (final LinkageError ignored) { }
     }
     
-    public void compileLoaded(final Predicate<? super Class> predicate, final Level level = defautLevel()) = Stream.of(Maho.instrumentation().getAllLoadedClasses()).filter(predicate).forEach(clazz -> compile(clazz, level));
+    public void compileLoaded(final Predicate<? super Class> predicate, final boolean asyncEnqueue = true, final Level level = defautLevel())
+        = Stream.of(Maho.instrumentation().getAllLoadedClasses()).filter(predicate).forEach(asyncEnqueue ? clazz -> async(() -> compile(clazz, level)) : clazz -> compile(clazz, level));
     
     public void compileLoaded(final String prefix) = compileLoaded(clazz -> clazz.getName().startsWith(prefix));
     

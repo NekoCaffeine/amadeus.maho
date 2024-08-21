@@ -192,8 +192,8 @@ public class BranchHandler extends BaseSyntaxHandler {
         = $this.token().kind == Tokens.TokenKind.BANG ? JavacContext.AdditionalOperators.TAG_POST_ASSERT_ACCESS : capture;
     
     @Hook(value = TreeInfo.class, isStatic = true)
-    private static Hook.Result getStartPos(final JCTree tree) {
-        if (tree.getTag() == JavacContext.AdditionalOperators.TAG_POST_ASSERT_ACCESS)
+    private static Hook.Result getStartPos(final @Nullable JCTree tree) {
+        if (tree != null && tree.getTag() == JavacContext.AdditionalOperators.TAG_POST_ASSERT_ACCESS)
             return new Hook.Result(TreeInfo.getStartPos(((JCTree.JCUnary) tree).arg));
         return Hook.Result.VOID;
     }
@@ -540,10 +540,15 @@ public class BranchHandler extends BaseSyntaxHandler {
         (Privilege) (gen.result = result);
     }
     
-    @Hook(at = @At(method = @At.MethodInsn(name = "genExpr")), before = false, capture = true)
-    private static void visitSelect(final Items.Item capture, final Gen $this, final JCTree.JCFieldAccess access) {
-        if (access instanceof AssertFieldAccess assertFieldAccess)
+    @Hook(at = @At(method = @At.MethodInsn(name = "load")), before = false)
+    private static void visitSelect_$load(final Gen $this, final JCTree.JCFieldAccess access) {
+        if (access instanceof AssertFieldAccess assertFieldAccess && !isSelectSuper(access))
             instance(BranchHandler.class).genNullCheck((Privilege) $this.code, assertFieldAccess);
+    }
+    
+    private static boolean isSelectSuper(final JCTree.JCFieldAccess access) {
+        final @Nullable Symbol symbol = symbol(access.selected);
+        return symbol != null && symbol.kind == TYP && symbol.name == symbol.name.table.names._super;
     }
     
     private void genNullCheck(final Code code, final JCTree tree) {

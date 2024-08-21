@@ -53,7 +53,7 @@ public abstract class RedirectMethodHandler<A extends Annotation> extends BaseHa
     }
     
     protected List<JCTree.JCVariableDecl> params(final Method method)
-            = List.from(method.getParameters()).map(parameter -> maker.VarDef(maker.Modifiers(FINAL | PARAMETER), name(parameter.getName()), IdentQualifiedName(parameter.getType().getName()), null));
+        = List.from(method.getParameters()).map(parameter -> maker.VarDef(maker.Modifiers(FINAL | PARAMETER), name(parameter.getName()), IdentQualifiedName(parameter.getType().getName()), null));
     
     protected List<JCTree.JCStatement> stats(final Method from, final Method to) = List.of(maker.Return(maker.Apply(List.nil(), maker.Select(IdentQualifiedName(to.getDeclaringClass().getCanonicalName()), name(to.getName())),
             List.<JCTree.JCExpression>of(maker.Ident(names._this)).appendList(List.from(from.getParameters()).map(parameter -> maker.Ident(name(parameter.getName())))))));

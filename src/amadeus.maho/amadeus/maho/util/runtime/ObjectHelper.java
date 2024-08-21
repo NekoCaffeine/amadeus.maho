@@ -11,9 +11,11 @@ import amadeus.maho.lang.inspection.Nullable;
 
 public interface ObjectHelper {
     
-    Set<Method> OBJECT_METHODS = Stream.of(Object.class.getDeclaredMethods()).collect(Collectors.toSet());
+    Set<Method> objectBaseMethods = Stream.of(Object.class.getDeclaredMethods()).collect(Collectors.toSet());
     
-    static Set<Method> objectMethods() = OBJECT_METHODS;
+    Set<org.objectweb.asm.commons.Method> objectBaseMethodIdentities = objectBaseMethods.stream().map(org.objectweb.asm.commons.Method::getMethod).collect(Collectors.toSet());
+    
+    static boolean nonObjectMethod(final Method method) = !objectBaseMethods.contains(method) && !objectBaseMethodIdentities.contains(org.objectweb.asm.commons.Method.getMethod(method));
     
     @SuppressWarnings("EqualsReplaceableByObjectsCall")
     static boolean equals(final @Nullable Object a, final @Nullable Object b) = a == b || a != null && a.equals(b);

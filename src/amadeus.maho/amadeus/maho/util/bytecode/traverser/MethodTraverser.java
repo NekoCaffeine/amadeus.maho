@@ -92,7 +92,7 @@ public interface MethodTraverser {
             Frame.Snapshot snapshot = init;
             @Nullable AbstractInsnNode next = instructions.getFirst();
             while (next != null) {
-                if (next.getType() == LABEL && ((LabelNode) next).labelGet() instanceof ComputeLabel computeLabel && computeLabel.mark)
+                if (next instanceof LabelNode labelNode && labelNode.labelGet() instanceof ComputeLabel computeLabel && computeLabel.mark)
                     if (computeLabel.result != null) {
                         while ((next = next.getNext()) != null && next.getOpcode() == -1) ;
                         if (next == null)
@@ -135,9 +135,8 @@ public interface MethodTraverser {
             boolean result = handlers != null;
             loop:
             do
-                switch (next?.getType() ?? NOP) {
-                    case LABEL             -> {
-                        final LabelNode labelNode = (LabelNode) next;
+                switch (next) {
+                    case LabelNode labelNode                 -> {
                         if (handlers != null) {
                             for (final TryCatchBlockNode block : handlers) {
                                 contextHandlers.removeIf(it -> it.end == labelNode);
@@ -163,29 +162,27 @@ public interface MethodTraverser {
                         label.mark = labelNode.labelGet() == shouldMark;
                         labelNode.label(label);
                     }
-                    case JUMP_INSN         -> {
+                    case JumpInsnNode jumpInsnNode           -> {
                         result = true;
-                        markLabel(((JumpInsnNode) next).label);
+                        markLabel(jumpInsnNode.label);
                     }
-                    case TABLESWITCH_INSN  -> {
-                        final TableSwitchInsnNode switchInsnNode = (TableSwitchInsnNode) next;
-                        result = true;
-                        final HashSet<LabelNode> nodes = { switchInsnNode.labels };
-                        for (final LabelNode label : nodes)
-                            markLabel(label);
-                        markLabel(switchInsnNode.dflt);
-                    }
-                    case LOOKUPSWITCH_INSN -> {
-                        final LookupSwitchInsnNode switchInsnNode = (LookupSwitchInsnNode) next;
+                    case TableSwitchInsnNode switchInsnNode  -> {
                         result = true;
                         final HashSet<LabelNode> nodes = { switchInsnNode.labels };
                         for (final LabelNode label : nodes)
                             markLabel(label);
                         markLabel(switchInsnNode.dflt);
                     }
-                    case TYPE_INSN         -> {
-                        if (next.getOpcode() == NEW) {
-                            @Nullable AbstractInsnNode prev = next, at = null;
+                    case LookupSwitchInsnNode switchInsnNode -> {
+                        result = true;
+                        final HashSet<LabelNode> nodes = { switchInsnNode.labels };
+                        for (final LabelNode label : nodes)
+                            markLabel(label);
+                        markLabel(switchInsnNode.dflt);
+                    }
+                    case TypeInsnNode typeInsnNode           -> {
+                        if (typeInsnNode.getOpcode() == NEW) {
+                            @Nullable AbstractInsnNode prev = typeInsnNode, at = null;
                             lookup:
                             while ((prev = prev.getPrevious()) != null)
                                 switch (prev.getOpcode()) {
@@ -201,11 +198,13 @@ public interface MethodTraverser {
                             final LabelNode labelNode = { };
                             labelNode.label(new ComputeLabel(handlersGet.get()));
                             if (at == null)
-                                instructions.insertBefore(next, labelNode);
+                                instructions.insertBefore(typeInsnNode, labelNode);
                             else
                                 instructions.insert(at, labelNode);
                         }
                     }
+                    case null,
+                         default                       -> { }
                 }
             while ((next = next.getNext()) != null);
             return result;

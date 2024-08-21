@@ -18,6 +18,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
@@ -54,10 +55,10 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.transform.mark.base.Transformer;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.ClassWriter;
+import amadeus.maho.util.container.Indexed;
 import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.resource.ResourcePath;
-import amadeus.maho.util.runtime.ArrayHelper;
 
 import static amadeus.maho.transform.AOTTransformer.Level.CLOSED_WORLD;
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
@@ -73,6 +74,8 @@ public interface Jlink {
         
         AOTTransformer.AOTClassLoader loader;
         
+        ToIntFunction<ClassLoader> loaderIndexed;
+        
         ResourcePath path = ResourcePath.of(loader());
         
         HashMap<Object, Object> properties = { System.getProperties() };
@@ -85,14 +88,14 @@ public interface Jlink {
         
         { manager().setup(loader, path, CLOSED_WORLD, "maho-image"); }
         
-        List<ClassFileTransformer> transformers = new ArrayList<>(List.of(manager(), AllClassesPublic.instance(), ReflectionInjector.instance(), UnsafeInjector.instance(), HookResultInjector.instance()));
+        List<ClassFileTransformer> transformers = new ArrayList<>(List.of(AllClassesPublic.instance(), ReflectionInjector.instance(), UnsafeInjector.instance(), HookResultInjector.instance()));
         
         MapTable<String, String, Set<String>> moduleOpensTable = MapTable.ofHashMapTable();
         
         List<String> changedClasses = new ArrayList<>();
         
         public void open(final String moduleName, final String packageName, final String... targets)
-                = moduleOpensTable().row(moduleName).computeIfAbsent(packageName.replace('.', '/'), _ -> new HashSet<>()) *= List.of(targets);
+            = moduleOpensTable().row(moduleName).computeIfAbsent(packageName.replace('.', '/'), _ -> new HashSet<>()) *= List.of(targets);
         
         @Override
         @SneakyThrows
@@ -101,7 +104,8 @@ public interface Jlink {
             in.transformAndCopy(resource -> {
                 if (resource.type() == ResourcePoolEntry.Type.CLASS_OR_RESOURCE && resource.path().endsWith(Javac.CLASS_SUFFIX)) {
                     final String path = resource.path();
-                    byte bytes[] = resource.contentBytes();
+                    final byte source[] = resource.contentBytes();
+                    byte bytes[] = source;
                     if (path.endsWith(Jar.MODULE_INFO)) {
                         final String moduleName = path.substring(1, path.indexOf('/', 1));
                         final @Nullable Map<String, Set<String>> opensMap = moduleOpensTable()[moduleName];
@@ -118,7 +122,8 @@ public interface Jlink {
                         final String className = path.substring(nameStartIndex, path.indexOf('.', nameStartIndex));
                         for (final ClassFileTransformer transformer : transformers)
                             bytes = transformer.transform(null, loader, className, null, null, bytes) ?? bytes;
-                        if (!ArrayHelper.equals(bytes, resource.contentBytes()))
+                        bytes = manager.aot(loader, loaderIndexed, bytes) ?? bytes;
+                        if (bytes != source)
                             changedClasses += className;
                         {
                             final ClassNode node = ASMHelper.newClassNode(bytes);
@@ -147,9 +152,9 @@ public interface Jlink {
             if (base != null && !ASMHelper.hasAnnotation(node, TransformProvider.Exception.class) && base.keySet().stream().anyMatch(annotationType -> ASMHelper.hasAnnotation(node, annotationType)))
                 return true;
             return base != null && !ASMHelper.hasAnnotation(node, TransformProvider.Exception.class) && base.keySet().stream().anyMatch(annotationType -> ASMHelper.hasAnnotation(node, annotationType)) ||
-                    ASMHelper.hasAnnotation(node, TransformProvider.class) && (
-                            manager.transformerTable()[FieldTransformer.class]?.keySet().stream().anyMatch(annotationType -> node.fields.stream().anyMatch(fieldNode -> ASMHelper.hasAnnotation(fieldNode, annotationType))) ?? false ||
-                                    manager.transformerTable()[MethodTransformer.class]?.keySet().stream().anyMatch(annotationType -> node.methods.stream().anyMatch(methodNode -> ASMHelper.hasAnnotation(methodNode, annotationType))) ?? false);
+                   ASMHelper.hasAnnotation(node, TransformProvider.class) && (
+                           manager.transformerTable()[FieldTransformer.class]?.keySet().stream().anyMatch(annotationType -> node.fields.stream().anyMatch(fieldNode -> ASMHelper.hasAnnotation(fieldNode, annotationType))) ?? false ||
+                           manager.transformerTable()[MethodTransformer.class]?.keySet().stream().anyMatch(annotationType -> node.methods.stream().anyMatch(methodNode -> ASMHelper.hasAnnotation(methodNode, annotationType))) ?? false);
         }
         
     }
@@ -158,7 +163,7 @@ public interface Jlink {
     jdk.tools.jlink.internal.Jlink instance = { };
     
     @SneakyThrows
-    static Path createMahoImage(final Workspace workspace, final Module module, final Path output = workspace.output("maho-image")) {
+    static Path createMahoImage(final Workspace workspace, final Module module, final Path output = workspace.output("maho-image"), final ToIntFunction<ClassLoader> loaderIndexed = Indexed.ofConcurrent()) {
         final LinkedList<Path> paths = { };
         final Path jmods = Path.of(System.getProperty("java.home"), "jmods");
         paths *= Files.list(jmods).toList();
@@ -168,7 +173,7 @@ public interface Jlink {
         final Set<String> modules = finder.findAll().stream().map(ModuleReference::descriptor).map(ModuleDescriptor::name).collect(Collectors.toUnmodifiableSet());
         final JlinkConfiguration jlinkConfiguration = { output, modules, ByteOrder.nativeOrder(), finder };
         try (final AOTTransformer.AOTClassLoader loader = { paths.stream().map(Path::toUri).map(URI::toURL).toArray(URL[]::new) }) {
-            final MahoImageTransformPlugin mahoImageTransformPlugin = { loader };
+            final MahoImageTransformPlugin mahoImageTransformPlugin = { loader, loaderIndexed };
             mahoImageTransformPlugin.open("java.instrument", "sun.instrument", "amadeus.maho");
             final List<Plugin> plugins = List.of(mahoImageTransformPlugin);
             final Map<String, String> launchers = Map.of("maho", "amadeus.maho");

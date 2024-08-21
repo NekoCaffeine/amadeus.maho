@@ -587,22 +587,26 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
         ++target;
         if (checker.test(source)) {
             final byte bytecode[] = Files.readAllBytes(source);
-            final ClassReader reader = { bytecode };
-            final String name = ASMHelper.sourceName(reader.getClassName());
-            final List<ClassTransformer> transformers = lookupTransformer(null, loader, name).filter(ClassTransformer::canAOT).toList();
-            if (!transformers.isEmpty()) {
-                final ClassNode p_node[] = { ASMHelper.newClassNode(reader) };
-                final ClassWriter writer = { loader };
-                final TransformContext.WithSource context = writer.mark(p_node[0]).context(loaderIndexed, bytecode);
-                transformers.forEach(transformer -> p_node[0] = transform(context, p_node[0], transformer, loader));
-                final @Nullable byte result[] = writeBytecodeAndMark(p_node[0], context, loader);
-                if (result != null) {
-                    result >> target;
-                    return;
-                }
+            if (aot(loader, loaderIndexed, bytecode) instanceof byte[] result) {
+                result >> target;
+                return;
             }
         }
         source >> target;
+    }
+    
+    public @Nullable byte[] aot(final ClassLoader loader, final ToIntFunction<ClassLoader> loaderIndexed, final byte[] bytecode) {
+        final ClassReader reader = { bytecode };
+        final String name = ASMHelper.sourceName(reader.getClassName());
+        final List<ClassTransformer> transformers = lookupTransformer(null, loader, name).filter(ClassTransformer::canAOT).toList();
+        if (!transformers.isEmpty()) {
+            final ClassNode p_node[] = { ASMHelper.newClassNode(reader) };
+            final ClassWriter writer = { loader };
+            final TransformContext.WithSource context = writer.mark(p_node[0]).context(loaderIndexed, bytecode);
+            transformers.forEach(transformer -> p_node[0] = transform(context, p_node[0], transformer, loader));
+            return writeBytecodeAndMark(p_node[0], context, loader);
+        }
+        return null;
     }
     
     public static @Nullable ClassNode transform(final TransformContext context, final @Nullable ClassNode node, final ClassTransformer transformer, final @Nullable ClassLoader loader,
@@ -627,7 +631,7 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             final AnnotationNode annotationNode = { Type.getDescriptor(Transformed.class) };
             node.visibleAnnotations == null ? node.visibleAnnotations = new LinkedList<>() : node.visibleAnnotations += annotationNode;
         }
-        try (final var _ = sampler()["MahoCompute"]) { return context.compute().writer().toBytecodeNoCompute(node); }
+        try (final var _ = sampler()["MahoCompute"]) { return context.compute().writer().toBytecodeWithoutComputeFrame(node); }
     }
     
     public static void transform(final String name, final String text) = Maho.debug(STR."Transform: <\{name}> \{text}");

@@ -43,6 +43,7 @@ import com.sun.tools.javac.comp.Enter;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.InferenceContext;
 import com.sun.tools.javac.comp.MemberEnter;
+import com.sun.tools.javac.comp.Modules;
 import com.sun.tools.javac.comp.Operators;
 import com.sun.tools.javac.comp.Resolve;
 import com.sun.tools.javac.comp.TypeEnter;
@@ -97,6 +98,7 @@ import amadeus.maho.util.function.FunctionHelper;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
+import amadeus.maho.util.throwable.BreakException;
 import amadeus.maho.util.tuple.Tuple;
 import amadeus.maho.util.tuple.Tuple2;
 import amadeus.maho.util.tuple.Tuple3;
@@ -284,12 +286,6 @@ public class JavacContext {
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class ClassAnnotationFinder extends ClassVisitor {
         
-        private static class Break extends FlowControlException {
-            
-            static final Break instance = { };
-            
-        }
-        
         String annotationTypes[];
         
         @Nullable
@@ -315,7 +311,7 @@ public class JavacContext {
                     if (mapper != null)
                         return mapper.apply(cache[descriptor]);
                     else
-                        throw Break.instance;
+                        throw BreakException.BREAK;
             return null;
         }
         
@@ -324,7 +320,7 @@ public class JavacContext {
             try {
                 reader.accept(new ClassAnnotationFinder(annotationTypes), ClassReader.SKIP_CODE);
                 return false;
-            } catch (final Break ignored) { return true; }
+            } catch (final BreakException ignored) { return true; }
         }
         
         @SafeVarargs
@@ -612,6 +608,7 @@ public class JavacContext {
     Attr         attr;
     DeferredAttr deferredAttr;
     Symtab       symtab;
+    Modules      modules;
     Gen          gen;
     Lint         lint;
     Log          log;
@@ -643,6 +640,7 @@ public class JavacContext {
         attr = Attr.instance(context);
         deferredAttr = DeferredAttr.instance(context);
         symtab = Symtab.instance(context);
+        modules = Modules.instance(context);
         gen = Gen.instance(context);
         lint = Lint.instance(context);
         log = Log.instance(context);
@@ -734,7 +732,7 @@ public class JavacContext {
         if (modifiers.annotations != null) {
             final AnnotationProxyMaker.Evaluator evaluator = { this, env };
             return modifiers.annotations.stream()
-                    .peek(annotation -> annotation.type = attr.attribType(annotation.annotationType, env))
+                    .peek(annotation -> annotation.type = annotation.type ?? attr.attribType(annotation.annotationType, env))
                     .filter(annotation -> annotation.type.tsym.getQualifiedName().toString().equals(annotationType.getCanonicalName()))
                     .peek(annotation -> annotation.type.tsym.complete())
                     .map(annotation -> Tuple.tuple(AnnotationProxyMaker.make(annotation, annotationType, evaluator), annotation))
@@ -845,7 +843,7 @@ public class JavacContext {
             .findFirst()
             .orElse(null);
     
-    public void followAnnotation(final JCTree.JCAnnotation target, final String name, final JCTree.JCModifiers follower) = target.getArguments().stream()
+    public void followAnnotation(final JCTree.JCAnnotation target, final String name, final JCTree.JCModifiers follower) = target.args.stream()
             .cast(JCTree.JCAssign.class)
             .filter(assign -> assign.lhs instanceof JCTree.JCIdent ident && ident.name.toString().equals(name))
             .map(assign -> assign.rhs)

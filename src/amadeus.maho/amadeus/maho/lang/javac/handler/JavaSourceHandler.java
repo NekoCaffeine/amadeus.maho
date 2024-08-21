@@ -27,7 +27,7 @@ public class JavaSourceHandler extends JavacContext {
             Attach     = name(JavaSource.Attach.class.getName()),
             importCode = name(LookupHelper.method1(JavaSource::importCode).getName()),
             bodyCode   = name(LookupHelper.method1(JavaSource::bodyCode).getName()),
-            time   = name(LookupHelper.method1(JavaSource::time).getName());
+            time       = name(LookupHelper.method1(JavaSource::time).getName());
     
     @Hook
     private static void attribClassBody(final Attr $this, final Env<AttrContext> env, final Symbol.ClassSymbol c) = instance(JavaSourceHandler.class).attachSourceIfNeed(env, (JCTree.JCClassDecl) env.tree, c);

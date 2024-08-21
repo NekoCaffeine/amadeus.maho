@@ -11,7 +11,6 @@ import java.util.LinkedList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -60,7 +59,6 @@ import amadeus.maho.transform.mark.base.At;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
-import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashSet;
 import amadeus.maho.util.runtime.DebugHelper;
 
 import static amadeus.maho.lang.javac.handler.ExtensionHandler.PRIORITY;
@@ -82,8 +80,8 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         
         MethodSymbol delegate;
         
-        public ReferenceMethodSymbol(final MethodSymbol delegate, final Symbol owner) {
-            super(delegate.flags_field & ~STATIC, delegate.name, dropFirstParameter(delegate.type.asMethodType()), owner);
+        public ReferenceMethodSymbol(final MethodSymbol delegate) {
+            super(delegate.flags_field & ~STATIC, delegate.name, dropFirstParameter(delegate.type.asMethodType()), delegate.params.head.type.tsym);
             this.delegate = delegate;
         }
         
@@ -112,15 +110,22 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
     
     @ToString
     @EqualsAndHashCode
-    public record SymbolTable(ConcurrentHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ClassSymbol>> extensionProviders = { },
-                              ConcurrentHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ModuleSymbol>> importInfos = { },
-                              ConcurrentHashMap<Symbol.ModuleSymbol, Map<Name, Collection<Symbol.MethodSymbol>>> extensionMethodsWithImport = { },
-                              ConcurrentHashMap<Symbol.MethodSymbol, ConcurrentWeakIdentityHashMap<Symbol, ReferenceMethodSymbol>> referenceMethodSymbolsCache = { }) implements SharedComponent {
+    public record SymbolTable(ConcurrentWeakIdentityHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ClassSymbol>> extensionProviders = { },
+                              ConcurrentWeakIdentityHashMap<Symbol.ModuleSymbol, CopyOnWriteArrayList<Symbol.ModuleSymbol>> importInfos = { },
+                              ConcurrentWeakIdentityHashMap<Symbol.ModuleSymbol, Map<Name, Collection<Symbol.MethodSymbol>>> extensionMethodsWithImport = { },
+                              ConcurrentWeakIdentityHashMap<Symbol.MethodSymbol, ReferenceMethodSymbol> referenceMethodSymbolsCache = { }) implements SharedComponent {
         
         public static SymbolTable instance(final Context context) = context.get(SymbolTable.class) ?? new SymbolTable().let(it -> context.put(SymbolTable.class, it));
         
         public Map<Name, Collection<Symbol.MethodSymbol>> lookupExtensionProvider(final Symbol.ModuleSymbol moduleSymbol) = extensionMethodsWithImport().computeIfAbsent(moduleSymbol, it -> {
-            final @Nullable Collection<Symbol.ModuleSymbol> moduleSymbols = importInfos()[it];
+            final @Nullable Collection<Symbol.ModuleSymbol> moduleSymbols = importInfos().computeIfAbsent(it, infoSource -> {
+                if (infoSource.module_info != null && infoSource.module_info.classfile != null) {
+                    final @Nullable Extension.Import annotation = infoSource.module_info.getAnnotation(Extension.Import.class);
+                    if (annotation != null)
+                        return importInfo(annotation.includes(), annotation.exclusions());
+                }
+                return null;
+            });
             final HashMap<Name, Collection<Symbol.MethodSymbol>> methodsByName = { };
             (moduleSymbols == null ?
                     extensionProviders().values().stream().flatMap(Collection::stream) :
@@ -142,34 +147,37 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
             return symbol.kind == Kinds.Kind.MTH && (flags & (PUBLIC | STATIC)) == (PUBLIC | STATIC) && (flags & SYNTHETIC) == 0;
         };
         
-        public ReferenceMethodSymbol asReferenceMethodSymbol(final Symbol.MethodSymbol methodSymbol, final Symbol owner)
-            = referenceMethodSymbolsCache().computeIfAbsent(methodSymbol, _ -> new ConcurrentWeakIdentityHashMap<>()).computeIfAbsent(owner, it -> new ReferenceMethodSymbol(methodSymbol, it));
+        public ReferenceMethodSymbol asReferenceMethodSymbol(final Symbol.MethodSymbol methodSymbol) = referenceMethodSymbolsCache().computeIfAbsent(methodSymbol, ReferenceMethodSymbol::new);
         
-    }
-    
-    @NoArgsConstructor
-    @Handler(value = Extension.Import.class, priority = PRIORITY)
-    public static class ImportHandler extends BaseHandler<Extension.Import> { // TODO Support incremental compilation, loading import information from class files.
+        public void importInfo(final Symbol.ModuleSymbol moduleSymbol, final String includes[], final String exclusions[]) = importInfos()[moduleSymbol] = importInfo(includes, exclusions);
         
-        @Override
-        public void processClass(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final JCTree owner, final Extension.Import annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
-            if (tree.name == names.module_info) {
-                final LinkedList<Symbol.ModuleSymbol> modules = { };
-                final SymbolTable table = instance(SymbolTable.class);
-                final Set<Symbol.ModuleSymbol> providerModules = table.extensionProviders().keySet();
-                process(providerModules, modules::add, annotation.includes());
-                process(providerModules, modules::remove, annotation.exclusions());
-                table.importInfos()[tree.sym.packge().modle] = { modules };
-            }
+        public CopyOnWriteArrayList<Symbol.ModuleSymbol> importInfo(final String includes[], final String exclusions[]) {
+            final LinkedList<Symbol.ModuleSymbol> modules = { };
+            final Set<Symbol.ModuleSymbol> providerModules = extensionProviders().keySet();
+            process(providerModules, modules::add, includes);
+            process(providerModules, modules::remove, exclusions);
+            return { modules };
         }
         
-        protected void process(final Collection<Pattern> patterns = Stream.of(regexes)
+        private static void process(final Collection<Pattern> patterns = Stream.of(regexes)
                 // The Handler for @RegularExpression will prompt the user for exceptions from regular expressions.
                 .map(regex -> { try { return Pattern.compile(regex); } catch (PatternSyntaxException e) { return null; } })
                 .nonnull()
                 .toList(), final Collection<Symbol.ModuleSymbol> modules, final Consumer<Symbol.ModuleSymbol> consumer, final String... regexes) = modules.stream()
                 .filter(module -> patterns.stream().anyMatch(pattern -> pattern.matcher(module.name.toString()).matches()))
                 .forEach(consumer);
+        
+    }
+    
+    @NoArgsConstructor
+    @Handler(value = Extension.Import.class, priority = PRIORITY)
+    public static class ImportHandler extends BaseHandler<Extension.Import> {
+        
+        @Override
+        public void processClass(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final JCTree owner, final Extension.Import annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) {
+            if (tree.name == names.module_info)
+                instance(SymbolTable.class).importInfo(tree.sym.packge().modle, annotation.includes(), annotation.exclusions());
+        }
         
     }
     
@@ -187,14 +195,7 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
     
     Set<Name> polymorphicSignatureMethodNames = PolymorphicSignatureHolder.methodNames.stream().map(names::fromString).collect(Collectors.toSet());
     
-    Set<Symbol.TypeSymbol> handleSymbols = Set.of(symtab.methodHandleType.tsym, symtab.varHandleType.tsym);
-    
     SymbolTable table = SymbolTable.instance(context);
-    
-    Set<Symbol> errorSymbols = new ConcurrentWeakIdentityHashSet<>();
-    
-    @Override
-    public void initModules(final Set<Symbol.ModuleSymbol> modules) = table.extensionProviders().clear();
     
     @Override
     public Class<? extends Annotation> providerType() = Extension.Provider.class;
@@ -204,6 +205,9 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
     
     @Override
     public void addSymbol(final Symbol.ClassSymbol symbol) = table.extensionProviders().computeIfAbsent(symbol.packge().modle, _ -> new CopyOnWriteArrayList<>()) += symbol;
+    
+    @Override
+    public Collection<Symbol.ClassSymbol> allSymbols(final Symbol.ModuleSymbol module) = table.extensionProviders()[module] ?? List.<Symbol.ClassSymbol>nil();
     
     @Override
     public void processClass(final Env<AttrContext> env, final JCTree.JCClassDecl tree, final JCTree owner, final Extension annotation, final JCTree.JCAnnotation annotationTree, final boolean advance) = addSymbol(tree.sym);
@@ -239,12 +243,17 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         return capture;
     }
     
+    private static JCTree.JCExpression bindQualifier(final JCTree.JCExpression expression, final ReferenceMethodSymbol referenceMethodSymbol) {
+        expression.type = referenceMethodSymbol.owner.type;
+        return expression;
+    }
+    
     @Hook
     private static Hook.Result visitReference(final LambdaToMethod $this, final JCTree.JCMemberReference tree) {
         if (tree.sym instanceof ReferenceMethodSymbol referenceMethodSymbol) {
             final LambdaToMethod.LambdaAnalyzerPreprocessor.ReferenceTranslationContext localContext = (LambdaToMethod.LambdaAnalyzerPreprocessor.ReferenceTranslationContext) (Privilege) $this.context;
             (Privilege) ($this.result = (Privilege) $this.makeMetafactoryIndyCall(localContext, referenceMethodSymbol.asHandle(), switch (tree.kind) {
-                case BOUND   -> (Privilege) $this.translate(List.of(tree.getQualifierExpression()), (Privilege) localContext.prev);
+                case BOUND   -> (Privilege) $this.translate(List.of(bindQualifier(tree.expr, referenceMethodSymbol)), (Privilege) localContext.prev);
                 case UNBOUND -> List.nil();
                 default      -> throw DebugHelper.breakpointBeforeThrow(new IllegalArgumentException(STR."Unexpected kind: \{tree.kind}"));
             }));
@@ -273,20 +282,18 @@ public class ExtensionHandler extends BaseHandler<Extension> implements DynamicA
         if (site.isErroneous() || argTypes.stream().anyMatch(Type::isErroneous))
             return capture;
         final ExtensionHandler instance = instance(ExtensionHandler.class);
-        if (instance.skipByName(name) || instance.handleSymbols[site.tsym] && instance.polymorphicSignatureMethodNames[name] || instance.table.extensionProviders.isEmpty())
+        if (instance.skipByName(name) || (site.tsym == instance.symtab.methodHandleType.tsym || site.tsym == instance.symtab.varHandleType.tsym) && instance.polymorphicSignatureMethodNames[name] || instance.table.extensionProviders.isEmpty())
             return capture;
         final Attr.ResultInfo resultInfo = (Privilege) instance.attr.resultInfo;
         if (resultInfo == null)
             return capture;
         @Nullable Collection<Symbol.MethodSymbol> extensionMethods = instance.table.lookupExtensionProvider(env, name);
-        if (extensionMethods != null && isReference) {
-            final Symbol owner = site.tsym;
+        if (extensionMethods != null && isReference)
             extensionMethods = extensionMethods.stream()
                     .filter(methodSymbol -> instance.types.isAssignable(site, methodSymbol.type.asMethodType().argtypes.head))
                     .filter(methodSymbol -> !instance.skipOriginal(bestSoFar, methodSymbol))
-                    .map(methodSymbol -> instance.table.asReferenceMethodSymbol(methodSymbol, owner))
+                    .map(instance.table::asReferenceMethodSymbol)
                     .collect(Collectors.toList());
-        }
         if (extensionMethods != null && !extensionMethods.isEmpty()) {
             final List<Type> extArgTypes = isReference ? argTypes : argTypes.prepend(site);
             final Type pt = (Privilege) resultInfo.pt;

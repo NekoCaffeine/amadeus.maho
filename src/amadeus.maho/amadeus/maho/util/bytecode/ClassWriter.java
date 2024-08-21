@@ -120,7 +120,7 @@ public class ClassWriter extends org.objectweb.asm.ClassWriter {
         return toByteArray();
     }
     
-    public byte[] toBytecodeNoCompute(final ClassNode node) {
+    public byte[] toBytecodeWithoutComputeFrame(final ClassNode node) {
         mark(node);
         node.accept(this);
         return toByteArray();
