@@ -1,5 +1,5 @@
 package amadeus.maho.transform.mark.base;
 
-public enum Boolean {
+public enum BooleanMark {
     TRUE, FALSE, WILDCARD
 }

@@ -55,7 +55,7 @@ public interface LLMJSONSchema {
         final DynamicObject.MapUnit response_format = { }, json_schema = { };
         response_format["type"] = "json_schema";
         response_format["json_schema"] = json_schema;
-        json_schema["name"] = className(type);
+        json_schema["name"] = "Result";
         json_schema["schema"] = createJsonSchema(type, nameMapping);
         json_schema["strict"] = true;
         nameMapping.remove(type);
@@ -81,6 +81,14 @@ public interface LLMJSONSchema {
             property["type"] = typeOf;
             properties["value"] = property;
             required += "value";
+        } else if(type.isArray()) {
+            final DynamicObject.MapUnit property = { };
+            property["type"] = "array";
+            properties["value"] = property;
+            required += "value";
+            final DynamicObject.MapUnit items = { };
+            property["items"] = items;
+            markType(items, type.getComponentType(), nameMapping);
         } else
             FieldsMap.fieldsMapLocal()[type].forEach((name, fieldInfo) -> {
                 final Field field = fieldInfo.field();

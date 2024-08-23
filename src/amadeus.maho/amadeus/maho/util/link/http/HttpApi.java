@@ -365,9 +365,9 @@ public interface HttpApi {
     }
     
     @IndirectCaller
-    static Map<String, String> authorizationArgs(final String type = "Bearer", final String token = token()) = Map.of(HttpHelper.Header.Authorization, STR."\{type} \{token}");
+    static Map<String, String> authorizationArgs(final String token = token(), final String type = "Bearer") = Map.of(HttpHelper.Header.Authorization, STR."\{type} \{token}");
     
     @IndirectCaller
-    static HttpSetting authorization(final String type = "Bearer", final String token = token()) = { HttpSetting.withBaseHeaders(authorizationArgs(type, token)) };
+    static HttpSetting authorization(final String token = token(), final String type = "Bearer") = { HttpSetting.withBaseHeaders(authorizationArgs(token, type)) };
     
 }

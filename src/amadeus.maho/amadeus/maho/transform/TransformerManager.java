@@ -497,10 +497,11 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
             throw DebugHelper.breakpointBeforeThrow(new UnsupportedOperationException("redefine non-runtime TransformerManger"));
         final List<ClassDefinition> providers = Stream.of(definitions).filter(definition -> definition.getDefinitionClass().isAnnotationPresent(TransformProvider.class)).toList();
         final Set<String> names = providers.stream().map(definition -> definition.getDefinitionClass().getName()).map(ASMHelper::className).collect(Collectors.toSet());
+        final ArrayList<BaseTransformer<?>> rollbackTransformers = { };
+        final Context context;
         final ReentrantReadWriteLock.WriteLock lock = write;
         lock.lock();
         try {
-            final ArrayList<BaseTransformer<?>> rollbackTransformers = { };
             transformerMap.values().forEach(list -> list.removeIf(transformer -> {
                 if (transformer instanceof BaseTransformer<?> baseTransformer && names[baseTransformer.sourceClass.name]) {
                     rollbackTransformers += baseTransformer;
@@ -508,14 +509,14 @@ public class TransformerManager implements ClassFileTransformer, StreamRemapHand
                 }
                 return false;
             }));
-            final Context context = { this, TransformerManager.class.getClassLoader() };
+            context = { this, TransformerManager.class.getClassLoader() };
             providers.forEach(definition -> {
                 final ClassLoadable.Loaded loaded = { definition.getDefinitionClass() };
                 final ClassNode node = ASMHelper.newClassNode(definition.getDefinitionClassFile());
                 context.scanProvider(loaded, node, true);
             });
-            context.setup(null, AOTTransformer.Level.RUNTIME, false, rollbackTransformers);
         } finally { lock.unlock(); }
+        context.setup(null, AOTTransformer.Level.RUNTIME, false, rollbackTransformers);
     }
     
     public synchronized Context setupRuntimeClass(final Class<?> clazz, final ClassNode node = Maho.getClassNodeFromClassNonNull(clazz)) {

@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import amadeus.maho.core.MahoExport;
+import amadeus.maho.core.extension.ShutdownHook;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.mark.Hook;
@@ -52,9 +53,9 @@ public interface LLMThrowableAssistant {
         return null;
     }
     
-    @Hook(metadata = @TransformMetadata(enable = MahoExport.MAHO_LLM_THROWABLE_ASSISTANT))
-    private static Hook.Result printStackTrace(final Throwable $this, final PrintStream s) {
-        if (newWrappedPrintStream != null && printStackTrace != null && LLMApi.hasDefaultInstance() && MahoExport.debug())
+    @Hook(metadata = @TransformMetadata(enable = MahoExport.MAHO_LLM_THROWABLE_ASSISTANT, order = 1 << 4))
+    private static Hook.Result printStackTrace(final Throwable $this, final PrintStream stream) {
+        if (newWrappedPrintStream != null && printStackTrace != null && !ShutdownHook.shuttingDown() && LLMApi.hasDefaultInstance() && MahoExport.debug())
             try {
                 final ByteArrayOutputStream buffer = { };
                 final PrintStream wrapped = { buffer, false, StandardCharsets.UTF_8 };
@@ -62,7 +63,7 @@ public interface LLMThrowableAssistant {
                 wrapped.flush();
                 final String stackTrace = buffer.toString(StandardCharsets.UTF_8);
                 final AnalyzedResult reasonsAndSuggestions = analyze(stackTrace);
-                s.println(STR."""
+                stream.println(STR."""
                 \{stackTrace}
                 \{reasonsAndSuggestions}""");
                 return Hook.Result.NULL;

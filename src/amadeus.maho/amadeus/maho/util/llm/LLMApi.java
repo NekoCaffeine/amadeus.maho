@@ -17,6 +17,7 @@ import amadeus.maho.util.dynamic.DynamicObject;
 import amadeus.maho.util.link.http.HttpApi;
 import amadeus.maho.util.llm.backend.OpenRouter;
 import amadeus.maho.util.logging.LogLevel;
+import amadeus.maho.util.runtime.DebugHelper;
 
 public interface LLMApi {
     
@@ -59,13 +60,15 @@ public interface LLMApi {
         final Class<?> returnType = method.getReturnType();
         final String model = model(llm);
         final boolean structuredOutputs = supportStructuredOutputs(model);
-        final DynamicObject
-                sourceRequest = withModel(withContent(defaultRequestParameters(), makeInvokePrompt(method, structuredOutputs, args)), model).let(provider),
-                request = beforeInvoke(sourceRequest, method, model, structuredOutputs),
-                response = send(request),
-                parsed = JSON.parse(result(response));
+        final DynamicObject sourceRequest = withModel(withContent(defaultRequestParameters(), makeInvokePrompt(method, structuredOutputs, args)), model).let(provider);
+        final DynamicObject request = beforeInvoke(sourceRequest, method, model, structuredOutputs);
+        final DynamicObject response = send(request);
+        final String result = result(response);
+        if (result.isEmpty())
+            throw DebugHelper.breakpointBeforeThrow(new AssertionError(STR."Empty result with: \{JSON.stringify(request)}"));
+        final DynamicObject parsed = JSON.parse(result);
         final @Nullable String typeOf = LLMJSONSchema.typeMap[returnType];
-        return (typeOf != null ? parsed["value"] : parsed).as(returnType)!;
+        return (typeOf != null || returnType.isArray() ? parsed["value"] : parsed).as(returnType)!;
     }
     
     default String model(final LLM llm) = llm.model().isEmpty() ? defaultModel() : llm.model();

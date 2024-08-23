@@ -16,6 +16,8 @@ open module amadeus.maho {
     requires transitive jdk.jshell;
     requires transitive jdk.zipfs;
     
+    requires transitive jdk.internal.vm.ci;
+    
     requires transitive jdk.incubator.vector;
     
     requires transitive org.objectweb.asm;

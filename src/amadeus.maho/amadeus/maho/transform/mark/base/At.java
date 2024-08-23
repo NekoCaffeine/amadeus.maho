@@ -168,7 +168,7 @@ public @interface At {
                                       (methodInsn.owner().equals(WILDCARD) || methodInsn.owner().equals(it.owner)) &&
                                       (name.equals(WILDCARD) || name.equals(it.name)) &&
                                       (desc.equals(WILDCARD) || desc.equals(it.desc)) &&
-                                      (methodInsn.itf() == Boolean.WILDCARD || methodInsn.itf() == (it.itf ? Boolean.TRUE : Boolean.FALSE));
+                                      (methodInsn.itf() == BooleanMark.WILDCARD || methodInsn.itf() == (it.itf ? BooleanMark.TRUE : BooleanMark.FALSE));
                 }
                 case TypeInsn typeInsn                     -> {
                     final String desc;
@@ -342,7 +342,7 @@ public @interface At {
         
         MethodDescriptor descriptor() default @MethodDescriptor;
         
-        Boolean itf() default Boolean.WILDCARD;
+        BooleanMark itf() default BooleanMark.WILDCARD;
         
     }
     

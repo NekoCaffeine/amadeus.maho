@@ -165,7 +165,8 @@ public final class Maho {
     private static void loadJavaSupport(final Instrumentation instrumentation) {
         checkInstrumentationSupport(instrumentation);
         workaroundClassCircularityError();
-        instrumentation.addTransformer(AllClassesPublic.instance(), false);
+        if (System.getProperty("amadeus.maho.skip.acp") == null)
+            instrumentation.addTransformer(AllClassesPublic.instance(), false);
         if (!MahoImage.isImage()) {
             inject(instrumentation, ReflectionInjector.instance());
             inject(instrumentation, UnsafeInjector.instance());

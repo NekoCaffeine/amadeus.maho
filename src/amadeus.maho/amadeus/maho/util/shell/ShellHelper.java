@@ -22,9 +22,9 @@ import amadeus.maho.util.llm.LLMHelper;
 import amadeus.maho.util.misc.Dumper;
 import amadeus.maho.util.runtime.UnsafeHelper;
 
-@Include(Scaffold.class)
+@Include({Scaffold.class, ScriptHelper.class, LLMHelper.class})
 @SneakyThrows
-public interface ShellHelper extends ScriptHelper, LLMHelper {
+public interface ShellHelper {
     
     Unsafe unsafe = UnsafeHelper.unsafe();
     

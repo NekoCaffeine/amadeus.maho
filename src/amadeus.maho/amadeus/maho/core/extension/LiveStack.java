@@ -110,11 +110,8 @@ public class LiveStack {
     @Proxy(INVOKEVIRTUAL)
     public static native StackTraceElement[] getOurStackTrace(Throwable $this);
     
-    @Hook(metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
-    public static Hook.Result printStackTrace(final Throwable $this, final PrintStream stream) {
-        printStackTraceToStream($this, stream);
-        return Hook.Result.NULL;
-    }
+    @Hook(forceReturn = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME, enable = MAHO_LIVE_STACK))
+    public static void printStackTrace(final Throwable $this, final PrintStream stream) = printStackTraceToStream($this, stream);
     
     private static final String CAUSE_CAPTION = "Caused by: ", SUPPRESSED_CAPTION = "Suppressed: ", ARROW = "↑";
     

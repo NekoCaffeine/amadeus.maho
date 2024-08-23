@@ -140,6 +140,9 @@ public interface Jlink {
             out.add(ResourcePoolEntry.create("/amadeus.maho/transform-marks", ResourcePoolEntry.Type.CLASS_OR_RESOURCE, String.join("\n", marks).getBytes(StandardCharsets.UTF_8)));
             out.add(ResourcePoolEntry.create("/amadeus.maho/transform-providers", ResourcePoolEntry.Type.CLASS_OR_RESOURCE, String.join("\n", providers).getBytes(StandardCharsets.UTF_8)));
             out.add(ResourcePoolEntry.create("/java.base/changed-classes", ResourcePoolEntry.Type.TOP, String.join("\n", changedClasses()).getBytes(StandardCharsets.UTF_8)));
+            final Path options = Path.of(URI.create("jrt:/java.base/jdk/internal/vm/options"));
+            if (Files.isRegularFile(options))
+                out.add(ResourcePoolEntry.create("/java.base/jdk/internal/vm/options", Files.readAllBytes(options)));
             return out.build();
         }
         

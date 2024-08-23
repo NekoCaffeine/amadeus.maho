@@ -72,7 +72,7 @@ public interface Shell {
     @SneakyThrows
     @IndirectCaller
     static JShell instance(final List<String> runtimeOptions = Javac.runtimeOptions(), final ExecutionControlProvider provider = new DirectExecutionControlProvider(), final @Nullable Map<String, String> parameters = null)
-            = JShell.builder().executionEngine(provider, parameters).compilerOptions(runtimeOptions.toArray(String[]::new)).build();
+        = JShell.builder().executionEngine(provider, parameters).compilerOptions(runtimeOptions.toArray(String[]::new)).build();
     
     @SneakyThrows
     @IndirectCaller
@@ -80,16 +80,21 @@ public interface Shell {
         try { return JavaShellToolBuilder.builder().start(Stream.concat(Stream.of("-execution", "maho", "-n"), runtimeOptions.stream().map("-C"::concat)).toArray(String[]::new)); } finally { Context.leave(); }
     }
     
-    @Setter
-    @Getter
-    @Mutable
-    String imports = STR."\{Stream.of(Shell.class, Object.class)
+    private static String importJavaAndAmadeusPackages() = Stream.of(Shell.class, Object.class)
             .map(Class::getModule)
             .map(Module::getPackages)
             .flatMap(Collection::stream)
             .filter(pkg -> pkg.startsWith("java.") || pkg.startsWith("amadeus."))
             .map("import %s.*;"::formatted)
-            .collect(Collectors.joining("\n", "\n", "\n"))}import static amadeus.maho.util.shell.ShellHelper.*;";
+            .collect(Collectors.joining("\n", "\n", "\n"));
+    
+    @Setter
+    @Getter
+    @Mutable
+    String imports = STR."""
+            \{importJavaAndAmadeusPackages()}
+            import static amadeus.maho.util.shell.ShellHelper.*;
+            """;
     
     static void extraModule(final Module module = CallerContext.caller().getModule()) = imports(imports() + List.of(module.getPackages().stream().map("import %s.*;"::formatted).collect(Collectors.joining())));
     

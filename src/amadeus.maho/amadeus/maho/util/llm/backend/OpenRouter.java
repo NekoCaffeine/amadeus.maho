@@ -277,10 +277,10 @@ public interface OpenRouter extends LLMHttpBackend {
             if (choice.error() instanceof Error error)
                 throw DebugHelper.breakpointBeforeThrow(new RequestFailedException(STR."Error \{error.code}: \{error.message}"));
             switch (choice.finish_reason()) {
-                case null             -> { }
                 case "length"         -> throw new LengthException("The completion is too long.");
                 case "content_filter" -> throw new ContentFilterException("The completion was filtered by the content filter.");
-                default               -> { }
+                case null,
+                     default          -> { }
             }
             if (first["message"].undefinedToNull()["refusal"].undefinedToNull().as() instanceof String refusal)
                 throw new RefusalException(refusal);

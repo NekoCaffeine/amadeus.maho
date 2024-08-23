@@ -11,7 +11,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import jdk.internal.jrtfs.JrtPath;
+
 import amadeus.maho.core.Maho;
+import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.EqualsAndHashCode;
@@ -55,7 +58,17 @@ public record Module(Path path = Path.of(""), String name, Map<String, Path> sub
         public Stream<SingleDependency> flat() = Stream.of(this);
         
         @SneakyThrows
-        public static Set<SingleDependency> maho() throws FileNotFoundException = allOf(-+-Maho.jar());
+        public static Set<SingleDependency> maho() throws FileNotFoundException {
+            final @Nullable String mahoHome = System.getenv(MahoExport.MAHO_HOME_VARIABLE);
+            final @Nullable Path mahoHomeDir = mahoHome != null ? Path.of(mahoHome) : null;
+            if (mahoHome == null || !Files.isDirectory(mahoHomeDir)) {
+                final Path jar = Maho.jar();
+                if (!(jar instanceof JrtPath) && -jar instanceof Path parent && parent.fileName().equals("modules") && -parent instanceof Path home)
+                    return allOf(home);
+                throw new FileNotFoundException("Maho home directory not found");
+            }
+            return allOf(mahoHomeDir);
+        }
         
         @SneakyThrows
         public static Set<SingleDependency> allOf(final Path home) throws FileNotFoundException = Files.walk(home / "modules")

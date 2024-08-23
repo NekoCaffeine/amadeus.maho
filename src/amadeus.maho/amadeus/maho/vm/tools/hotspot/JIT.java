@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import jdk.internal.misc.Unsafe;
+import jdk.vm.ci.runtime.JVMCI;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.lang.AccessLevel;
@@ -228,6 +229,12 @@ public enum JIT {
             waitingQueue.forEach(this::compile);
             waitingQueue.clear();
         }
-        Maho.debug("JITCompiler: Ready!");
+        Maho.debug(STR."Tiered Compilation: \{Compiler.isTieredCompilationEnabled() ? "Enabled" : "Disabled"}");
+        Maho.debug(STR."C1: \{Compiler.isC1Enabled() ? "Enabled" : "Disabled"}");
+        Maho.debug(STR."C2: \{Compiler.isC2Enabled() ? "Enabled" : "Disabled"}");
+        Maho.debug(STR."JVMCI: \{Compiler.isJVMCIEnabled() ? (Compiler.isJVMCINativeEnabled() ? "Enabled (Native)" : "Enabled") + (Compiler.isGraalEnabled() ? " (Used)" : "") : "Disabled"}");
+        if (Compiler.isGraalEnabled())
+            Maho.debug(STR."JVMCI Compiler: \{JVMCI.getRuntime().getCompiler().getClass().getName()}");
+        Maho.debug("JIT Controller: Ready!");
     }
 }

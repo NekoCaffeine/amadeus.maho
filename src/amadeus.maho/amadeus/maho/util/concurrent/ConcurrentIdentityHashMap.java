@@ -1,7 +1,5 @@
 package amadeus.maho.util.concurrent;
 
-import java.lang.ref.Reference;
-import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
@@ -23,46 +21,39 @@ import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.NoArgsConstructor;
 import amadeus.maho.lang.RequiredArgsConstructor;
 import amadeus.maho.lang.inspection.Nullable;
-import amadeus.maho.util.dynamic.ReferenceCollector;
 import amadeus.maho.util.runtime.ObjectHelper;
 
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PROTECTED, makeFinal = true)
-public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V>, ReferenceCollector.Collectible<K> {
+public class ConcurrentIdentityHashMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> {
     
-    @NoArgsConstructor
-    public static class Managed<K, V> extends ConcurrentWeakIdentityHashMap<K, V> implements ReferenceCollector.Manageable<K> {
-        
-        @Override
-        public ConcurrentHashMap<Key<K>, V> purgeKeys() = map;
-        
-    }
     
     @Getter
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class Key<K> extends WeakReference<K> {
         
+        K referent;
+        
         int hashCode;
         
-        public Key(final K key, final @Nullable ReferenceQueue<? super K> queue = null) {
-            super(ObjectHelper.requireNonNull(key), queue);
-            hashCode = System.identityHashCode(key);
+        public Key(final K key) {
+            super(ObjectHelper.requireNonNull(key));
+            hashCode = System.identityHashCode(referent = key);
         }
         
         @Override
         public boolean equals(final Object object) {
             if (this == object)
                 return true;
-            final @Nullable K value = get();
-            return value != null && object instanceof Key key && key.get() == value;
+            return object instanceof Key key && key.get() == referent;
         }
         
     }
     
-    protected class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+    protected class EntrySet extends AbstractSet<Entry<K, V>> {
         
         @NoArgsConstructor
-        protected class Entry extends AbstractMap.SimpleEntry<K, V> {
+        protected class Entry extends SimpleEntry<K, V> {
             
             @Override
             public V setValue(final V value) {
@@ -124,30 +115,27 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
         public EntryIterator iterator() = { map.entrySet().iterator() };
         
         @Override
-        public void clear() = ConcurrentWeakIdentityHashMap.this.clear();
+        public void clear() = ConcurrentIdentityHashMap.this.clear();
         
         @Override
-        public int size() = ConcurrentWeakIdentityHashMap.this.size();
+        public int size() = ConcurrentIdentityHashMap.this.size();
         
         @Override
-        public boolean isEmpty() = ConcurrentWeakIdentityHashMap.this.isEmpty();
+        public boolean isEmpty() = ConcurrentIdentityHashMap.this.isEmpty();
         
         @Override
         public boolean contains(final Object object) = object instanceof Map.Entry<?, ?> entry && get(entry.getKey()) == entry.getValue();
         
         @Override
-        public boolean remove(final Object object) = object instanceof Map.Entry<?, ?> entry && ConcurrentWeakIdentityHashMap.this.remove(entry.getKey(), entry.getValue());
+        public boolean remove(final Object object) = object instanceof Map.Entry<?, ?> entry && ConcurrentIdentityHashMap.this.remove(entry.getKey(), entry.getValue());
         
     }
     
     @Default
     ConcurrentHashMap<Key<K>, V> map = { };
     
-    @Getter
-    ReferenceQueue<K> referenceQueue = { };
-    
     @Getter(lazy = true)
-    Set<Map.Entry<K, V>> entrySet = new EntrySet();
+    Set<Entry<K, V>> entrySet = new EntrySet();
     
     ThreadLocal<Supplier<V>> recursiveGuard = { }, recursiveCall = { };
     
@@ -171,98 +159,85 @@ public class ConcurrentWeakIdentityHashMap<K, V> extends AbstractMap<K, V> imple
             }
     }
     
-    public ConcurrentWeakIdentityHashMap(final int initialCapacity, final float loadFactor = 0.75F, final int concurrencyLevel = 1) = this(new ConcurrentHashMap<K, V>(initialCapacity, loadFactor, concurrencyLevel));
+    public ConcurrentIdentityHashMap(final int initialCapacity, final float loadFactor = 0.75F, final int concurrencyLevel = 1) = this(new ConcurrentHashMap<K, V>(initialCapacity, loadFactor, concurrencyLevel));
     
-    public ConcurrentWeakIdentityHashMap(final Map<K, V> map) {
+    public ConcurrentIdentityHashMap(final Map<K, V> map) {
         this();
         putAll(map);
     }
     
-    @Override
-    public void collect(final Reference<? extends K> reference) = map.remove(reference);
-    
-    public ConcurrentHashMap<Key<K>, V> purgeKeys() {
-        ReferenceCollector.collect(this);
-        return map;
-    }
-    
-    public Key<K> keyEnqueue(final K key) = { key, referenceQueue };
-    
     public <K> Key<K> key(final K key) = { key };
     
     @Override
-    public V get(final Object key) = purgeKeys().get(key(key));
+    public V get(final Object key) = map.get(key(key));
     
     @Override
-    public V put(final K key, final V value) = purgeKeys().put(keyEnqueue(key), value);
+    public V put(final K key, final V value) = map.put(key(key), value);
     
     @Override
-    public int size() = purgeKeys().size();
+    public int size() = map.size();
     
     @Override
-    public V putIfAbsent(final K key, final V value) = purgeKeys().putIfAbsent(keyEnqueue(key), value);
+    public V putIfAbsent(final K key, final V value) = map.putIfAbsent(key(key), value);
     
     @Override
-    public V remove(final Object key) = purgeKeys().remove(key(key));
+    public V remove(final Object key) = map.remove(key(key));
     
     @Override
-    public boolean remove(final Object key, final Object value) = purgeKeys().remove(key(key), value);
+    public boolean remove(final Object key, final Object value) = map.remove(key(key), value);
     
     @Override
-    public boolean replace(final K key, final V oldValue, final V newValue) = purgeKeys().replace(key(key), oldValue, newValue);
+    public boolean replace(final K key, final V oldValue, final V newValue) = map.replace(key(key), oldValue, newValue);
     
     @Override
-    public V replace(final K key, final V value) = purgeKeys().replace(key(key), value);
+    public V replace(final K key, final V value) = map.replace(key(key), value);
     
     @Override
-    public boolean containsKey(final Object key) = purgeKeys().containsKey(key(key));
+    public boolean containsKey(final Object key) = map.containsKey(key(key));
     
     @Override
-    public void clear() {
-        while (referenceQueue.poll() != null) ;
-        map.clear();
-    }
+    public void clear() = map.clear();
     
     @Override
-    public boolean containsValue(final Object value) = purgeKeys().containsValue(value);
+    public boolean containsValue(final Object value) = map.containsValue(value);
     
     @Override
-    public V getOrDefault(final Object key, final V defaultValue) = purgeKeys().getOrDefault(key(key), defaultValue);
+    public V getOrDefault(final Object key, final V defaultValue) = map.getOrDefault(key(key), defaultValue);
     
     @Override
-    public void forEach(final BiConsumer<? super K, ? super V> action) = purgeKeys().forEach((key, value) -> {
+    public void forEach(final BiConsumer<? super K, ? super V> action) = map.forEach((key, value) -> {
         final @Nullable K k = key.get();
         if (k != null)
             action.accept(k, value);
     });
     
     @Override
-    public void replaceAll(final BiFunction<? super K, ? super V, ? extends V> function) = purgeKeys().replaceAll((key, value) -> {
+    public void replaceAll(final BiFunction<? super K, ? super V, ? extends V> function) = map.replaceAll((key, value) -> {
         final @Nullable K k = key.get();
         return k != null ? function.apply(k, value) : value;
     });
     
     @Override
-    public @Nullable V computeIfPresent(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = purgeKeys().computeIfPresent(key(key), (_, value) -> remappingFunction.apply(key, value));
+    public @Nullable V computeIfPresent(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = map.computeIfPresent(key(key), (_, value) -> remappingFunction.apply(key, value));
     
     @Override
     public V computeIfAbsent(final K key, final Function<? super K, ? extends V> mappingFunction) {
-        final ConcurrentHashMap<Key<K>, V> inner = purgeKeys();
-        return inner[key(key)] ?? recursiveGuard(() -> inner.computeIfAbsent(keyEnqueue(key), _ -> mappingFunction.apply(key)));
+        final ConcurrentHashMap<Key<K>, V> inner = map;
+        return inner[key(key)] ?? recursiveGuard(() -> inner.computeIfAbsent(key(key), _ -> mappingFunction.apply(key)));
     }
     
     public V weakComputeIfAbsent(final K key, final Function<? super K, ? extends V> mappingFunction) {
-        final ConcurrentHashMap<Key<K>, V> inner = purgeKeys();
+        final ConcurrentHashMap<Key<K>, V> inner = map;
         return inner[key(key)] ?? recursiveGuard(() -> {
             final V v = mappingFunction.apply(key);
-            return inner.computeIfAbsent(keyEnqueue(key), _ -> v);
+            return inner.computeIfAbsent(key(key), _ -> v);
         });
     }
     
     @Override
-    public V compute(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = recursiveGuard(() -> purgeKeys().compute(keyEnqueue(key), (_, value) -> remappingFunction.apply(key, value)));
+    public V compute(final K key, final BiFunction<? super K, ? super V, ? extends V> remappingFunction) = recursiveGuard(() -> map.compute(key(key), (_, value) -> remappingFunction.apply(key, value)));
     
     @Override
-    public V merge(final K key, final V value, final BiFunction<? super V, ? super V, ? extends V> remappingFunction) = purgeKeys().merge(keyEnqueue(key), value, remappingFunction);
+    public V merge(final K key, final V value, final BiFunction<? super V, ? super V, ? extends V> remappingFunction) = map.merge(key(key), value, remappingFunction);
     
 }

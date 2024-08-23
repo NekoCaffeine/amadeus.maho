@@ -89,18 +89,21 @@ public class Main {
                     .flatMap(name -> Stream.of(STR."import \{name};", STR."import static \{name}.*;"))
                     .collect(Collectors.joining("\n", "\n", "\n"));
             final List<String> runtimeOptions = runtimeOptions(), shellOptions = new ArrayList<>(runtimeOptions.size());
-            boolean p = false;
+            boolean p = false, findP = false;
             for (final String option : runtimeOptions)
                 if (p) {
                     shellOptions += scriptOutputDir + File.pathSeparator + option;
                     p = false;
                 } else {
                     switch (option) {
-                        case "-p",
-                             "-cp" -> p = true;
+                        case "-p" -> findP = p = true;
                     }
                     shellOptions += option;
                 }
+            if (!findP) {
+                shellOptions += "-p";
+                shellOptions += scriptOutputDir;
+            }
             ModuleAdder.injectMissingSystemModules(scriptOutputPath / (MODULE_INFO + CLASS_SUFFIX));
             final URLClassLoader loader = { new URL[]{ scriptOutputPath.toUri().toURL() }, Main.class.getClassLoader() };
             final ModuleFinder finder = ModuleFinder.of(scriptOutputPath);

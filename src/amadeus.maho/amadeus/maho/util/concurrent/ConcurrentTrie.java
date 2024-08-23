@@ -90,9 +90,10 @@ public class ConcurrentTrie<P, E, V> implements ConcurrentMap<P, V> {
         }
         
         public @Nullable Node<P, E, V> remove() {
-            if (parent() == null)
+            final @Nullable Node<P, E, V> parent = parent();
+            if (parent == null)
                 throw DebugHelper.breakpointBeforeThrow(new IllegalStateException("remove root element"));
-            final @Nullable Node<P, E, V> removed = parent().children().remove(path());
+            final @Nullable Node<P, E, V> removed = parent.children().remove(path());
             if (removed != null) {
                 trie().nodes() -= this;
                 children?.values().forEach(Node::remove);
@@ -155,11 +156,11 @@ public class ConcurrentTrie<P, E, V> implements ConcurrentMap<P, V> {
     @Default
     Supplier<ConcurrentMap<E, Node<P, E, V>>> mapMaker = ConcurrentHashMap::new;
     
-    Node<P, E, V> root = createNode();
-    
     Function<E, Node<P, E, V>> factory = this::createNode;
     
     Set<Node<P, E, V>> nodes = ConcurrentHashMap.newKeySet();
+    
+    Node<P, E, V> root = createNode();
     
     protected ConcurrentMap<E, Node<P, E, V>> createMap() = mapMaker().get();
     
@@ -186,7 +187,7 @@ public class ConcurrentTrie<P, E, V> implements ConcurrentMap<P, V> {
     public @Nullable V put(final P key, final V value) = root().reach(as(value)).put(value);
     
     @Override
-    public V remove(final Object key) = root().locate(as(key))?.put() ?? null;
+    public @Nullable V remove(final Object key) = root().locate(as(key))?.put() ?? null;
     
     @Override
     public void putAll(final Map<? extends P, ? extends V> map) = map.forEach(this::put);
