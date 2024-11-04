@@ -26,6 +26,7 @@ public interface OpenRouter extends LLMHttpBackend {
     interface Models {
         
         String
+                OPENAI_O1_LATEST                = "openai/o1-latest",
                 OPENAI_CHATGPT_4O_MINI_LATEST    = "openai/gpt-4o-mini-2024-07-18",
                 OPENAI_CHATGPT_4O_LATEST         = "openai/chatgpt-4o-latest",
                 OPENAI_CHATGPT_4O_08_06          = "openai/gpt-4o-2024-08-06",

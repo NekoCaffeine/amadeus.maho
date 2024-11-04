@@ -17,7 +17,6 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 
 import static amadeus.maho.lang.javac.JavacContext.symbol;
-import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class IncrementalScanner extends TreeScanner {
@@ -30,14 +29,14 @@ public class IncrementalScanner extends TreeScanner {
     
     Symbol.ClassSymbol owner;
     
-    public boolean isSystemModule(final Symbol.ModuleSymbol symbol) = !symbol.isUnnamed() && systemModules[symbol.name.toString()];
+    public boolean isSystemModule(final Symbol.ModuleSymbol symbol) = incrementalContext.systemModules().computeIfAbsent(symbol, it -> !it.isUnnamed() && systemModules[it.name.toString()]);
     
     public boolean inSystemModule(final Symbol symbol) = isSystemModule(symbol.packge().modle);
     
     public static IncrementalScanner instance(final Context context) = context.get(incrementalScannerKey) ?? new IncrementalScanner(context);
     
     public IncrementalScanner(final Context context) {
-        incrementalContext = requireNonNull(context.get(IncrementalContext.incrementalContextKey));
+        incrementalContext = context.get(IncrementalContext.incrementalContextKey)!;
         context.put(incrementalScannerKey, this);
     }
     

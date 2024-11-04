@@ -11,6 +11,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import jdk.internal.loader.BuiltinClassLoader;
+import jdk.vm.ci.hotspot.HotSpotJVMCIRuntime;
+import jdk.vm.ci.runtime.JVMCI;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.core.MahoImage;
@@ -31,6 +33,7 @@ import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.FileHelper;
 import amadeus.maho.util.shell.Main;
 import amadeus.maho.util.shell.Shell;
+import amadeus.maho.vm.tools.hotspot.JIT;
 import amadeus.maho.vm.tools.hotspot.WhiteBox;
 
 @SneakyThrows
@@ -96,10 +99,12 @@ public interface Build {
     
     static void push(final Path build = build()) {
         System.out.println(STR."Push: \{build.toAbsolutePath() | "/"}");
-        final Path path = Maho.jar(), home = Files.isRegularFile(path) ? -+-path :
+        final Path path = Maho.jar(), home = Files.isRegularFile(path) ? (-+-path)! :
                 Optional.ofNullable(System.getenv("MAHO_HOME")).map(Path::of).orElseThrow(() -> new IllegalStateException("Environment variable 'MAHO_HOME' is missing"));
         Shell.Context.standardJavaFileManager().close();
         WhiteBox.instance().fullGC();
+        if (JIT.Compiler.isGraalEnabled() && JVMCI.getRuntime() instanceof HotSpotJVMCIRuntime runtime)
+            (Privilege) runtime.getVmEventListeners(); // cache vmEventListeners
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             ((Privilege) ((BuiltinClassLoader) Maho.class.getClassLoader()).moduleToReader).values().forEach(ModuleReader::close); // Unlock 'modules'
             // Class loading is disabled from here

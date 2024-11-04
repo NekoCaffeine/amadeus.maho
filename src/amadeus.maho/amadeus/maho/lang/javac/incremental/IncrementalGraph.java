@@ -5,7 +5,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
-import java.util.function.Predicate;
 
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symtab;
@@ -27,8 +26,6 @@ import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchContext;
 import amadeus.maho.lang.javac.multithreaded.parallel.ParallelCompiler;
 import amadeus.maho.util.logging.LogLevel;
 import amadeus.maho.util.runtime.DebugHelper;
-
-import static amadeus.maho.util.concurrent.AsyncHelper.await;
 
 @Getter
 @RequiredArgsConstructor
@@ -81,23 +78,20 @@ public class IncrementalGraph {
     
     public Queue<Env<AttrContext>> mark() {
         if (!incrementalContext().compatible()) {
-            log()[LogLevel.INFO] = "Incompatible version detected, clearing IncrementalContext";
+            log()[LogLevel.WARNING] = "Incompatible version detected, clearing IncrementalContext";
             incrementalContext().clear();
             return todo();
         }
-        markBy(this::markByTimestamp);
-        markBy(this::markByDependency);
+        markBy("incremental-markByTimestamp", this::markByTimestamp);
+        markBy("incremental-markByDependency", this::markByDependency);
         processDependencies();
         return todo().stream().filter(env -> recompile().contains(env.enclClass.sym)).collect(ListBuffer::new, ListBuffer::append, ListBuffer::appendList);
     }
     
-    public void markBy(final Predicate<Symbol.ClassSymbol> marker)
-        = todo().stream().parallel().map(env -> env.enclClass.sym).filterNot(recompile()::contains).filter(marker).forEach(recompile()::add);
+    public void markBy(final String name, final BiPredicate<ParallelCompiler, Symbol.ClassSymbol> marker)
+        = compiler().dispatch(name, todo().stream().map(env -> env.enclClass.sym).filterNot(recompile()::contains).toList(), marker > (_, symbol) -> recompile() += symbol);
     
-    public void markBy(final BiPredicate<ParallelCompiler, Symbol.ClassSymbol> marker)
-        = await(compiler().dispatch(todo().stream().map(env -> env.enclClass.sym).filterNot(recompile()::contains), marker > (_, symbol) -> recompile() += symbol));
-    
-    public boolean markByTimestamp(final Symbol.ClassSymbol symbol) {
+    public boolean markByTimestamp(final ParallelCompiler compiler, final Symbol.ClassSymbol symbol) {
         final @Nullable Long recordTime = incrementalContext().timestamps()[symbol.sourcefile.getName()];
         return recordTime == null || symbol.sourcefile.getLastModified() > recordTime;
     }

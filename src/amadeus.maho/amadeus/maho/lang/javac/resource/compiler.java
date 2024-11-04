@@ -37,7 +37,7 @@ class compiler {
             { "amadeus.maho.lang.err.rearrange.target.invalid.fields.alisa", "Invalid alias for @Rearrange" },
             { "amadeus.maho.lang.err.rearrange.components.must.be.same", "The components of @Rearrange must be of the same type" },
             { "amadeus.maho.lang.err.rearrange.adapters.components.must.be.same", "The components of @Rearrange adapter must be of the same type" },
-            { "amadeus.maho.lang.err.value.based.compare.inconsistency", "Comparison expressions of value types must be of the same type left and right.\nleft: {0}\nright{1}" },
+            { "amadeus.maho.lang.err.value.based.compare.inconsistency", "Comparison expressions of value types must be of the same type left and right.\nleft: {0}\nright: {1}" },
     };
     
     @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)

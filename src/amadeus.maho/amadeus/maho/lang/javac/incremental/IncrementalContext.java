@@ -21,6 +21,7 @@ import amadeus.maho.core.MahoExport;
 import amadeus.maho.lang.Privilege;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.javac.JavacContext;
+import amadeus.maho.lang.javac.multithreaded.SharedComponent;
 import amadeus.maho.lang.javac.multithreaded.dispatch.DispatchContext;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.container.Indexed;
@@ -36,7 +37,8 @@ public record IncrementalContext(
         ConcurrentHashMap<String, Long> timestamps = { },
         ConcurrentHashMap<String, String> moduleVersions = { },
         ConcurrentHashMap<DependencyItem.Class, Set<DependencyItem>> dependencies = { },
-        ConcurrentWeakIdentityHashMap<Symbol, List<DependencyItem>> cache = { }) {
+        ConcurrentWeakIdentityHashMap<Symbol, List<DependencyItem>> cache = { },
+        ConcurrentWeakIdentityHashMap<Symbol.ModuleSymbol, Boolean> systemModules = { }) implements SharedComponent {
     
     @SneakyThrows
     public interface Serializer {

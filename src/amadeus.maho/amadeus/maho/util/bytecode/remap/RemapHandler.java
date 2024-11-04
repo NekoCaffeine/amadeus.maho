@@ -149,13 +149,13 @@ public interface RemapHandler {
     default FieldNode mapFieldNode(final String owner, final FieldNode node) {
         final ClassNode result = { };
         node.accept(new LocalNodeRemapper(result, remapper()).className(owner));
-        return result.fields.get(0);
+        return result.fields.getFirst();
     }
     
     default MethodNode mapMethodNode(final String owner, final MethodNode node) {
         final ClassNode result = { };
         node.accept(new LocalNodeRemapper(result, remapper()).className(owner));
-        return result.methods.get(0);
+        return result.methods.getFirst();
     }
     
     default RemapHandler reverse() = this;

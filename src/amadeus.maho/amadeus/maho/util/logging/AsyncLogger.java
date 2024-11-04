@@ -15,6 +15,7 @@ import amadeus.maho.lang.AccessLevel;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.SneakyThrows;
+import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.control.Interrupt;
 import amadeus.maho.util.dynamic.CallerContext;
 import amadeus.maho.util.function.CloseableConsumer;
@@ -58,7 +59,7 @@ public class AsyncLogger extends Thread implements AutoCloseable {
     
     public void addConsumer(final Consumer<LogRecord> consumer) = consumers() += consumer;
     
-    public void addCloseableConsumer(final Consumer<LogRecord> consumer, final Closeable closeable) = consumers() += CloseableConsumer.of(consumer, closeable);
+    public void addCloseableConsumer(final Consumer<LogRecord> consumer, final @Nullable Closeable closeable) = consumers() += CloseableConsumer.of(consumer, closeable);
     
     @Override
     @SneakyThrows

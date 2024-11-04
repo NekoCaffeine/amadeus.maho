@@ -23,6 +23,7 @@ import amadeus.maho.util.depend.Repository;
 import amadeus.maho.util.depend.maven.MavenRepository;
 import amadeus.maho.util.dynamic.DynamicObject;
 import amadeus.maho.util.link.http.HttpSetting;
+import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.shell.Main;
 import amadeus.maho.util.tuple.Tuple2;
 
@@ -81,7 +82,7 @@ public interface IDEA {
         @SneakyThrows
         static Path resolveSources(final Repository repository, final Tuple2<String, String> metadata, final LinkedHashSet<String> record = { }, final String... suffix = { "-EAP-CANDIDATE-SNAPSHOT", "-EAP-SNAPSHOT", "" })
                 = (record.add(metadata.v2) ? Stream.of(suffix).map(it -> tryResolveSources(repository, metadata, it)).nonnull().findFirst()
-                .or(() -> Optional.ofNullable(resolveSources(repository, lowAdaptive(metadata), record, suffix))) : Optional.<Path>empty())
+                .or(() -> Optional.of(resolveSources(repository, lowAdaptive(metadata), record, suffix))) : Optional.<Path>empty())
                 .orElseThrow(() -> new IOException(STR."Cannot be resolved from the following archives.\{record.stream().map(
                         it -> STR."com.jetbrains.intellij.idea:idea\{metadata.v1}:\{it}:sources").collect(Collectors.joining("\n    ", "\n    ", ""))}"));
         
@@ -97,7 +98,10 @@ public interface IDEA {
                 final Project.Dependency dependency = { Project.of(STR."com.jetbrains.intellij.idea:idea\{metadata.v1}:\{metadata.v2}\{suffix}:sources") };
                 final Module.SingleDependency result = repository.resolveModuleDependency(dependency, JarRequirements.ONLY_CLASSES);
                 return result.classes();
-            } catch (final IOException e) { return null; }
+            } catch (final IOException e) {
+                DebugHelper.breakpoint(e);
+                return null;
+            }
         }
         
         @SneakyThrows

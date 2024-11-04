@@ -43,6 +43,7 @@ import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.bytecode.context.TransformContext;
 import amadeus.maho.util.dynamic.CallerContext;
+import amadeus.maho.util.logging.progress.ProgressBar;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.ObjectHelper;
 
@@ -88,8 +89,12 @@ public interface LoggerHelper {
                 return;
             final String message = formatter.apply(record);
             if (console) {
-                sysout.print(message);
-                sysout.flush();
+                if (ProgressBar.supported())
+                    ProgressBar.render(() -> message);
+                else {
+                    sysout.print(message);
+                    sysout.flush();
+                }
             }
             if (channel != null)
                 channel.write(ByteBuffer.wrap(formatter.apply(record).getBytes(charset)));

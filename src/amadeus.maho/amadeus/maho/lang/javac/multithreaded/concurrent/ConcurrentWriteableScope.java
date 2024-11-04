@@ -1,8 +1,8 @@
 package amadeus.maho.lang.javac.multithreaded.concurrent;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -31,16 +31,17 @@ public class ConcurrentWriteableScope extends Scope.WriteableScope {
     
     private static final Predicate<Symbol> noFilter = _ -> true;
     
-    HashMap<Name, LinkedList<Symbol>> symbolTables = { };
+    ConcurrentHashMap<Name, CopyOnWriteArrayList<Symbol>> symbolTables = { };
     
-    LinkedList<Symbol> symbols = { };
+    CopyOnWriteArrayList<Symbol> symbols = { };
     
     ReentrantReadWriteLock lock = { };
     
     @Default
-    @Nullable ConcurrentWriteableScope next = null;
+    @Nullable
+    ConcurrentWriteableScope next = null;
     
-    protected LinkedList<Symbol> queue(final Name name) = symbolTables.computeIfAbsent(name, _ -> new LinkedList<>());
+    protected CopyOnWriteArrayList<Symbol> queue(final Name name) = symbolTables.computeIfAbsent(name, _ -> new CopyOnWriteArrayList<>());
     
     @Override
     public void enter(final Symbol symbol) {
@@ -56,7 +57,7 @@ public class ConcurrentWriteableScope extends Scope.WriteableScope {
     public void enterIfAbsent(final Symbol symbol) {
         lock.writeLock().lock();
         try {
-            final LinkedList<Symbol> queue = queue(symbol.name);
+            final CopyOnWriteArrayList<Symbol> queue = queue(symbol.name);
             if (queue.stream().noneMatch(it -> it.kind == symbol.kind)) {
                 queue >> symbol;
                 symbols >> symbol;

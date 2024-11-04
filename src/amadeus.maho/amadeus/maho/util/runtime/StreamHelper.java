@@ -59,5 +59,4 @@ public interface StreamHelper {
     
     static String collectCodepoints(final IntStream $this) = $this.collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
     
-    
 }

@@ -5,6 +5,7 @@ import amadeus.maho.lang.AllArgsConstructor;
 import amadeus.maho.lang.FieldDefaults;
 import amadeus.maho.lang.Getter;
 import amadeus.maho.lang.inspection.Nullable;
+import amadeus.maho.util.throwable.ExtraInformationThrowable;
 
 @Getter
 @AllArgsConstructor
@@ -14,5 +15,10 @@ public class ParseException extends RuntimeException {
     @Nullable String debugSource;
     
     int pos;
+    
+    {
+        if (debugSource() != null)
+            addSuppressed(new ExtraInformationThrowable(debugSource()));
+    }
     
 }

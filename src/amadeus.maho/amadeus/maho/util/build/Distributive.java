@@ -1,5 +1,6 @@
 package amadeus.maho.util.build;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -7,6 +8,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.dynamic.DynamicObject;
 import amadeus.maho.util.logging.LoggerHelper;
@@ -16,12 +18,23 @@ import static amadeus.maho.util.concurrent.AsyncHelper.*;
 
 public interface Distributive {
     
-    String DISTRIBUTIVE_DIR = "distributive";
-
+    String DISTRIBUTIVE_DIR = "distributive", LATEST_MARK_SUFFIX = ".latest.mark";
+    
+    static Path latestMark(final Workspace workspace, final String name) = workspace.root() / workspace.buildDir() / DISTRIBUTIVE_DIR / (name + LATEST_MARK_SUFFIX);
+    
+    @SneakyThrows
+    static @Nullable Path latest(final Workspace workspace, final String name) {
+        final Path latestMark = latestMark(workspace, name);
+        if (!Files.exists(latestMark))
+            return null;
+        return workspace.root() / workspace.buildDir() / DISTRIBUTIVE_DIR / Files.readString(latestMark);
+    }
+    
     static Path zip(final Workspace workspace, final Module module, final Consumer<Path> collect, final String name = module.name(), final DateTimeFormatter formatter = LoggerHelper.LOG_FILE_NAME_FORMATTER) {
         final Module.Metadata metadata = workspace.config().load(new Module.Metadata(), module.name());
         final Path distributive = ~(workspace.root() / workspace.buildDir() / DISTRIBUTIVE_DIR) / (LocalDateTime.now().format(formatter) + STR."-\{name}-\{metadata.version}.zip");
         distributive | collect;
+        distributive.getFileName().toString() >> latestMark(workspace, name);
         return distributive;
     }
     
@@ -47,5 +60,5 @@ public interface Distributive {
             System.out.println(STR."Upload completed: \{fileName}");
         })));
     }
-
+    
 }

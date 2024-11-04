@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.tools.JavaFileManager;
@@ -15,6 +16,8 @@ import jdk.jshell.Eval;
 import jdk.jshell.EvalException;
 import jdk.jshell.JShell;
 import jdk.jshell.Snippet;
+import jdk.jshell.execution.DirectExecutionControl;
+import jdk.jshell.spi.ExecutionControl;
 import jdk.jshell.spi.ExecutionControlProvider;
 import jdk.jshell.tool.JavaShellToolBuilder;
 
@@ -76,9 +79,12 @@ public interface Shell {
     
     @SneakyThrows
     @IndirectCaller
-    static int attachTool(final List<String> runtimeOptions = Javac.runtimeOptions()) {
-        try { return JavaShellToolBuilder.builder().start(Stream.concat(Stream.of("-execution", "maho", "-n"), runtimeOptions.stream().map("-C"::concat)).toArray(String[]::new)); } finally { Context.leave(); }
+    static int attachTool(final List<String> runtimeOptions = Javac.runtimeOptions(), final JavaShellToolBuilder builder = JavaShellToolBuilder.builder().interactiveTerminal(true)) {
+        try { return builder.start(Stream.concat(Stream.of("-execution", "maho", "-n"), runtimeOptions.stream().map("-C"::concat)).toArray(String[]::new)); } finally { Context.leave(); }
     }
+    
+    static void importModulePackages(final Module module = CallerContext.caller().getModule(), final Predicate<String> filter = _ -> true)
+        = imports() += module.getPackages().stream().filter(filter).map("import %s.*;"::formatted).collect(Collectors.joining("\n", "\n", "\n"));
     
     private static String importJavaAndAmadeusPackages() = Stream.of(Shell.class, Object.class)
             .map(Class::getModule)
@@ -93,6 +99,7 @@ public interface Shell {
     @Mutable
     String imports = STR."""
             \{importJavaAndAmadeusPackages()}
+            import static java.lang.Math.*;
             import static amadeus.maho.util.shell.ShellHelper.*;
             """;
     
@@ -126,5 +133,11 @@ public interface Shell {
     
     @Hook(at = @At(method = @At.MethodInsn(name = "getName")), before = false, capture = true, metadata = @TransformMetadata(aotLevel = AOTTransformer.Level.RUNTIME))
     private static String toString(final String name, final Throwable $this) = $this instanceof EvalException evalEx ? evalEx.getExceptionClassName() : name;
+    
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    private static void asRunException(final ExecutionControl.RunException capture, final DirectExecutionControl $this, final Throwable exception) = Stream.of(exception.getSuppressed()).forEach(capture::addSuppressed);
+    
+    @Hook(at = @At(endpoint = @At.Endpoint(At.Endpoint.Type.RETURN)), capture = true)
+    private static void asEvalException(final EvalException capture, final Eval $this, final ExecutionControl.UserException exception) = Stream.of(exception.getSuppressed()).forEach(capture::addSuppressed);
     
 }

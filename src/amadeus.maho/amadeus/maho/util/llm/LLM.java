@@ -10,13 +10,12 @@ import java.util.function.Consumer;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.util.dynamic.DynamicObject;
 
-@Target(ElementType.METHOD)
+@Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface LLM {
     
-    @Target({ElementType.PARAMETER, ElementType.METHOD, ElementType.TYPE, ElementType.FIELD})
-    @Retention(RetentionPolicy.RUNTIME)
-    @interface Description {
+    @Target({ ElementType.PARAMETER, ElementType.METHOD, ElementType.TYPE, ElementType.FIELD })
+    @Retention(RetentionPolicy.RUNTIME) @interface Description {
         
         String value();
         
@@ -36,6 +35,14 @@ public @interface LLM {
     interface ParametersProvider extends Consumer<DynamicObject> {
         
         LLM.ParametersProvider empty = _ -> { };
+        
+    }
+    
+    @FunctionalInterface
+    interface ModelContext {
+        
+        @Nullable
+        String model();
         
     }
     

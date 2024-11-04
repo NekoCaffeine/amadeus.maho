@@ -25,6 +25,7 @@ import com.sun.tools.javac.tree.JCTree;
 import amadeus.maho.core.Maho;
 import amadeus.maho.core.MahoExport;
 import amadeus.maho.core.extension.ModuleAdder;
+import amadeus.maho.core.extension.ReflectBreaker;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.AOTTransformer;
@@ -39,6 +40,7 @@ import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.misc.ExitCodeException;
 import amadeus.maho.util.resource.ResourcePath;
 import amadeus.maho.util.runtime.DebugHelper;
+import amadeus.maho.util.runtime.ModuleHelper;
 import amadeus.maho.util.runtime.StringHelper;
 import amadeus.maho.vm.tools.hotspot.JIT;
 
@@ -58,8 +60,8 @@ public class Main {
             
         }.setDefaultUseCaches(false);
         final Environment local = Environment.local();
+        local.lookup("jdk.console", "java.base"); // jline: "jdk.internal.le"
         local.lookup(MahoExport.MAHO_LOGS_LEVEL, LogLevel.WARNING.name());
-        local.lookup(MahoExport.MAHO_LLM_THROWABLE_ASSISTANT, true);
         if (local.lookup("amadeus.maho.shell.minimize", true))
             MahoExport.Setup.minimize();
         Maho.instrumentation();
@@ -104,6 +106,7 @@ public class Main {
                 shellOptions += "-p";
                 shellOptions += scriptOutputDir;
             }
+            ModuleHelper.openAllBootModule();
             ModuleAdder.injectMissingSystemModules(scriptOutputPath / (MODULE_INFO + CLASS_SUFFIX));
             final URLClassLoader loader = { new URL[]{ scriptOutputPath.toUri().toURL() }, Main.class.getClassLoader() };
             final ModuleFinder finder = ModuleFinder.of(scriptOutputPath);
@@ -112,6 +115,7 @@ public class Main {
             final Configuration config = parentLayer.configuration().resolveAndBind(finder, ModuleBootstrap.unlimitedFinder(), modules.stream().map(ModuleDescriptor::name).collect(Collectors.toSet()));
             final ModuleLayer scriptLayer = parentLayer.defineModulesWithOneLoader(config, loader);
             scriptLayer.modules().forEach(Maho::accessRequires);
+            scriptLayer.modules().forEach(ReflectBreaker::doBreak);
             try (final var path = ResourcePath.of(loader)) {
                 TransformerManager.runtime().setup(loader, path, AOTTransformer.Level.RUNTIME, modules.stream().map(ModuleDescriptor::toNameAndVersion).collect(Collectors.joining(";")));
             }

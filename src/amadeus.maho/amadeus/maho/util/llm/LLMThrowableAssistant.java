@@ -14,11 +14,13 @@ import amadeus.maho.core.extension.ShutdownHook;
 import amadeus.maho.lang.SneakyThrows;
 import amadeus.maho.lang.inspection.Nullable;
 import amadeus.maho.transform.mark.Hook;
+import amadeus.maho.transform.mark.Init;
 import amadeus.maho.transform.mark.base.TransformMetadata;
 import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 
+@Init(initialized = true)
 @SneakyThrows
 @TransformProvider
 public interface LLMThrowableAssistant {

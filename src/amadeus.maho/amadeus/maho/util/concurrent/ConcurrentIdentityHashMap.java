@@ -27,7 +27,6 @@ import amadeus.maho.util.runtime.ObjectHelper;
 @FieldDefaults(level = AccessLevel.PROTECTED, makeFinal = true)
 public class ConcurrentIdentityHashMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> {
     
-    
     @Getter
     @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class Key<K> extends WeakReference<K> {

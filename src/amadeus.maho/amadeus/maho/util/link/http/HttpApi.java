@@ -116,7 +116,7 @@ public interface HttpApi {
             
             @Getter(nonStatic = true)
             private static final Map<Type, MethodHandle>
-                    handlerMappers = Mapping.form(HttpResponse.BodyHandlers.class, method -> method.getParameterCount() == 0, method -> TypeInferer.infer(bodyHandlerT, method.getGenericReturnType()));
+                    handlerMappers = Mapping.form(HttpResponse.BodyHandlers.class, method -> method.getParameterCount() == 0, method -> TypeInferer.infer(bodyHandlerT, method.getGenericReturnType()).erasedType());
             
             static { handlerMappers[void.class] = LookupHelper.methodHandle0(HttpResponse.BodyHandlers::discarding); }
             

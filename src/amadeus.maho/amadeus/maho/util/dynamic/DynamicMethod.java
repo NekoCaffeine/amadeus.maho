@@ -45,7 +45,6 @@ import amadeus.maho.util.annotation.mark.IndirectCaller;
 import amadeus.maho.util.bytecode.ASMHelper;
 import amadeus.maho.util.bytecode.Bytecodes;
 import amadeus.maho.util.bytecode.ClassWriter;
-import amadeus.maho.util.bytecode.ComputeType;
 import amadeus.maho.util.bytecode.generator.MethodGenerator;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
@@ -173,11 +172,11 @@ public class DynamicMethod {
                     initBody(functionalMethod.getName(), sourceMethodType.getDescriptor());
                 else {
                     initBody(functionalMethod.getName(), genericMethodType.getDescriptor());
-                    genericBridgeBody(new MethodNode(ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC | ACC_BRIDGE, functionalMethod.getName(), sourceMethodType.getDescriptor(), null, null));
-                    final MethodGenerator generator = MethodGenerator.fromMethodNode(genericBridgeBody());
+                    genericBridgeBody = { ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC | ACC_BRIDGE, functionalMethod.getName(), sourceMethodType.getDescriptor(), null, null };
+                    final MethodGenerator generator = MethodGenerator.fromMethodNode(genericBridgeBody);
                     generator.loadThis();
                     generator.loadArgs(genericMethodType.getArgumentTypes());
-                    generator.invokeSpecial(wrapperType(), new org.objectweb.asm.commons.Method(genericBridgeBody().name, genericMethodType.getDescriptor()), false);
+                    generator.invokeSpecial(wrapperType(), new org.objectweb.asm.commons.Method(genericBridgeBody.name, genericMethodType.getDescriptor()), false);
                     generator.checkCast(sourceMethodType.getReturnType(), genericMethodType.getReturnType());
                     generator.returnValue();
                     generator.endMethod();
@@ -245,7 +244,7 @@ public class DynamicMethod {
         }
         
         @SneakyThrows
-        public T allocateInstance() = UnsafeHelper.allocateInstance(wrapperClass());
+        public T allocateInstance() = (T) super.allocateInstance();
         
     }
     

@@ -1,12 +1,16 @@
 package amadeus.maho.util.shell;
 
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
 import jdk.internal.misc.Unsafe;
+
+import org.objectweb.asm.ClassReader;
 
 import amadeus.maho.core.Maho;
 import amadeus.maho.core.MahoExport;
@@ -38,5 +42,9 @@ public interface ShellHelper {
     static void profile() = Dumper.print(Stream.of(MahoProfile::dump));
     
     static void dump(final boolean onlyProfile = true) = Dumper.dump(~(MahoExport.workDirectory() / "dump"), (onlyProfile ? Map.<String, BiConsumer<List<String>, String>>of("Profile", MahoProfile::dump) : Dumper.dumper).entrySet().stream());
+    
+    static void dumpBytecode(final Path classFile, final Path bytecodeFile = classFile << ".bytecode") = ASMHelper.dumpBytecode(new ClassReader(Files.readAllBytes(classFile))) >> bytecodeFile;
+    
+    static void printBytecode(final Path classFile) = ASMHelper.printBytecode(new ClassReader(Files.readAllBytes(classFile)));
     
 }

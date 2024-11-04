@@ -128,7 +128,7 @@ public interface MethodTraverser {
         public static boolean preMark(final MethodNode methodNode, final BinaryOperator<String> getCommonSuperClass) {
             final InsnList instructions = methodNode.instructions;
             FrameHelper.dropFrame(instructions);
-            @Nullable AbstractInsnNode next = instructions.getFirst();
+            @Nullable AbstractInsnNode next = instructions.getFirst()!;
             final @Nullable List<TryCatchBlockNode> handlers = methodNode.tryCatchBlocks == null || methodNode.tryCatchBlocks.isEmpty() ? null : methodNode.tryCatchBlocks;
             final @Nullable ArrayList<TryCatchBlockNode> contextHandlers = handlers == null ? null : new ArrayList<>();
             final Supplier<List<TryCatchBlockNode>> handlersGet = contextHandlers == null ? () -> null : () -> new ArrayList<>(contextHandlers);
@@ -203,8 +203,7 @@ public interface MethodTraverser {
                                 instructions.insert(at, labelNode);
                         }
                     }
-                    case null,
-                         default                       -> { }
+                    default                                  -> { }
                 }
             while ((next = next.getNext()) != null);
             return result;
@@ -731,6 +730,7 @@ public interface MethodTraverser {
     
     private static void instanceOf(final Frame frame) {
         checkTargetType(frame, ASMHelper.TYPE_OBJECT, frame.pop());
+        
         frame.push(TypeOwner.INTEGER);
     }
     

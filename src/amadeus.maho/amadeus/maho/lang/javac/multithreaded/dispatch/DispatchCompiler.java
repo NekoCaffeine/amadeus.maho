@@ -82,6 +82,7 @@ import amadeus.maho.lang.javac.handler.base.DelayedContext;
 import amadeus.maho.lang.javac.handler.base.HandlerSupport;
 import amadeus.maho.lang.javac.incremental.IncrementalContext;
 import amadeus.maho.lang.javac.incremental.IncrementalScanner;
+import amadeus.maho.lang.javac.multithreaded.CompileTaskProgress;
 import amadeus.maho.lang.javac.multithreaded.MultiThreadedContext;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentCompleter;
 import amadeus.maho.lang.javac.multithreaded.concurrent.ConcurrentSymtab;
@@ -97,17 +98,17 @@ import amadeus.maho.transform.mark.base.TransformProvider;
 import amadeus.maho.util.concurrent.AsyncHelper;
 import amadeus.maho.util.concurrent.ConcurrentWeakIdentityHashMap;
 import amadeus.maho.util.control.Interrupt;
-import amadeus.maho.util.dynamic.LookupHelper;
 import amadeus.maho.util.function.Consumer3;
 import amadeus.maho.util.function.Function4;
+import amadeus.maho.util.logging.progress.ProgressBar;
 import amadeus.maho.util.runtime.DebugHelper;
 import amadeus.maho.util.runtime.MethodHandleHelper;
 
 import static amadeus.maho.util.bytecode.Bytecodes.ASTORE;
 import static amadeus.maho.util.concurrent.AsyncHelper.*;
-import static amadeus.maho.util.runtime.ObjectHelper.requireNonNull;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.Kind.TYP;
+import static com.sun.tools.javac.comp.CompileStates.CompileState.*;
 import static com.sun.tools.javac.main.Option.XLINT_CUSTOM;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
 
@@ -139,21 +140,24 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     
     final HashSet<Symbol.ClassSymbol> symbols = { };
     
-    public <T> CompletableFuture<T> evaluate(final Function<ParallelCompiler, T> task) {
+    protected <T> CompletableFuture<T> evaluate(final Function<ParallelCompiler, T> task) {
         final CompletableFuture<T> future = { };
         queue += context -> {
             try {
-                future.complete(task[context]);
+                final T result = task[context];
+                step();
+                future.complete(result);
             } catch (final Throwable throwable) { future.completeExceptionally(throwable); }
         };
         return future;
     }
     
-    public CompletableFuture<Void> dispatch(final Consumer<ParallelCompiler> task) {
+    protected CompletableFuture<Void> dispatch(final Consumer<ParallelCompiler> task) {
         final CompletableFuture<Void> future = { };
         queue += context -> {
             try {
                 task[context];
+                step();
                 future.complete(null);
             } catch (final Throwable throwable) { future.completeExceptionally(throwable); }
         };
@@ -169,6 +173,8 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     volatile boolean enterDoing;
     
     volatile boolean hasError;
+    
+    LinkedList<ProgressBar<CompileTaskProgress>> progressBars = { };
     
     public DispatchCompiler(final DispatchContext context) {
         super(context);
@@ -213,25 +219,59 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
             } finally { barrier = null; }
     }
     
-    @SneakyThrows
-    public <S, V, R> R dispatch(final Stream<S> stream, final BiFunction<ParallelCompiler, S, V> processor, final Collector<? super V, ?, R> collector) = stream
-            .map(source -> evaluate(compiler -> processor.apply(compiler, source)))
-            .toList()
-            .stream()
-            .map(AsyncHelper::await)
-            .collect(collector);
+    protected void step() = progressBars.getLast()?.update(CompileTaskProgress::step);
     
     @SneakyThrows
-    public <S> Stream<CompletableFuture<Void>> dispatch(final Stream<S> stream, final BiConsumer<ParallelCompiler, S> processor) = stream.map(source -> dispatch(compiler -> processor.accept(compiler, source)));
-    
-    public <S, V> Queue<V> dispatchQueue(final Queue<S> envs, final BiFunction<ParallelCompiler, S, V> processor) = dispatch(envs.stream(), processor, Collectors.toCollection(ListBuffer::new));
-    
-    @SneakyThrows
-    public <S, V> Queue<V> dispatchToQueue(final Queue<S> envs, final Consumer3<ParallelCompiler, S, Queue<V>> processor) {
-        final ConcurrentLinkedQueue<V> queue = { };
-        await(envs.stream().map(source -> dispatch(compiler -> processor.accept(compiler, source, queue))));
-        return queue;
+    protected synchronized <T> T dispatchTask(final String name, final int total, final Supplier<T> task) {
+        final CompileTaskProgress progress = { name, total };
+        try (final ProgressBar<CompileTaskProgress> progressBar = { CompileTaskProgress.renderer, progress }) {
+            progressBars << progressBar;
+            return DebugHelper.logTimeConsuming(name, task);
+        } finally {
+            progressBars--;
+            VarHandle.fullFence();
+        }
     }
+    
+    @SneakyThrows
+    protected synchronized void dispatchTask(final String name, final int total, final Runnable task) {
+        final CompileTaskProgress progress = { name, total };
+        try (final ProgressBar<CompileTaskProgress> progressBar = { CompileTaskProgress.renderer, progress }) {
+            progressBars << progressBar;
+            DebugHelper.logTimeConsuming(name, task);
+        } finally {
+            progressBars--;
+            VarHandle.fullFence();
+        }
+    }
+    
+    @SneakyThrows
+    public <S> Stream<CompletableFuture<Void>> dispatchAsync(final Collection<S> queue, final BiConsumer<ParallelCompiler, S> processor)
+        = queue.stream().map(source -> dispatch(compiler -> processor.accept(compiler, source)));
+    
+    @SneakyThrows
+    public <S> void dispatch(final String name, final Collection<S> queue, final BiConsumer<ParallelCompiler, S> processor)
+        = dispatchTask(name, queue.size(), () -> await(dispatchAsync(queue, processor)));
+    
+    @SneakyThrows
+    public <S, V, R> R dispatch(final String name, final Collection<S> queue, final BiFunction<ParallelCompiler, S, V> processor, final Collector<? super V, ?, R> collector)
+        = dispatchTask(name, queue.size(), () -> queue.stream()
+                .map(source -> evaluate(compiler -> processor.apply(compiler, source)))
+                .toList()
+                .stream()
+                .map(AsyncHelper::await)
+                .collect(collector));
+    
+    public <S, V> Queue<V> dispatchQueue(final String name, final Collection<S> envs, final BiFunction<ParallelCompiler, S, V> processor)
+        = dispatch(name, envs, processor, Collectors.toCollection(ListBuffer::new));
+    
+    @SneakyThrows
+    public <S, V> Queue<V> dispatchToQueue(final String name, final Collection<S> envs, final Consumer3<ParallelCompiler, S, Queue<V>> processor)
+        = dispatchTask(name, envs.size(), () -> {
+            final ConcurrentLinkedQueue<V> queue = { };
+            await(envs.stream().map(source -> dispatch(compiler -> processor.accept(compiler, source, queue))));
+            return queue;
+        });
     
     @SneakyThrows
     private static final VarHandle contentCacheHandle = MethodHandleHelper.lookup().findVarHandle(BaseFileManager.class, "contentCache", Map.class);
@@ -258,7 +298,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
             final Map<RelativePath.RelativeDirectory, java.util.List<JavacFileManager.PathAndContainer>> capture, final JavacFileManager manager, final JavaFileManager.Location location)
         = JavacContext.instance().context instanceof MultiThreadedContext ? new ConcurrentHashMap<>(capture) : capture;
     
-    public Queue<Env<AttrContext>> queue() = incrementalContext != null ? runTask("incremental-mark", () -> incrementalContext.graph(context).mark()) : todo;
+    public Queue<Env<AttrContext>> queue() = incrementalContext?.queue(context) ?? todo;
     
     @Override
     public void compile(final Collection<JavaFileObject> sourceFileObjects, final Collection<String> classNames, final Iterable<? extends Processor> processors, final Collection<String> addModules) {
@@ -271,10 +311,10 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         options.remove(XLINT_CUSTOM.primaryName + Lint.LintCategory.OPTIONS.option);
         context.parallelContexts();
         try {
-            enterTrees(stopIfError(CompileStates.CompileState.ENTER, initModules(stopIfError(CompileStates.CompileState.ENTER, parseFiles(sourceFileObjects)))));
+            enterTrees(stopIfError(ENTER, initModules(stopIfError(ENTER, parseFiles(sourceFileObjects)))));
             if (taskListener.isEmpty() && implicitSourcePolicy == ImplicitSourcePolicy.NONE)
                 todo.retainFiles(inputFiles);
-            if (!CompileStates.CompileState.ATTR.isAfter(shouldStopPolicyIfNoError))
+            if (!ATTR.isAfter(shouldStopPolicyIfNoError))
                 generate(desugar(flow(attribute(queue()))));
         } finally {
             reportDeferredDiagnostics();
@@ -327,23 +367,21 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     
     @Override
     public List<JCTree.JCCompilationUnit> parseFiles(final Iterable<JavaFileObject> fileObjects, final boolean force)
-        = !force && shouldStop(CompileStates.CompileState.PARSE) ? List.nil() : runTask("parseFiles", () -> dispatch(fileObjects.fromIterable().distinct(), ParallelCompiler::parse, List.collector()));
+        = !force && shouldStop(PARSE) ? List.nil() : dispatch("parseFiles", fileObjects.fromIterable().distinct().toList(), ParallelCompiler::parse, List.collector());
     
     @Override
     public List<JCTree.JCCompilationUnit> enterTrees(final List<JCTree.JCCompilationUnit> roots) {
         try {
-            return runTask("enterTrees", () -> {
-                if (shouldPushEvent())
-                    roots.stream().map(unit -> new TaskEvent(TaskEvent.Kind.PARSE, unit)).forEach(taskListener::started);
-                enter(roots);
-                enterDone();
-                if (shouldPushEvent())
-                    roots.stream().map(unit -> new TaskEvent(TaskEvent.Kind.ENTER, unit)).forEach(taskListener::finished);
-                if (sourceOutput)
-                    (Privilege) (rootClasses = roots.stream().flatMap(unit -> unit.defs.stream()).cast(JCTree.JCClassDecl.class).collect(List.collector()));
-                roots.stream().map(unit -> unit.sourcefile).forEach(inputFiles::add);
-                return roots;
-            });
+            if (shouldPushEvent())
+                roots.stream().map(unit -> new TaskEvent(TaskEvent.Kind.PARSE, unit)).forEach(taskListener::started);
+            enter(roots);
+            enterDone();
+            if (shouldPushEvent())
+                roots.stream().map(unit -> new TaskEvent(TaskEvent.Kind.ENTER, unit)).forEach(taskListener::finished);
+            if (sourceOutput)
+                (Privilege) (rootClasses = roots.stream().flatMap(unit -> unit.defs.stream()).cast(JCTree.JCClassDecl.class).collect(List.collector()));
+            roots.stream().map(unit -> unit.sourcefile).forEach(inputFiles::add);
+            return roots;
         } finally {
             final ConcurrentLinkedQueue<Env<AttrContext>> buffer = { };
             barrier(compiler -> buffer *= compiler.todo);
@@ -362,15 +400,9 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         return Hook.Result.VOID;
     }
     
-    protected static final VarHandle permitted = LookupHelper.<Symbol.ClassSymbol>varHandle(classSymbol -> classSymbol.permitted);
-    
-    private static void appendPermitted(final Symbol.ClassSymbol classSymbol, final Symbol.ClassSymbol permittedSymbol) {
-        while (true) {
-            final List<Symbol> symbols = classSymbol.permitted;
-            if (permitted.compareAndSet(classSymbol, symbols, symbols.prepend(permittedSymbol)))
-                break;
-        }
-    }
+    // ArrayList is not thread safe
+    @Hook(at = @At(field = @At.FieldInsn(name = "permitted")), capture = true)
+    private static CopyOnWriteArrayList<?> _init_(final java.util.List<?> capture, final Symbol.ClassSymbol $this, final long flags, final Name name, final Type type, final Symbol owner) = { capture };
     
     // permitted thread safe
     @Hook(forceReturn = true)
@@ -384,7 +416,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                     final Symbol.ClassSymbol superClassSymbol = (Symbol.ClassSymbol) superType.tsym;
                     final Env<AttrContext> superEnv = instance.enter.getEnv(superClassSymbol);
                     if (superClassSymbol.isSealed() && !superClassSymbol.isPermittedExplicit && superEnv != null && superEnv.toplevel == baseEnv.toplevel)
-                        appendPermitted(superClassSymbol, classSymbol);
+                        superClassSymbol.addPermittedSubclass(classSymbol, tree.pos);
                 }
             }
         }
@@ -396,7 +428,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                 final Type pt = (Privilege) instance.attr.attribBase(permitted, baseEnv, false, false, false);
                 permittedSubtypeSymbols.append(pt.tsym);
             }
-            classSymbol.permitted = permittedSubtypeSymbols.toList();
+            classSymbol.setPermittedSubclasses(permittedSubtypeSymbols.toList());
         }
     }
     
@@ -409,8 +441,8 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         throw new AssertionError(STR."Phase instance not found: \{phaseType.getName()}");
     }
     
-    public void runPhase(final Stream<Symbol.ClassSymbol> symbols, final Class<? extends TypeEnter.Phase> phaseType, final ConcurrentLinkedQueue<CompletableFuture<Void>> futures,
-            final Function<Symbol.ClassSymbol, Stream<Symbol.ClassSymbol>> derivedFunction = _ -> null) = dispatch(symbols, (compiler, symbol) -> {
+    public void runPhase(final Collection<Symbol.ClassSymbol> symbols, final Class<? extends TypeEnter.Phase> phaseType, final ConcurrentLinkedQueue<CompletableFuture<Void>> futures,
+            final Function<Symbol.ClassSymbol, Collection<Symbol.ClassSymbol>> derivedFunction = _ -> null) = dispatchAsync(symbols, (compiler, symbol) -> {
         final TypeEnter typeEnter = TypeEnter.instance(compiler.context);
         final TypeEnter.Phase phase = lookupPhase(typeEnter, phaseType), prevTopLevelPhase = (Privilege) typeEnter.topLevelPhase;
         final Env<AttrContext> env = (Privilege) TypeEnvs.instance(context).get(symbol);
@@ -419,7 +451,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         final JCDiagnostic.DiagnosticPosition prevLintPos = ((Privilege) typeEnter.deferredLintHandler).setPos(tree.pos());
         try {
             (Privilege) phase.runPhase(env);
-            final @Nullable Stream<Symbol.ClassSymbol> derived = derivedFunction[symbol];
+            final @Nullable Collection<Symbol.ClassSymbol> derived = derivedFunction[symbol];
             if (derived != null)
                 runPhase(derived, phaseType, futures, derivedFunction);
         } finally {
@@ -434,14 +466,14 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         final HashMap<Symbol.ClassSymbol, ArrayList<Symbol.ClassSymbol>> dependencies = { };
         symbols.forEach(classSymbol -> prev[classSymbol] instanceof Symbol.ClassSymbol superClassSymbol && symbols[superClassSymbol] ?
                                                dependencies.computeIfAbsent(superClassSymbol, _ -> new ArrayList<>()) : roots += classSymbol);
-        awaitRecursion(futures -> runPhase(roots.stream(), phase.getClass(), futures, symbol -> dependencies[symbol]?.stream() ?? null));
+        awaitRecursion(futures -> runPhase(roots, phase.getClass(), futures, dependencies::get));
     }
     
     public void enter(final List<JCTree.JCCompilationUnit> trees) {
         annotate.blockAnnotations();
         try {
             final CopyOnWriteArrayList<Symbol.ClassSymbol> allUncompleted = { };
-            runTask("classEnter", () -> await(dispatch(trees.stream(), (compiler, tree) -> {
+            dispatch("classEnter", trees, (compiler, tree) -> {
                 final Enter nextEnter = (Privilege) compiler.enter;
                 final ListBuffer<Symbol.ClassSymbol> uncompletedBuffer = { };
                 (Privilege) (nextEnter.uncompleted = uncompletedBuffer);
@@ -452,32 +484,34 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                     classSymbol.flags_field |= UNATTRIBUTED | SUPER_OWNER_ATTRIBUTED;
                 });
                 allUncompleted.addAll(uncompletedBuffer);
-            })));
+            });
             final TypeEnter typeEnter = (Privilege) enter.typeEnter;
             TypeEnter.Phase phase = (Privilege) typeEnter.completeClass;
             {
+                final java.util.List<Symbol.ClassSymbol> uncompleted = allUncompleted.stream().filter(symbol -> symbol.owner.kind == Kinds.Kind.PCK).toList();
                 final TypeEnter.Phase current = phase; // Import
-                runTask(STR."\{current.getClass().getSimpleName()}", () -> awaitRecursion(futures -> runPhase(allUncompleted.stream().filter(symbol -> symbol.owner.kind == Kinds.Kind.PCK), current.getClass(), futures)));
+                dispatchTask(STR."enter-\{current.getClass().getSimpleName()}", uncompleted.size(), () -> awaitRecursion(futures ->
+                        runPhase(uncompleted, current.getClass(), futures)));
             }
             phase = (Privilege) phase.next;
             symbols.clear();
             symbols *= allUncompleted;
             {
                 final TypeEnter.Phase current = phase; // Hierarchy
-                runTask(STR."\{current.getClass().getSimpleName()}", () -> runPhaseWithDependencies(symbols, symbol -> symbol.owner, current));
+                dispatchTask(STR."enter-\{current.getClass().getSimpleName()}", symbols.size(), () -> runPhaseWithDependencies(symbols, symbol -> symbol.owner, current));
             }
             phase = (Privilege) phase.next;
             do {
                 final TypeEnter.Phase current = phase; // Header | Record
-                runTask(STR."\{current.getClass().getSimpleName()}", () -> awaitRecursion(futures -> runPhase(symbols.stream(), current.getClass(), futures)));
+                dispatchTask(STR."enter-\{current.getClass().getSimpleName()}", symbols.size(), () -> awaitRecursion(futures -> runPhase(symbols, current.getClass(), futures)));
                 phase = (Privilege) phase.next;
             } while (!(phase instanceof TypeEnter.MembersPhase));
             {
                 final TypeEnter.Phase current = phase; // Members
-                runTask(STR."\{current.getClass().getSimpleName()}", () -> runPhaseWithDependencies(symbols, symbol -> types.supertype(symbol.type).tsym, current));
+                dispatchTask(STR."enter-\{current.getClass().getSimpleName()}", symbols.size(), () -> runPhaseWithDependencies(symbols, symbol -> types.supertype(symbol.type).tsym, current));
             }
-            runTask("finishImports", () -> await(dispatch(trees.stream(), (compiler, tree) -> (Privilege) TypeEnter.instance(compiler.context).finishImports(tree, !tree.starImportScope.isFilled() ?
-                    () -> (Privilege) ((Privilege) TypeEnter.instance(compiler.context).completeClass).resolveImports(tree, Enter.instance(compiler.context).getTopLevelEnv(tree)) : () -> { }))));
+            dispatch("finishImports", trees, (compiler, tree) -> (Privilege) TypeEnter.instance(compiler.context).finishImports(tree, !tree.starImportScope.isFilled() ?
+                    () -> (Privilege) ((Privilege) TypeEnter.instance(compiler.context).completeClass).resolveImports(tree, Enter.instance(compiler.context).getTopLevelEnv(tree)) : () -> { }));
         } finally { annotate.unblockAnnotations(); }
     }
     
@@ -501,7 +535,7 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         if (JavacContext.instance().context instanceof DispatchContext context) {
             final DispatchCompiler instance = instance(context);
             if (instance.enterDoing) {
-                allQ.forEach((name, q) -> runTask(STR."flush-\{name}", () -> instance.barrier(compiler -> run((Privilege) compiler.annotate, q), () -> run($this, q))));
+                allQ.forEach((name, q) -> instance.barrier(compiler -> run((Privilege) compiler.annotate, q), () -> run($this, q)));
                 return Hook.Result.NULL;
             }
         }
@@ -519,14 +553,14 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     
     @Override
     public void enterDone() {
-        await(dispatch(modules.allModules().stream(), (compiler, module) -> JavacContext.instance(compiler.context, HandlerSupport.class).loadDynamicAnnotationProvider(module)));
+        dispatch("loadDynamicAnnotationProvider", modules.allModules(), (compiler, module) -> JavacContext.instance(compiler.context, HandlerSupport.class).loadDynamicAnnotationProvider(module));
         enterDoing = true;
         try {
             barrier(ParallelCompiler::unblockAnnotationsNoFlush);
             (Privilege) (enterDone = true);
             annotate.enterDone();
         } finally { enterDoing = false; }
-        runTask("enterDone", () -> JavacContext.instance(DelayedContext.class).beforeEnterDone(this));
+        JavacContext.instance(DelayedContext.class).beforeEnterDone(this);
     }
     
     @Hook(metadata = @TransformMetadata(order = -1 /* DefaultValueHandler */)) // unexpected thread crossing
@@ -574,43 +608,37 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
     
     @Override
     public Queue<Env<AttrContext>> attribute(final Queue<Env<AttrContext>> envs) {
-        final ConcurrentHashMap<String, Long> timing = { };
-        final Queue<Env<AttrContext>> queue = runTask("attribute", () -> {
-            if (envs == todo) {
-                final var futures = dispatch(symbols.stream(), (compiler, symbol) -> {
-                    final Env<AttrContext> env = enter.getEnv(symbol);
-                    if (compileStates.isDone(env, CompileStates.CompileState.ATTR))
-                        return;
-                    if (shouldPushEvent())
-                        taskListener.started((Privilege) ((JavaCompiler) this).newAnalyzeTaskEvent(env));
-                    final long now = System.currentTimeMillis();
-                    ((Privilege) compiler.attr).attribClass(env.tree.pos(), symbol);
-                    final String name = symbol.fullname.toString();
-                    timing[name] = System.currentTimeMillis() - now;
-                    if (symbol.outermostClass() == symbol)
-                        compileStates[env] = CompileStates.CompileState.ATTR;
-                }).toList();
-                envs.forEach(env -> {
-                    switch (env.tree.getTag()) {
-                        case MODULEDEF,
-                             PACKAGEDEF -> attr.attrib(env);
-                    }
-                });
-                await(futures);
-                return stopIfError(CompileStates.CompileState.ATTR, envs);
-            }
-            return stopIfError(CompileStates.CompileState.ATTR, dispatchQueue(envs, ParallelCompiler::attribute));
-        });
+        final Queue<Env<AttrContext>> queue;
+        if (envs == todo) {
+            dispatch("attribute", symbols, (compiler, symbol) -> {
+                final Env<AttrContext> env = enter.getEnv(symbol);
+                if (compileStates.isDone(env, ATTR))
+                    return;
+                if (shouldPushEvent())
+                    taskListener.started((Privilege) ((JavaCompiler) this).newAnalyzeTaskEvent(env));
+                ((Privilege) compiler.attr).attribClass(env.tree.pos(), symbol);
+                if (symbol.outermostClass() == symbol)
+                    compileStates[env] = ATTR;
+            });
+            envs.forEach(env -> {
+                switch (env.tree.getTag()) {
+                    case MODULEDEF,
+                         PACKAGEDEF -> attr.attrib(env);
+                }
+            });
+            return stopIfError(ATTR, envs);
+        } else
+            queue = stopIfError(ATTR, dispatchQueue("attribute", envs, ParallelCompiler::attribute));
         if (queue.nonEmpty()) {
-            runTask("attributeDone", () -> JavacContext.instance(DelayedContext.class).beforeAttributeDone(this));
-            if (errorCount() > 0 && !shouldStop(CompileStates.CompileState.ATTR))
-                dispatch(envs.stream(), (compiler, env) -> attr.postAttr(env.tree));
+            JavacContext.instance(DelayedContext.class).beforeAttributeDone(this);
+            if (errorCount() > 0 && !shouldStop(ATTR))
+                dispatch("postAttr", envs, (compiler, env) -> attr.postAttr(env.tree));
         }
         return queue;
     }
     
     @Override
-    public Queue<Env<AttrContext>> flow(final Queue<Env<AttrContext>> envs) = runTask("flow", () -> dispatchToQueue(envs, ParallelCompiler::flow));
+    public Queue<Env<AttrContext>> flow(final Queue<Env<AttrContext>> envs) = dispatchToQueue("flow", envs, ParallelCompiler::flow);
     
     ConcurrentHashMap<Env<AttrContext>, Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>>> desugaredEnvs = { };
     
@@ -625,12 +653,12 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                 Assert.check(def.tail.isEmpty());
                 results += new Pair<>(env, (JCTree.JCClassDecl) def.head);
             }
-            compileStates[env] = CompileStates.CompileState.LOWER;
+            compileStates[env] = LOWER;
         } finally { log.useSource(prev); }
     }
     
-    public void translateTypes(final Stream<Symbol.ClassSymbol> symbols, final ConcurrentLinkedQueue<CompletableFuture<Void>> futures, final Function<Symbol.ClassSymbol, Stream<Symbol.ClassSymbol>> derivedFunction)
-        = dispatch(symbols, (compiler, symbol) -> {
+    public void translateTypes(final Collection<Symbol.ClassSymbol> symbols, final ConcurrentLinkedQueue<CompletableFuture<Void>> futures, final Function<Symbol.ClassSymbol, Collection<Symbol.ClassSymbol>> derivedFunction)
+        = dispatchAsync(symbols, (compiler, symbol) -> {
             final Env<AttrContext> env = enter.getEnv(symbol);
             final JavaFileObject prev = compiler.log.useSource(symbol.sourcefile != null ? symbol.sourcefile : env.toplevel.sourcefile);
             final TreeMaker localMake = ((Privilege) compiler.make).at(Position.FIRSTPOS).forToplevel(env.toplevel);
@@ -639,16 +667,16 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                 (Privilege) (transTypes.make = localMake);
                 (Privilege) (transTypes.pt = null);
                 transTypes.translateClass(symbol, env);
-                compileStates[env] = CompileStates.CompileState.TRANSTYPES;
+                compileStates[env] = TRANSTYPES;
             } finally { compiler.log.useSource(prev); }
-            final @Nullable Stream<Symbol.ClassSymbol> derived = derivedFunction[symbol];
+            final @Nullable Collection<Symbol.ClassSymbol> derived = derivedFunction[symbol];
             if (derived != null)
                 translateTypes(derived, futures, derivedFunction);
         }).forEach(futures::add);
     
-    public <T> void translate(final Queue<Env<AttrContext>> envs, final Predicate<Env<AttrContext>> predicate = _ -> true, final Function<Context, T> translator,
+    public <T> void translate(final String name, final Queue<Env<AttrContext>> envs, final Predicate<Env<AttrContext>> predicate = _ -> true, final Function<Context, T> translator,
             final Function4<T, Env<AttrContext>, JCTree, TreeMaker, JCTree> translate, final CompileStates.CompileState state)
-        = await(dispatch(envs.stream(), (compiler, env) -> {
+        = dispatch(name, envs, (compiler, env) -> {
             if (predicate.test(env)) {
                 final JavaFileObject prev = compiler.log.useSource(env.enclClass.sym.sourcefile != null ? env.enclClass.sym.sourcefile : env.toplevel.sourcefile);
                 final TreeMaker localMake = ((Privilege) compiler.make).at(Position.FIRSTPOS).forToplevel(env.toplevel);
@@ -657,22 +685,22 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                     compileStates[env] = state;
                 } finally { compiler.log.useSource(prev); }
             }
-        }));
+        });
     
     public void translateLower(final Queue<Env<AttrContext>> envs, final Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> results)
-        = await(dispatch(envs.stream(), (compiler, env) -> {
+        = dispatch("lower", envs, (compiler, env) -> {
             final JavaFileObject prev = compiler.log.useSource(env.enclClass.sym.sourcefile != null ? env.enclClass.sym.sourcefile : env.toplevel.sourcefile);
             final TreeMaker localMake = ((Privilege) compiler.make).at(Position.FIRSTPOS).forToplevel(env.toplevel);
             try {
                 ((Privilege) compiler.lower).translateTopLevelClass(env, env.tree, localMake).stream()
                         .map(classDecl -> new Pair<>(env, (JCTree.JCClassDecl) classDecl))
                         .forEach(results::add);
-                compileStates[env] = CompileStates.CompileState.LOWER;
+                compileStates[env] = LOWER;
             } finally { compiler.log.useSource(prev); }
-        }));
+        });
     
     @Override
-    public Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> desugar(final Queue<Env<AttrContext>> envs) = runTask("desugar", () -> {
+    public Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> desugar(final Queue<Env<AttrContext>> envs) {
         final ConcurrentLinkedQueue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> result = { };
         if (envs.isEmpty())
             return result;
@@ -682,8 +710,8 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
         if (!modules.multiModuleMode)
             stream = stream.filter(env -> env.toplevel.modle == modules.getDefaultModule());
         stream = stream.filter(env -> {
-            if (compileStates.isDone(env, CompileStates.CompileState.LOWER)) {
-                result *= requireNonNull(desugaredEnvs[env]);
+            if (compileStates.isDone(env, LOWER)) {
+                result *= desugaredEnvs[env]!;
                 return false;
             }
             if (env.tree.hasTag(PACKAGEDEF) || env.tree.hasTag(MODULEDEF)) {
@@ -693,16 +721,16 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
             return true;
         });
         final Queue<Env<AttrContext>> queue = stream.collect(Collectors.toCollection(LinkedList::new));
-        if (shouldStop(CompileStates.CompileState.TRANSTYPES))
+        if (shouldStop(TRANSTYPES))
             return new ConcurrentLinkedQueue<>();
-        final Map<Env<AttrContext>, NestedScanner> scanners = dispatch(queue.stream(),
+        final Map<Env<AttrContext>, NestedScanner> scanners = dispatch("desugar-scan", queue,
                 (compiler, env) -> new NestedScanner(compiler.context, env).let(scanner -> scanner.scan(env.tree)), Collectors.toMap(NestedScanner::env, Function.identity()));
         {
             final Queue<Env<AttrContext>> dependencies = scanners.values().stream()
                     .map(NestedScanner::dependencies)
                     .flatMap(Collection::stream)
                     .distinct()
-                    .filter(env -> !compileStates.isDone(env, CompileStates.CompileState.FLOW))
+                    .filter(env -> !compileStates.isDone(env, FLOW))
                     .collect(Collectors.toCollection(ConcurrentLinkedQueue::new));
             // The normal compilation process should not enter this branch, this is just a cover for unexpected calls
             if (!dependencies.isEmpty()) {
@@ -710,26 +738,26 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                 dependencies.stream().filterNot(new HashSet<>(envs)::contains).forEach(queue::add);
             }
         }
-        if (shouldStop(CompileStates.CompileState.TRANSTYPES))
+        if (shouldStop(TRANSTYPES))
             return new ConcurrentLinkedQueue<>();
-        runTask("translateTypes", () -> {
+        {
             final Set<Symbol.ClassSymbol> symbols = scanners.values().stream().map(NestedScanner::symbols).flatMap(Collection::stream).collect(Collectors.toSet());
             final ArrayList<Symbol.ClassSymbol> roots = { };
             final HashMap<Symbol.ClassSymbol, ArrayList<Symbol.ClassSymbol>> dependencies = { };
             symbols.forEach(classSymbol -> types.supertype(classSymbol.type).tsym instanceof Symbol.ClassSymbol superClassSymbol && symbols[superClassSymbol] ?
                                                    dependencies.computeIfAbsent(superClassSymbol, _ -> new ArrayList<>()) : roots += classSymbol);
-            awaitRecursion(futures -> translateTypes(roots.stream(), futures, symbol -> dependencies[symbol]?.stream() ?? null));
-        });
-        if (shouldStop(CompileStates.CompileState.TRANSLITERALS))
+            dispatchTask("desugar-translateTypes", symbols.size(), () -> awaitRecursion(futures -> translateTypes(roots, futures, dependencies::get)));
+        }
+        if (shouldStop(TRANSLITERALS))
             return new ConcurrentLinkedQueue<>();
-        runTask("translateLiterals", () -> translate(queue, TransLiterals::instance, TransLiterals::translateTopLevelClass, CompileStates.CompileState.TRANSLITERALS));
-        if (shouldStop(CompileStates.CompileState.TRANSPATTERNS))
+        translate("desugar-translateLiterals", queue, TransLiterals::instance, TransLiterals::translateTopLevelClass, TRANSLITERALS);
+        if (shouldStop(TRANSPATTERNS))
             return new ConcurrentLinkedQueue<>();
-        runTask("translatePatterns", () -> translate(queue, env -> requireNonNull(scanners[env]).hasPatterns(), TransPatterns::instance, TransPatterns::translateTopLevelClass, CompileStates.CompileState.TRANSPATTERNS));
-        if (shouldStop(CompileStates.CompileState.UNLAMBDA))
+        translate("desugar-translatePatterns", queue, env -> scanners[env]!.hasPatterns(), TransPatterns::instance, TransPatterns::translateTopLevelClass, TRANSPATTERNS);
+        if (shouldStop(UNLAMBDA))
             return new ConcurrentLinkedQueue<>();
-        runTask("unlambda", () -> translate(queue, env -> requireNonNull(scanners[env]).hasLambdas(), LambdaToMethod::instance, LambdaToMethod::translateTopLevelClass, CompileStates.CompileState.TRANSPATTERNS));
-        if (shouldStop(CompileStates.CompileState.LOWER))
+        translate("desugar-unlambda", queue, env -> scanners[env]!.hasLambdas(), LambdaToMethod::instance, LambdaToMethod::translateTopLevelClass, UNLAMBDA);
+        if (shouldStop(LOWER))
             return new ConcurrentLinkedQueue<>();
         if (sourceOutput)
             scanners.values().stream()
@@ -737,34 +765,23 @@ public class DispatchCompiler extends JavaCompiler implements AutoCloseable {
                     .map(scanner -> new Pair<>(scanner.env(), (JCTree.JCClassDecl) scanner.env().tree))
                     .forEach(result::add);
         else
-            runTask("lower", () -> translateLower(queue, result));
+            translateLower(queue, result);
         return result;
-    });
+        
+    }
     
     @Override
     public void generate(final Queue<Pair<Env<AttrContext>, JCTree.JCClassDecl>> queue, final @Nullable Queue<JavaFileObject> results) {
         if (incrementalContext != null)
-            runTask("incremental-collect", () -> dispatch(queue.stream().map(pair -> pair.snd), (compiler, classDecl) -> classDecl.accept(IncrementalScanner.instance(compiler.context))));
+            dispatch("incremental-collect", queue.stream().map(pair -> pair.snd).toList(), (compiler, classDecl) -> classDecl.accept(IncrementalScanner.instance(compiler.context)));
         final @Nullable Queue<JavaFileObject> delegateQueue = results == null ? null : new ConcurrentLinkedQueue<>();
-        runTask("generate", () -> await(queue.stream().map(source -> {
+        dispatch("generate", queue, (compiler, pair) -> {
             final LinkedList<Pair<Env<AttrContext>, JCTree.JCClassDecl>> wrapper = { };
-            wrapper << source;
-            return dispatch(compiler -> compiler.generate(wrapper, delegateQueue));
-        })));
+            wrapper << pair;
+            compiler.generate(wrapper, delegateQueue);
+        });
         // noinspection DataFlowIssue
         results?.addAll(delegateQueue);
-    }
-    
-    private static <T> T runTask(final String name, final Supplier<T> task) {
-        try {
-            return DebugHelper.logTimeConsuming(name, task);
-        } finally { VarHandle.fullFence(); }
-    }
-    
-    private static void runTask(final String name, final Runnable task) {
-        try {
-            DebugHelper.logTimeConsuming(name, task);
-        } finally { VarHandle.fullFence(); }
     }
     
 }

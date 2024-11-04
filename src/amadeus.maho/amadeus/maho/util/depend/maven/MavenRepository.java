@@ -33,11 +33,12 @@ import amadeus.maho.util.build.Module;
 import amadeus.maho.util.container.MapTable;
 import amadeus.maho.util.data.XML;
 import amadeus.maho.util.depend.CacheableHttpRepository;
-import amadeus.maho.util.depend.RepositoryFileNotFoundException;
 import amadeus.maho.util.depend.JarRequirements;
 import amadeus.maho.util.depend.Project;
 import amadeus.maho.util.depend.Repository;
+import amadeus.maho.util.depend.RepositoryFileNotFoundException;
 import amadeus.maho.util.link.http.HttpSetting;
+import amadeus.maho.util.logging.LogLevel;
 import amadeus.maho.util.misc.Environment;
 import amadeus.maho.util.runtime.ArrayHelper;
 import amadeus.maho.util.runtime.ObjectHelper;
@@ -234,7 +235,7 @@ public class MavenRepository extends CacheableHttpRepository {
                 super.visitTagEnd(tag);
             }
             
-            public VersionInfo result() = { latest, release, lastUpdated, versions.toArray(String[]::new) };
+            public VersionInfo result() = { latest!, release!, lastUpdated!, versions.toArray(String[]::new) };
             
         }
         
@@ -263,13 +264,13 @@ public class MavenRepository extends CacheableHttpRepository {
                     case "dependency" -> {
                         if (!Boolean.parseBoolean(optional)) {
                             boolean compile = false, runtime = false;
-                            switch (scope = scope == null ? "compile" : scope) {
+                            switch (scope ?? "compile") {
                                 case "compile" -> compile = runtime = true;
                                 case "provided"-> compile = true;
                                 case "runtime" -> runtime = true;
                             }
                             if (compile || runtime) {
-                                final Project project = { group, artifact, version ?? "+" };
+                                final Project project = { group!, artifact!, version ?? "+" };
                                 final Project.Dependency dependency = { project, compile, runtime };
                                 dependencies += dependency;
                             }
@@ -351,6 +352,8 @@ public class MavenRepository extends CacheableHttpRepository {
             final String relativeChecksum = cache.checksum(MD5), actualChecksum = readMD5(downloadDataFormRemote(relative << MD5_SUFFIX, cache << MD5_SUFFIX, true));
             if (!relativeChecksum.equalsIgnoreCase(actualChecksum))
                 throw new IllegalStateException(STR."relative=\{cache}, checksum=\{relativeChecksum}, actual=\{actualChecksum}");
+            else
+                setting().logger()[LogLevel.DEBUG] = STR."Checksum verified: \{cache} (\{relativeChecksum})";
         }
     }
     
